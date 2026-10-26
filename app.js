@@ -930,13 +930,17 @@ async function doSync() {
   paintSync();
 }
 
+/** El estado de sincronización vive en el botón flotante: ruedita azul mientras sincroniza, puntito verde si está al día. */
+const SYNC_LABEL = { offline: 'sin conexión', syncing: 'sincronizando', pending: 'por sincronizar', ok: 'al día' };
 function paintSync() {
-  const el = $('#sync');
-  if (!el) return;
+  const d = $('#dock');
+  if (!d) return;
   const offline = !navigator.onLine;
   const pending = state.dirty || state.syncState === 'error';
-  el.dataset.state = offline ? 'offline' : state.syncState === 'syncing' ? 'syncing' : pending ? 'pending' : 'ok';
-  el.textContent = offline ? 'Sin conexión' : state.syncState === 'syncing' ? 'Sincronizando' : pending ? 'Por sincronizar' : 'Al día';
+  const st = offline ? 'offline' : state.syncState === 'syncing' ? 'syncing' : pending ? 'pending' : 'ok';
+  d.dataset.sync = st;
+  const btn = d.querySelector('.dock-btn');
+  if (btn && btn.dataset.name) btn.setAttribute('aria-label', `Menú (${btn.dataset.name}), ${SYNC_LABEL[st]}${hasUnreadNews() ? ', hay novedades' : ''}`);
 }
 
 /* ───────────────────────── descargas ───────────────────────── */
@@ -1330,7 +1334,6 @@ function header(title, { actions = '', overlay = false } = {}) {
     <button class="icon-btn" data-act="back" aria-label="Volver">${ICON.back}</button>
     <button class="icon-btn" data-act="home" aria-label="Inicio">${ICON.home}</button>
     <h1 class="bar-title">${title}</h1>
-    <span id="sync" class="sync" data-state="ok"></span>
     ${actions}
   </header>`;
 }
@@ -1389,8 +1392,9 @@ function paintDock() {
   if (!show) { closeDock(); return; }
   const p = visibleProfiles().find((x) => x.id === state.profile.id) || state.profile;
   const btn = dock.querySelector('.dock-btn');
-  btn.innerHTML = `${avatarHTML(p, 'dock-avatar')}<span class="dock-dots" aria-hidden="true"><i></i><i></i><i></i></span>`;
-  btn.setAttribute('aria-label', `Menú (${p.name})${hasUnreadNews() ? ', hay novedades' : ''}`);
+  btn.innerHTML = `${avatarHTML(p, 'dock-avatar')}<span class="dock-ring" aria-hidden="true"></span><span class="dock-state" aria-hidden="true"></span>`;
+  btn.dataset.name = p.name;
+  paintSync();
   paintNewsDot();
   if (!dock.querySelector('.dock-panel').hidden) fillDock();
 }
@@ -1855,7 +1859,6 @@ function tvTop() {
       <p class="tv-clock" id="tv-clock">${clockHTML()}</p>
     </div>
     <div class="tv-top-tools">
-      <span id="sync" class="sync" data-state="ok"></span>
       <button class="tv-icon" data-act="home-search" aria-label="Buscar" aria-expanded="false">${ICON.search}</button>
     </div>
   </header>

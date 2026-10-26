@@ -148,12 +148,6 @@ svg.solid, svg .solid { fill: currentColor; stroke: none; }
 }
 .bar.is-overlay .bar-title { margin: 0 auto 0 0; }
 
-.sync { font-size: 12px; color: var(--dim); display: inline-flex; align-items: center; gap: 6px; margin-right: 4px; }
-.sync::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
-.sync[data-state='ok'] { font-size: 0; gap: 0; }
-.sync[data-state='syncing']::before { background: var(--accent); animation: pulse 1s ease-in-out infinite alternate; }
-.sync[data-state='pending']::before { background: var(--accent); }
-.sync[data-state='offline']::before { background: var(--faint); }
 @keyframes pulse { to { opacity: 0.3; } }
 
 main { padding: 6px var(--gutter) calc(48px + env(safe-area-inset-bottom)); max-width: 1000px; margin: 0 auto; }
@@ -789,8 +783,15 @@ html.kai-fs-on .dock, html.kai-fs-on .ambi { display: none; }
   opacity: 0.62; transition: opacity 0.2s, transform 0.2s;
 }
 .dock-btn .dock-avatar { width: 40px; height: 40px; font-size: 17px; }
-.dock-dots { position: absolute; right: -2px; bottom: -2px; display: flex; gap: 2px; padding: 4px 5px; border-radius: 999px; background: var(--glass-solid); border: 1px solid var(--glass-edge); }
-.dock-dots i { width: 3px; height: 3px; border-radius: 50%; background: var(--text); }
+/* sincronización: ruedita azul alrededor mientras sincroniza; puntito abajo a la derecha (verde al día, azul por sincronizar, gris sin conexión) */
+.dock-ring { position: absolute; inset: -4px; border-radius: 50%; border: 2.5px solid transparent; border-top-color: var(--accent); border-right-color: color-mix(in srgb, var(--accent) 45%, transparent); display: none; animation: dock-spin 0.9s linear infinite; pointer-events: none; }
+.dock[data-sync='syncing'] .dock-ring { display: block; }
+@keyframes dock-spin { to { transform: rotate(360deg); } }
+.dock-state { position: absolute; right: 1px; bottom: 1px; width: 11px; height: 11px; border-radius: 50%; background: var(--ok); border: 2px solid var(--bg); pointer-events: none; }
+.dock[data-sync='syncing'] .dock-state { display: none; }
+.dock[data-sync='pending'] .dock-state { background: var(--accent); }
+.dock[data-sync='offline'] .dock-state { background: var(--faint); }
+@media (prefers-reduced-motion: reduce) { .dock-ring { animation-duration: 2.4s; } }
 @media (hover: hover) { .dock-btn:hover { opacity: 1; transform: scale(1.05); } }
 .dock-btn:focus-visible, .dock.is-open .dock-btn { opacity: 1; }
 body.is-playing:not(:has(.dock.is-open)) .dock-btn { opacity: 0.32; }
