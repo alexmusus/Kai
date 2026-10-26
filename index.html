@@ -87,6 +87,18 @@
     <div class="dock-panel" role="menu" hidden></div>
     <button class="dock-btn" data-act="dock" aria-expanded="false" aria-haspopup="menu" aria-label="Menú"></button>
   </nav>
+  <!-- Mini reproductor: el mismo video sigue aquí mientras navegas por Kai. -->
+  <div id="mini" class="mini" role="region" aria-label="Mini reproductor" hidden>
+    <div class="mini-video" id="mini-slot">
+      <button class="mini-open" data-act="mini-open" aria-label="Volver al reproductor"></button>
+    </div>
+    <button class="mini-text" data-act="mini-open"><span class="mini-title" id="mini-title"></span><span class="mini-sub" id="mini-sub"></span></button>
+    <button class="mini-btn" id="mini-toggle" data-act="mini-toggle" aria-label="Pausar"></button>
+    <button class="mini-btn" data-act="mini-close" aria-label="Cerrar el reproductor">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+    <span class="mini-progress" aria-hidden="true"><i></i></span>
+  </div>
   <div id="sheet" class="sheet" hidden></div>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 </body>

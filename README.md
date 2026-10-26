@@ -35,13 +35,28 @@ Anime/
 - En la raíz de tu MEGA, Kai guarda `.kai-compartido.json` (perfiles, intros aprendidas, imágenes elegidas) y un `.kai-progreso-….json` por perfil. No los borres.
 - Desde **Explorar MEGA** puedes reproducir cualquier video de tu cuenta, aunque no esté en la carpeta de series.
 
+### Películas
+
+Una carpeta llamada `Peliculas` (o `Películas`, `Movies`) dentro de `Anime` se trata como colección, no como serie:
+
+```
+Anime/
+  Peliculas/
+    1. Fate Heaven's Feel I/
+      archivo.mp4
+    2. Your Name/
+      archivo.mp4
+```
+
+Kai busca cada película por separado en AniList, usando el nombre de su subcarpeta (pon el título real para que acierte). La colección se muestra con un mosaico de los pósters y un texto con la lista de películas. Cada película aparece con su título y su imagen. Si prefieres una sola imagen para la colección, en su página toca **Cambiar imagen**.
+
 ## Perfiles
 
 Al abrir Kai eliges quién está viendo. Cada perfil tiene su propio progreso, su "Continuar viendo" y sus avisos de capítulos nuevos. Los perfiles se guardan en tu MEGA, así que aparecen en todos los dispositivos. Para cambiar de perfil, abre el botón flotante (tu inicial, abajo a la derecha) y toca tu nombre. Si creas un perfil con un nombre que ya existe, Kai entra al que ya estaba; y si por alguna razón quedaron dos perfiles con el mismo nombre, se juntan solos, con su progreso.
 
 ## Portadas y sinopsis
 
-Kai busca cada serie en AniList (una base de datos de anime gratuita) usando el nombre de la carpeta y de la temporada, y trae imagen de fondo, póster, año, géneros y sinopsis. Si eligió mal, en la página de la serie toca **Cambiar imagen** y escoge otra; la elección se guarda para todos. La sinopsis viene en inglés: en Chrome reciente se traduce sola o con **Traducir sinopsis al español**. Con nombres de carpeta completos ("Fate stay night Unlimited Blade Works") acierta mucho más.
+Kai busca cada serie en AniList (una base de datos de anime gratuita) usando el nombre de la carpeta y de la temporada, y trae imagen de fondo, póster, año, géneros y sinopsis. Las tarjetas de los capítulos usan esa misma imagen con el número del capítulo encima, en vez de un fotograma de cada video (así no hay que pedirle una miniatura a MEGA por cada capítulo). Si eligió mal, en la página de la serie toca **Cambiar imagen** y escoge otra; la elección se guarda para todos. La sinopsis viene en inglés: en Chrome reciente se traduce sola o con **Traducir sinopsis al español**. Con nombres de carpeta completos ("Fate stay night Unlimited Blade Works") acierta mucho más.
 
 ## Menú
 
@@ -73,14 +88,26 @@ Toca la flecha de un capítulo para guardarlo en el dispositivo. Al terminar de 
 
 **Varios a la vez:** en la página de la serie toca **Seleccionar** junto a "Episodios", marca los capítulos que quieras (o **Todos** / **Sin ver**) y toca **Descargar**. Se bajan uno tras otro, en orden. Los que ya están descargados no se pueden marcar.
 
-### Guardar las descargas en una carpeta (Chrome y Edge en computadora)
+### Guardar las descargas en una carpeta (Chrome y Edge, en computadora y Android)
 
-En **Ajustes → Descargas → Elegir carpeta** escoges una carpeta de tu PC o Mac. Desde ahí, cada capítulo queda como un MP4 normal en `Tu carpeta/Serie/Temporada/archivo.mp4` (lo puedes abrir con VLC u otro reproductor), y lo que ya tenías descargado se pasa a esa carpeta. Mientras baja, el capítulo se guarda primero dentro de la app (para poder reanudar) y al terminar se mueve.
+En **Ajustes → Descargas → Elegir carpeta** escoges una carpeta de tu PC, Mac o teléfono Android. En Android, mejor crea una subcarpeta (por ejemplo `Download/Kai`) y elige esa: Android no deja usar algunas carpetas principales. Desde ahí, cada capítulo queda como un MP4 normal en `Tu carpeta/Serie/Temporada/archivo.mp4` (lo puedes abrir con VLC u otro reproductor), y lo que ya tenías descargado se pasa a esa carpeta. Mientras baja, el capítulo se guarda primero dentro de la app (para poder reanudar) y al terminar se mueve.
 
 - Al cerrar el navegador, Chrome puede volver a pedir permiso para la carpeta. Kai lo pide solo cuando tocas descargar o reproducir; también hay un botón **Permitir acceso** en Ajustes y en Descargados. Si Chrome ofrece "Permitir en cada visita", elígelo y no vuelve a preguntar.
 - Si borras un archivo a mano, Kai lo nota al intentar reproducirlo.
 - **Quitar del dispositivo** (o terminar el capítulo, si está activado) borra el archivo de la carpeta y la carpeta de la temporada si queda vacía.
 - **Safari (Mac y iPhone) y Firefox no permiten que una página guarde en una carpeta.** Ahí las descargas siguen dentro de la app. Si quieres una copia aparte, toca ⋯ en un capítulo descargado → **Guardar copia en el dispositivo** (en iPhone queda en la app Archivos → Descargas). Esa copia es para otros reproductores: Kai no la lee de vuelta.
+
+## Mini reproductor
+
+Si sales de la página del reproductor mientras ves algo (con la flecha de volver, el menú o cualquier enlace), el video sigue en un mini reproductor abajo a la derecha (en el teléfono, una barra abajo). Tócalo para volver a verlo en grande, sin que se reinicie. Tiene pausa y una ✕ para cerrarlo. Si termina el capítulo, sigue el siguiente ahí mismo.
+
+En el teléfono, deslizar el video hacia abajo lo manda al mini reproductor. En la computadora, si usas la ventana flotante del navegador y tocas "volver a la pestaña", Kai vuelve al reproductor grande.
+
+## Reproductor más rápido
+
+- Lo que ya se bajó de un capítulo queda en memoria mientras lo ves: retroceder, "Volver a la intro" o regresar a una parte vista es instantáneo y no gasta cuota de MEGA.
+- Kai pide varias partes del video a la vez (MEGA limita la velocidad por conexión), así que adelantar a una parte nueva tarda bastante menos.
+- En los últimos minutos de un capítulo prepara el inicio del siguiente (unos 3 MB), para que empiece sin espera. Se puede apagar en Ajustes.
 
 ## En iPhone
 
@@ -105,8 +132,9 @@ En el teléfono, sobre el video:
 
 - Un toque muestra u oculta los controles.
 - Doble toque a la derecha o a la izquierda salta 10 s; cada toque rápido extra suma otros 10 s.
-- Deslizar arriba o abajo (en cualquier lado) cambia el brillo del video. Es el brillo de la imagen, no el de la pantalla del teléfono, que una página web no puede cambiar. Se recuerda en cada dispositivo.
 - Mantener presionado reproduce a 2× mientras no sueltes.
+- Con el video en la página: deslizar hacia abajo lo manda al mini reproductor y hacia arriba lo pone en pantalla completa.
+- En pantalla completa: deslizar arriba o abajo (en cualquier lado) cambia el brillo del video. Es el brillo de la imagen, no el de la pantalla del teléfono, que una página web no puede cambiar. Se recuerda en cada dispositivo.
 - Para desplazar la página, desliza fuera del video.
 
 ## Actualizar la app

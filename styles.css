@@ -372,7 +372,8 @@ body.lights-off .bar { z-index: 1; }
   transition: opacity 0.25s, transform 0.25s;
 }
 .stage:not(:fullscreen) .st-bar { bottom: 10px; }
-.stage.is-idle .st-bar { opacity: 0; transform: translateY(8px); pointer-events: none; }
+.stage.is-idle .st-bar { opacity: 0; transform: translateY(8px); pointer-events: none; visibility: hidden; transition: opacity 0.25s, transform 0.25s, visibility 0s 0.25s; }
+/* oculta de verdad (no solo transparente) para que el desenfoque del vidrio no se calcule sobre el video en movimiento */
 .stage.is-idle .st-skip:not(.is-sticky) { opacity: 0; pointer-events: none; }
 .st-row { display: flex; align-items: center; gap: 0; }
 .st-gap { flex: 1; min-width: 4px; }
@@ -1007,3 +1008,53 @@ body.lights-off .ambi.is-on { opacity: 0.8; }
   .tv-hero .tv-alt { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .tv-hero .tv-facts { max-height: 64px; overflow: hidden; }
 }
+
+/* colección de películas: mosaico de pósters, cada uno a su tamaño (nunca estirados) */
+.collage { display: grid; gap: 2px; background: var(--thumb-bg, #111); overflow: hidden; }
+.collage img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.collage.n2 { grid-template-columns: 1fr 1fr; }
+.collage.n3 { grid-template-columns: 1fr 1fr 1fr; }
+.collage.n4 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+.tile .collage.tile-img.n4 { grid-template-columns: repeat(4, 1fr); grid-template-rows: 1fr; }
+.hero-poster.is-collage .collage, .poster.is-collage .collage { position: absolute; inset: 0; }
+.poster.is-collage { padding: 0; }
+.banner.is-collage { display: flex; gap: 2px; background: var(--thumb-bg, #111); justify-content: center; overflow: hidden; }
+.banner.is-collage img { position: static; flex: 0 0 auto; width: auto; height: 100%; aspect-ratio: 2 / 3; object-fit: cover; }
+/* tarjeta de capítulo con la imagen del anime: un velo para que el número se lea */
+.ep-thumb.is-art img { filter: saturate(1.05); }
+.ep-thumb.is-art::after { background: linear-gradient(180deg, rgba(0, 0, 0, 0.05) 30%, rgba(0, 0, 0, 0.6) 100%); }
+
+/* ───────── mini reproductor ───────── */
+.mini {
+  position: fixed; z-index: 28; right: max(18px, env(safe-area-inset-right)); bottom: calc(18px + env(safe-area-inset-bottom));
+  width: 340px; display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 2px;
+  padding: 8px 8px 10px; border-radius: 22px; overflow: hidden;
+  background: var(--glass-solid); box-shadow: inset 0 0 0 1px var(--glass-edge), inset 0 1px 0 var(--glass-hi), 0 22px 60px var(--shadow);
+  -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur);
+  animation: mini-in 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.mini[hidden] { display: none; }
+@keyframes mini-in { from { opacity: 0; transform: translateY(16px) scale(0.96); } }
+.mini-video { grid-column: 1 / -1; position: relative; border-radius: 14px; overflow: hidden; background: #000; aspect-ratio: 16 / 9; margin-bottom: 6px; }
+.mini-video .stage { position: absolute; inset: 0; width: 100%; height: 100%; max-height: none; aspect-ratio: auto; border-radius: 0; box-shadow: none; transform: none !important; opacity: 1 !important; }
+.stage.is-mini > :not(video) { display: none !important; }
+.mini-open { position: absolute; inset: 0; z-index: 2; cursor: pointer; background: transparent; }
+.mini-text { display: grid; min-width: 0; text-align: left; padding: 2px 6px; }
+.mini-title { font-weight: 650; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mini-sub { font-size: 12px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mini-btn { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 12px; color: var(--text); }
+.mini-btn:hover { background: var(--glass); }
+.mini-btn svg { width: 20px; height: 20px; }
+.mini-progress { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: var(--line); }
+.mini-progress i { position: absolute; left: 0; top: 0; bottom: 0; width: var(--mp, 0%); background: var(--accent); }
+/* lo flotante se acomoda arriba del mini reproductor */
+html.has-mini { --mini-space: 262px; }
+html.has-mini .dock { bottom: calc(18px + var(--mini-space) + env(safe-area-inset-bottom)); }
+html.has-mini .pick-bar, html.has-mini .toast { bottom: calc(18px + var(--mini-space) + env(safe-area-inset-bottom)); }
+@media (max-width: 600px) {
+  /* en el teléfono: una barra delgada con el video a la izquierda */
+  .mini { left: 8px; right: 8px; width: auto; grid-template-columns: 112px 1fr auto auto; gap: 4px; padding: 6px 6px 8px; border-radius: 16px; }
+  .mini-video { grid-column: auto; margin: 0; border-radius: 10px; }
+  html.has-mini { --mini-space: 76px; }
+}
+html.has-mini body { padding-bottom: var(--mini-space); }

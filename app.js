@@ -143,6 +143,14 @@ export function seasonInfo(name) {
 }
 
 function episodeLabel(ep) {
+  const e = index.byId.get(ep.id);
+  const s = e && state.library && state.library.series && state.library.series[e.si];
+  if (isCollection(s)) {
+    const it = itemFor(s, ep);
+    const m = itemMeta(s, it.key);
+    const t = it.title || (m && m.title) || ep.name.replace(/\.[^.]+$/, '');
+    return it.eps.length > 1 ? `${t} · parte ${it.eps.indexOf(ep) + 1}` : t;
+  }
   return ep.ep != null ? `Episodio ${ep.ep}` : ep.name.replace(/\.[^.]+$/, '');
 }
 
@@ -634,12 +642,17 @@ const filesNamed = (folder, name) => visibleChildren(folder).filter((c) => !c.di
 /** Lee un JSON de MEGA. Si no se puede leer, lanza error (nunca se confunde con "vacío"). Si está dañado, devuelve null. */
 async function readJson(n) {
   let text;
-  try {
-    text = await readNodeText({ id: n.nodeId, key: C.bytesToB64u(new Uint8Array(n.key)), size: n.size });
-  } catch (err) {
-    const e = new Error('No se pudo leer ' + n.name + ': ' + (err && err.message));
-    e.cause = err;
-    throw e;
+  // un fallo pasajero de MEGA se reintenta un par de veces; si sigue fallando, NUNCA se trata como vacío
+  for (let tries = 0; ; tries++) {
+    try {
+      text = await readNodeText({ id: n.nodeId, key: C.bytesToB64u(new Uint8Array(n.key)), size: n.size });
+      break;
+    } catch (err) {
+      if (tries < 2 && navigator.onLine && !(err && err.code === 'QUOTA')) { await sleep(1200 * (tries + 1)); continue; }
+      const e = new Error('No se pudo leer ' + n.name + ': ' + (err && err.message));
+      e.cause = err;
+      throw e;
+    }
   }
   try { return JSON.parse(text); } catch { return null; }
 }
@@ -957,7 +970,7 @@ async function localBlob(ep, ask = false) {
 }
 
 /* ── carpeta de descargas ──
- * Chrome y Edge en computadora dejan que la página escriba en una carpeta que tú eliges.
+ * Chrome y Edge (computadora y Android) dejan que la página escriba en una carpeta que tú eliges.
  * Cada capítulo se baja primero a la app (así se puede reanudar) y al terminar se pasa a la
  * carpeta como un MP4 normal (Serie/Temporada/archivo.mp4); la copia de la app se borra.
  * Safari (Mac y iPhone) y Firefox no lo permiten: ahí se puede guardar una copia aparte. */
@@ -1168,7 +1181,7 @@ function render() {
     setTint(si != null && state.library.series[si] ? seriesColor(state.library.series[si]) : null);
     renderWatch(arg);
   } else {
-    stopPlayback();
+    if (playing && video.currentSrc) enterMini(); else stopPlayback();
     setTint(null);
     if (view === 'serie') renderSeries(arg);
     else if (view === 'explorar') renderExplorer(arg);
@@ -1433,6 +1446,27 @@ async function ensureMeta() {
   try {
     for (const s of state.library.series) {
       const pick = state.shared.picks[s.name];
+      if (isCollection(s) && !pick) {
+        // cada película por separado; la carpeta no se busca
+        let failed = false;
+        for (const it of collectionItems(s)) {
+          const k = itemMetaKey(s, it.key);
+          const c = state.meta[k];
+          if (c && Date.now() - (c.at || 0) < 30 * 86400000) continue;
+          let m = null;
+          if (it.query) {
+            let list;
+            try { list = await searchAnime(it.query, 6); } catch (err) { console.warn('anilist', err); failed = true; break; }
+            m = list.find((x) => x.format === 'MOVIE') || list[0] || null;
+          }
+          state.meta[k] = m ? toMeta(m) : { none: true, id: 0, at: Date.now() };
+          changed = true;
+          saveMeta();
+          await sleep(400);
+        }
+        if (failed) break;
+        continue;
+      }
       const cur = state.meta[s.name];
       const stale = !cur || Date.now() - (cur.at || 0) > 30 * 86400000 || (pick && pick.id !== (cur.id || 0));
       if (!stale) continue;
@@ -1462,9 +1496,71 @@ async function ensureMeta() {
 
 function synopsisOf(m) { return m ? (m.synopsisEs || m.synopsis || '') : ''; }
 
+/* ── colecciones: una carpeta "Películas" no es una serie ──
+ * Cada película (subcarpeta, o archivo si están sueltos) se busca por separado en AniList,
+ * y la carpeta se muestra con un mosaico de sus pósters y un texto propio. */
+const COLLECTION_RE = /^(pel[ií]culas?|movies?|films?|filmes)$/i;
+const isCollection = (s) => !!s && COLLECTION_RE.test(String(s.name || '').trim());
+function cleanFileTitle(name) {
+  const t = String(name).replace(/\.[^.]+$/, '').replace(/[[(][^\])]*[\])]/g, ' ').replace(/[_.]+/g, ' ')
+    .replace(/\b(1080p|720p|480p|2160p|4k|x26[45]|hevc|aac|sub|subs|dub|latino|esp|spa|bd|bdrip|web|webrip)\b/gi, ' ')
+    .replace(/\s+/g, ' ').trim();
+  return /\p{L}{3}/u.test(t) ? t : '';
+}
+/** Las películas de una colección: { key, title, query, eps } */
+function collectionItems(s) {
+  const out = [];
+  for (const se of s.seasons) {
+    if (se.name) out.push({ key: se.name, title: se.title || se.name, query: se.title || se.name, eps: se.episodes });
+    else for (const ep of se.episodes) out.push({ key: baseName(ep.name), title: '', query: cleanFileTitle(ep.name), eps: [ep] });
+  }
+  return out;
+}
+const itemMetaKey = (s, key) => `${s.name}/${key}`; // un nombre de carpeta nunca lleva "/"
+function itemFor(s, ep) {
+  const e = index.byId.get(ep.id);
+  if (!e || !isCollection(s)) return null;
+  const se = s.seasons[e.ki];
+  return se && se.name ? { key: se.name, title: se.title || se.name, eps: se.episodes } : { key: baseName(ep.name), title: '', eps: [ep] };
+}
+function itemMeta(s, key) {
+  const m = state.meta[itemMetaKey(s, key)];
+  return m && !m.none ? m : null;
+}
+/** Lo que se muestra de una serie: lo de AniList, o para una colección, lo armado con sus películas. */
+function displayMeta(s) {
+  const m = metaFor(s);
+  if (m || !isCollection(s)) return m;
+  const items = collectionItems(s).map((it) => ({ ...it, m: itemMeta(s, it.key) }));
+  const named = items.map((it) => {
+    const t = it.title || (it.m && it.m.title) || '';
+    return t ? `${t}${it.m && it.m.year ? ` (${it.m.year})` : ''}` : '';
+  }).filter(Boolean);
+  const list = named.length > 1 ? `${named.slice(0, -1).join(', ')} y ${named[named.length - 1]}` : named[0] || '';
+  const text = `${items.length === 1 ? 'Una película' : `${items.length} películas`} de anime en tu MEGA${list ? `: ${list}` : ''}.`;
+  return {
+    collection: true, title: '', synopsis: text, synopsisEs: text,
+    collage: items.map((it) => it.m && it.m.cover).filter(Boolean).slice(0, 8),
+    color: (items.find((it) => it.m && it.m.color) || {}).m?.color || '',
+    format: 'Colección', count: items.length, genres: [],
+  };
+}
+function collageHTML(urls, cls = '') {
+  const u = urls.slice(0, 4);
+  return `<span class="collage n${u.length} ${cls}" aria-hidden="true">${u.map((x) => `<img src="${esc(x)}" alt="" loading="lazy" decoding="async">`).join('')}</span>`;
+}
+/** Imagen para la tarjeta de un capítulo: la del anime (o de la película), no un fotograma. */
+function episodeArt(ep) {
+  const e = index.byId.get(ep.id);
+  const s = e && state.library && state.library.series[e.si];
+  if (!s) return '';
+  const m = isCollection(s) && !metaFor(s) ? itemMeta(s, itemFor(s, ep).key) : metaFor(s);
+  return m ? m.banner || m.cover || '' : '';
+}
+
 /** Color de la serie para teñir el fondo de Kai (nunca una imagen estirada). */
 function seriesColor(s) {
-  const m = metaFor(s);
+  const m = displayMeta(s);
   return (m && m.color) || `hsl(${hue(s.name)} 45% 55%)`;
 }
 function setTint(color) {
@@ -1473,11 +1569,11 @@ function setTint(color) {
 }
 
 function tileHTML(s, si, { href, label = '', sub = '', pct = 0, badge = '' } = {}) {
-  const m = metaFor(s);
+  const m = displayMeta(s);
   const img = m && (m.banner || m.cover);
   const coverEp = s.all.find((e) => e.fa);
   return `<a class="tile" href="${href}" data-si="${si}" style="--h:${hue(s.name)}">
-    ${img ? `<img class="tile-img" src="${esc(img)}" alt="" loading="lazy" decoding="async">` : `<span class="tile-img is-fallback" ${coverEp ? `data-thumb="${esc(coverEp.id)}"` : ''}><span class="cover-glyph">${esc([...s.name.trim()][0] || '·')}</span></span>`}
+    ${m && m.collage && m.collage.length ? collageHTML(m.collage, 'tile-img') : img ? `<img class="tile-img" src="${esc(img)}" alt="" loading="lazy" decoding="async">` : `<span class="tile-img is-fallback" ${coverEp ? `data-thumb="${esc(coverEp.id)}"` : ''}><span class="cover-glyph">${esc([...s.name.trim()][0] || '·')}</span></span>`}
     ${badge ? `<span class="tile-badge">${esc(badge)}</span>` : ''}
     <span class="tile-text"><span class="tile-title">${esc(label || s.name)}</span>${sub ? `<span class="tile-sub">${esc(sub)}</span>` : ''}</span>
     ${pct ? `<span class="tile-bar"><span style="width:${pct}%"></span></span>` : ''}
@@ -1585,14 +1681,19 @@ function heroPlan(s) {
   return { next, label: next ? `${resume ? 'Continuar' : 'Ver'} ${episodeLabel(next)}` : 'Serie terminada', left: resume ? fmtLeft(np) : '' };
 }
 
+function countLabel(s, m) {
+  return m && m.collection ? plural(m.count, 'película', 'películas') : plural(s.all.length, 'capítulo', 'capítulos');
+}
 function heroInnerHTML(s, si) {
-  const m = metaFor(s);
+  const m = displayMeta(s);
   const plan = heroPlan(s);
   const fresh = newEpisodes(s).length;
-  const facts = [m && m.year, m && m.format, plural(s.all.length, 'capítulo', 'capítulos'), ...((m && m.genres) || [])].filter(Boolean);
+  const facts = [m && m.year, m && m.format, countLabel(s, m), ...((m && m.genres) || [])].filter(Boolean);
   const syn = synopsisOf(m);
   const coverEp = s.all.find((e) => e.fa);
-  const poster = m && m.cover
+  const poster = m && m.collage && m.collage.length
+    ? `<a class="hero-poster is-collage" href="#/serie/${si}" aria-hidden="true" tabindex="-1">${collageHTML(m.collage)}</a>`
+    : m && m.cover
     ? `<a class="hero-poster" href="#/serie/${si}" aria-hidden="true" tabindex="-1"><img src="${esc(m.cover)}" alt="" decoding="async"></a>`
     : (coverEp ? `<a class="hero-poster is-thumb" href="#/serie/${si}" aria-hidden="true" tabindex="-1"><span data-thumb="${esc(coverEp.id)}"></span></a>` : '');
   return `${poster}<div class="tvh-text"><h2 class="tv-title">${esc(s.name)}</h2>
@@ -1654,7 +1755,7 @@ function renderHome() {
       <section class="tv-hero" id="tv-hero">${heroInnerHTML(hs, heroSi)}</section>
       ${cont.length ? `<section class="tv-row"><h3 class="tv-row-title">Continuar viendo</h3><div class="tiles" role="list">
         ${cont.map((c) => tileHTML(c.series, siOf(c.series), {
-          href: '#/play/' + encodeURIComponent(c.ep.id),
+          href: '#/serie/' + siOf(c.series), // primero la página de la serie, con "Continuar" listo
           sub: `${episodeLabel(c.ep)}${c.p && c.p.t > 5 ? `, ${fmtLeft(c.p)}` : ''}`,
           pct: c.p && c.p.d ? Math.min(100, (c.p.t / c.p.d) * 100) : 0,
         })).join('')}
@@ -1684,25 +1785,28 @@ function renderSeries(arg) {
   if (!s) { go('#/'); return; }
   heroSi = si;
   heroUser = true;
-  const m = metaFor(s);
+  const m = displayMeta(s);
   const plan = heroPlan(s);
   const next = plan.next;
-  const ki = Math.min(currentSeason[s.name] ?? (next ? index.byId.get(next.id).ki : 0), s.seasons.length - 1);
-  const season = s.seasons[ki];
+  const flat = isCollection(s); // una colección muestra todas sus películas juntas, sin pestañas
+  const ki = flat ? 0 : Math.min(currentSeason[s.name] ?? (next ? index.byId.get(next.id).ki : 0), s.seasons.length - 1);
+  const season = flat ? { title: '', episodes: s.all } : s.seasons[ki];
   const fresh = new Set(newEpisodes(s).map((e) => e.id));
   const upcoming = next ? [next, ...nextUnseen(next, s.all, 2)].filter((x) => !state.saved.has(x.id)) : [];
-  const facts = [m && m.year, m && m.format, plural(s.all.length, 'capítulo', 'capítulos'), ...((m && m.genres) || [])].filter(Boolean);
+  const facts = [m && m.year, m && m.format, countLabel(s, m), ...((m && m.genres) || [])].filter(Boolean);
   const syn = synopsisOf(m);
   const coverEp = s.all.find((e) => e.fa);
   const seen = s.all.filter((e) => (prog(e) || {}).w).length;
+  const collage = m && m.collage && m.collage.length ? m.collage : null;
   setTint(seriesColor(s));
   app.innerHTML = header('', { overlay: true }) + `<div class="tv is-series">
     <div class="series-wash" aria-hidden="true">${m && m.cover ? `<img src="${esc(m.cover)}" alt="">` : ''}</div>
     <main class="tv-main series-main">
-      <section class="series-hero ${m && m.banner ? 'has-banner' : ''}">
-        ${m && m.banner ? `<div class="banner"><img src="${esc(m.banner)}" alt="" decoding="async"></div>` : ''}
+      <section class="series-hero ${(m && m.banner) || collage ? 'has-banner' : ''}">
+        ${collage ? `<div class="banner is-collage" aria-hidden="true">${Array.from({ length: Math.max(12, collage.length) }, (_, i) => collage[i % collage.length]).map((u) => `<img src="${esc(u)}" alt="" decoding="async">`).join('')}</div>`
+          : m && m.banner ? `<div class="banner"><img src="${esc(m.banner)}" alt="" decoding="async"></div>` : ''}
         <div class="series-top">
-          ${m && m.cover ? `<img class="poster" src="${esc(m.cover)}" alt="" decoding="async">` : (coverEp ? `<span class="poster is-thumb" data-thumb="${esc(coverEp.id)}"></span>` : '')}
+          ${collage ? `<span class="poster is-collage">${collageHTML(collage)}</span>` : m && m.cover ? `<img class="poster" src="${esc(m.cover)}" alt="" decoding="async">` : (coverEp ? `<span class="poster is-thumb" data-thumb="${esc(coverEp.id)}"></span>` : '')}
           <div class="series-info">
             <h2 class="tv-title">${esc(s.name)}</h2>
             ${m && m.title && m.title.toLowerCase() !== s.name.toLowerCase() ? `<p class="tv-alt">${esc(m.title)}${m.native ? ` <span lang="ja">${esc(m.native)}</span>` : ''}</p>` : ''}
@@ -1719,9 +1823,9 @@ function renderSeries(arg) {
       </section>
       <section class="ep-section">
         <div class="ep-head">
-          <h3 class="ep-heading">Episodios</h3>
+          <h3 class="ep-heading">${flat ? 'Películas' : 'Episodios'}</h3>
           <button class="pick-toggle" data-act="pick-mode" id="pick-toggle" aria-pressed="false">${ICON.check}<span>Seleccionar</span></button>
-          ${s.seasons.length > 1 ? `<nav class="seasons" aria-label="Temporadas">${s.seasons.map((se, i) => `<button class="season ${i === ki ? 'is-on' : ''}" data-act="season" data-i="${i}" aria-pressed="${i === ki}">${esc(se.num != null ? `Temporada ${se.num}` : se.name)}</button>`).join('')}</nav>` : ''}
+          ${!flat && s.seasons.length > 1 ? `<nav class="seasons" aria-label="Temporadas">${s.seasons.map((se, i) => `<button class="season ${i === ki ? 'is-on' : ''}" data-act="season" data-i="${i}" aria-pressed="${i === ki}">${esc(se.num != null ? `Temporada ${se.num}` : se.name)}</button>`).join('')}</nav>` : ''}
         </div>
         ${season.title && season.title !== s.name ? `<p class="season-title">${esc(season.title)}</p>` : ''}
         <ol class="episodes is-grid" id="season-eps">${season.episodes.map((ep) => episodeRow(ep, { fresh: fresh.has(ep.id), next: next && ep.id === next.id })).join('')}</ol>
@@ -1752,7 +1856,8 @@ let picking = null; // { si, ki, ids: Set } mientras se eligen capítulos
 
 function pickSeason() {
   const s = picking && state.library && state.library.series[picking.si];
-  return s ? s.seasons[picking.ki] || null : null;
+  if (!s) return null;
+  return isCollection(s) ? { episodes: s.all } : s.seasons[picking.ki] || null;
 }
 /** Se puede elegir lo que no está descargado ni en camino. */
 const pickable = (ep) => !state.saved.has(ep.id) && !state.dls[ep.id] && !state.queue.some((q) => q.ep.id === ep.id);
@@ -1865,6 +1970,9 @@ function dlButton(ep) {
 }
 
 function episodeRow(ep, { current = false, extra = '', fresh = false, next = false } = {}) {
+  const art = episodeArt(ep);
+  const e = index.byId.get(ep.id);
+  const movie = !!e && isCollection(state.library.series[e.si]);
   const p = prog(ep);
   const pct = p && p.d ? (p.w ? 100 : Math.min(100, (p.t / p.d) * 100)) : 0;
   const seen = !!(p && p.w);
@@ -1873,8 +1981,9 @@ function episodeRow(ep, { current = false, extra = '', fresh = false, next = fal
     : episodeStatus(ep);
   return `<li class="ep ${seen ? 'is-seen' : ''} ${current ? 'is-current' : ''} ${next ? 'is-next' : ''}" data-id="${esc(ep.id)}">
     <a class="ep-main" href="#/play/${encodeURIComponent(ep.id)}" ${current ? 'aria-current="true"' : ''}>
-      <span class="ep-thumb" ${ep.fa ? `data-thumb="${esc(ep.id)}"` : ''}>
-        <span class="ep-num" aria-hidden="true">${ep.ep != null ? esc(ep.ep) : '·'}</span>
+      <span class="ep-thumb ${art ? 'has-img is-art' : ''}" ${!art && ep.fa ? `data-thumb="${esc(ep.id)}"` : ''}>
+        ${art ? `<img src="${esc(art)}" alt="" loading="lazy" decoding="async">` : ''}
+        <span class="ep-num" aria-hidden="true">${movie ? '' : ep.ep != null ? esc(ep.ep) : '·'}</span>
         <span class="ep-flags">${fresh ? '<span class="ep-new">Nuevo</span>' : ''}${state.saved.has(ep.id) ? `<span class="ep-flag" title="Descargado">${ICON.saved}</span>` : ''}${seen ? `<span class="ep-flag is-seen" title="Visto">${ICON.check}</span>` : ''}</span>
         <span class="ep-play" aria-hidden="true">${ICON.play}</span>
         ${pct ? `<span class="mini-bar"><span style="width:${pct}%"></span></span>` : ''}
@@ -2003,6 +2112,7 @@ function renderSettings() {
       <label class="switch"><input type="checkbox" name="subs" ${s.subs !== 'off' ? 'checked' : ''}><span>Mostrar subtítulos cuando el capítulo los traiga</span></label>
       <label class="switch"><input type="checkbox" name="autoSkip" ${s.autoSkip ? 'checked' : ''}><span>Saltar intros solo cuando Kai sepa dónde están</span></label>
       <label class="switch"><input type="checkbox" name="ambient" ${s.ambient !== false ? 'checked' : ''}><span>Luz ambiental alrededor del video</span></label>
+      <label class="switch"><input type="checkbox" name="prefetchNext" ${s.prefetchNext !== false ? 'checked' : ''}><span>Preparar el siguiente capítulo para que empiece sin espera (usa unos 3 MB de MEGA)</span></label>
       <label class="switch"><input type="checkbox" name="autoRemoveLocal" ${s.autoRemoveLocal ? 'checked' : ''}><span>Quitar del dispositivo los capítulos que termine</span></label>
       <label class="switch"><input type="checkbox" name="trashOnFinish" ${s.trashOnFinish ? 'checked' : ''}><span>Mandar a la papelera de MEGA los capítulos que termine</span></label>
     </form>
@@ -2026,6 +2136,7 @@ function renderSettings() {
     s.subs = f.subs.checked ? 'on' : 'off';
     s.autoSkip = f.autoSkip.checked;
     s.ambient = f.ambient.checked;
+    s.prefetchNext = f.prefetchNext.checked;
     s.autoRemoveLocal = f.autoRemoveLocal.checked;
     s.trashOnFinish = f.trashOnFinish.checked;
     saveSettings();
@@ -2038,13 +2149,13 @@ function downloadsWhereHTML(perm = '') {
   if (!canFolder) {
     return `<p class="settings-label">Descargas</p>
       <p class="settings-value">Dentro de la app</p>
-      <p class="dim">Este navegador no deja que una página guarde en una carpeta (eso solo lo permiten Chrome y Edge en computadora). Si quieres el archivo aparte, toca ⋯ en un capítulo descargado y elige «Guardar copia en el dispositivo».</p>`;
+      <p class="dim">Este navegador no deja que una página guarde en una carpeta (Chrome y Edge sí lo permiten, en computadora y en Android). Si quieres el archivo aparte, toca ⋯ en un capítulo descargado y elige «Guardar copia en el dispositivo».</p>`;
   }
   const d = dirHandle;
   if (!d) {
     return `<p class="settings-label">Descargas</p>
       <p class="settings-value">Dentro de la app</p>
-      <p class="dim">Puedes elegir una carpeta de tu computadora: los capítulos quedarán ahí como MP4 normales, ordenados por serie y temporada.</p>
+      <p class="dim">Puedes elegir una carpeta de este dispositivo: los capítulos quedarán ahí como MP4 normales, ordenados por serie y temporada.</p>
       <button class="btn" data-act="dir-pick">${ICON.folder}<span>Elegir carpeta</span></button>`;
   }
   return `<p class="settings-label">Descargas</p>
@@ -2172,6 +2283,7 @@ function renderWatch(id) {
   }
   const same = playing && playing.ep.id === id && stage.isConnected && app.contains(stage);
   if (!same) {
+    leaveMini();
     parkStage();
     app.innerHTML = header('') + `<main class="watch">
       <div class="watch-grid">
@@ -2357,10 +2469,17 @@ function neighbor(delta) {
 }
 function switchTo(ep) {
   if (!ep) return;
-  history.replaceState(null, '', '#/play/' + encodeURIComponent(ep.id));
-  lastRouteKey = 'play/' + ep.id;
   const ctx = resolveContext(ep.id);
-  if (ctx) { startPlayback(ctx); paintWatchInfo(); }
+  if (!ctx) return;
+  if (route().view === 'play') {
+    history.replaceState(null, '', '#/play/' + encodeURIComponent(ep.id));
+    lastRouteKey = 'play/' + ep.id;
+    startPlayback(ctx);
+    paintWatchInfo();
+  } else {
+    startPlayback(ctx); // sigue en el mini reproductor
+    paintMini();
+  }
 }
 function playNext() { const n = neighbor(1); if (n) switchTo(n); }
 function playPrev() { const n = neighbor(-1); if (n) switchTo(n); }
@@ -2405,16 +2524,70 @@ function stopPlayback() {
   if (isFullscreen()) exitFullscreen();
   if (video.getAttribute('src')) { video.removeAttribute('src'); video.load(); }
   stage.hidden = true;
+  leaveMini();
   parkStage();
 }
 
+/* ── mini reproductor ── */
+
+const mini = $('#mini');
+function enterMini() {
+  if (!playing) return;
+  if (stage.classList.contains('kai-fs')) setKaiFullscreen(false);
+  else if (isFullscreen()) exitFullscreen();
+  if (document.body.classList.contains('lights-off')) setLights(false);
+  closeMenu();
+  const slot = $('#mini-slot');
+  if (stage.parentElement !== slot) slot.prepend(stage);
+  stage.classList.add('is-mini');
+  stage.hidden = false;
+  mini.hidden = false;
+  document.documentElement.classList.add('has-mini');
+  paintMini();
+}
+function leaveMini() {
+  stage.classList.remove('is-mini');
+  if (mini.hidden) return;
+  mini.hidden = true;
+  document.documentElement.classList.remove('has-mini');
+}
+function paintMini() {
+  if (mini.hidden || !playing) return;
+  $('#mini-title').textContent = episodeLabel(playing.ep);
+  $('#mini-sub').textContent = playing.ctx.title || '';
+  const t = $('#mini-toggle');
+  t.innerHTML = video.paused ? ICON.play : ICON.pause;
+  t.setAttribute('aria-label', video.paused ? 'Reproducir' : 'Pausar');
+  const d = isFinite(video.duration) ? video.duration : 0;
+  mini.style.setProperty('--mp', d ? (video.currentTime / d) * 100 + '%' : '0%');
+}
+['play', 'pause', 'timeupdate', 'loadedmetadata'].forEach((ev) => video.addEventListener(ev, paintMini));
+
+// al volver de la ventana flotante del sistema con el botón "volver a la pestaña", regresa al reproductor grande
+function backFromSystemPip() {
+  setTimeout(() => {
+    if (playing && !video.paused && route().view !== 'play') go('#/play/' + encodeURIComponent(playing.ep.id));
+  }, 60);
+}
+video.addEventListener('leavepictureinpicture', backFromSystemPip);
+video.addEventListener('webkitpresentationmodechanged', () => { if (video.webkitPresentationMode === 'inline') backFromSystemPip(); });
+
 /* ── controles ── */
 
+// se llama varias veces por segundo: solo toca el DOM cuando algo cambió
+const painted = {};
+function setOnce(key, value, apply) {
+  if (painted[key] === value) return;
+  painted[key] = value;
+  apply(value);
+}
 function paintControls() {
   const paused = video.paused;
-  ui.play.innerHTML = paused ? ICON.play : ICON.pause;
-  ui.play.setAttribute('aria-label', paused ? 'Reproducir' : 'Pausar');
-  stage.classList.toggle('is-paused', paused);
+  setOnce('play', paused, (v) => {
+    ui.play.innerHTML = v ? ICON.play : ICON.pause;
+    ui.play.setAttribute('aria-label', v ? 'Reproducir' : 'Pausar');
+    stage.classList.toggle('is-paused', v);
+  });
   const d = isFinite(video.duration) ? video.duration : 0;
   const t = seeking ? Number(ui.seek.value) : video.currentTime;
   ui.seek.max = String(d || 0);
@@ -2425,17 +2598,21 @@ function paintControls() {
   }
   stage.style.setProperty('--played', d ? (t / d) * 100 + '%' : '0%');
   stage.style.setProperty('--buffered', d ? (buf / d) * 100 + '%' : '0%');
-  ui.time.textContent = `${fmtTime(t)} / ${fmtTime(d)}`;
-  ui.next.hidden = !neighbor(1);
+  setOnce('time', `${fmtTime(t)} / ${fmtTime(d)}`, (v) => { ui.time.textContent = v; });
+  setOnce('next', !neighbor(1), (v) => { ui.next.hidden = v; });
   paintSkip(t, d);
   const ch = chapterAt(seeking ? t : video.currentTime);
-  ui.chapter.textContent = ch && ch.title ? ch.title : '';
-  ui.mute.innerHTML = video.muted || video.volume === 0
-    ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></svg>'
-    : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg>';
-  ui.speed.textContent = speed === 1 ? '1×' : `${speed}×`;
-  ui.fs.setAttribute('aria-label', isFullscreen() ? 'Salir de pantalla completa' : 'Pantalla completa');
-  stage.classList.toggle('is-fs', isFullscreen());
+  setOnce('chapter', ch && ch.title ? ch.title : '', (v) => { ui.chapter.textContent = v; });
+  setOnce('mute', video.muted || video.volume === 0, (v) => {
+    ui.mute.innerHTML = v
+      ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></svg>'
+      : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg>';
+  });
+  setOnce('speed', speed === 1 ? '1×' : `${speed}×`, (v) => { ui.speed.textContent = v; });
+  setOnce('fs', isFullscreen(), (v) => {
+    ui.fs.setAttribute('aria-label', v ? 'Salir de pantalla completa' : 'Pantalla completa');
+    stage.classList.toggle('is-fs', v);
+  });
 }
 
 function wake() {
@@ -2864,17 +3041,22 @@ function sampleAmbient() {
     const zone = (x0, x1) => {
       let r = 0, g = 0, b = 0, n = 0;
       for (let y = 0; y < 6; y++) for (let x = x0; x < x1; x++) { const i = (y * 12 + x) * 4; r += d[i]; g += d[i + 1]; b += d[i + 2]; n++; }
-      return `rgb(${Math.round(r / n)} ${Math.round(g / n)} ${Math.round(b / n)})`;
+      return [r / n, g / n, b / n];
     };
-    el.style.setProperty('--a1', zone(0, 4));
-    el.style.setProperty('--a2', zone(4, 8));
-    el.style.setProperty('--a3', zone(8, 12));
+    const zones = [zone(0, 4), zone(4, 8), zone(8, 12)];
+    // el desenfoque grande es caro de redibujar: solo si el color cambió de forma visible
+    const prev = el._zones;
+    const diff = prev ? Math.max(...zones.map((z, k) => Math.abs(z[0] - prev[k][0]) + Math.abs(z[1] - prev[k][1]) + Math.abs(z[2] - prev[k][2]))) : 999;
+    if (diff >= 18) {
+      el._zones = zones;
+      zones.forEach((z, k) => el.style.setProperty(`--a${k + 1}`, `rgb(${Math.round(z[0])} ${Math.round(z[1])} ${Math.round(z[2])})`));
+    }
     el.classList.add('is-on');
   } catch {
     ambiOk = false; // el navegador no deja leer los colores de este video
   }
 }
-setInterval(() => { if (playing && !video.paused) sampleAmbient(); }, 900);
+setInterval(() => { if (playing && !video.paused && !stage.classList.contains('is-mini')) sampleAmbient(); }, 1200);
 video.addEventListener('seeked', () => setTimeout(sampleAmbient, 120));
 video.addEventListener('loadeddata', () => setTimeout(sampleAmbient, 120));
 
@@ -2960,7 +3142,19 @@ if ('serviceWorker' in navigator) {
 
 /* ── eventos del video ── */
 
-video.addEventListener('timeupdate', () => { if (!seeking) paintControls(); savePosition(); });
+video.addEventListener('timeupdate', () => { if (!seeking) paintControls(); savePosition(); maybePrefetchNext(); });
+
+/** En los últimos minutos baja en silencio el inicio del siguiente capítulo (unos 3 MB) para que empiece sin espera. */
+function maybePrefetchNext() {
+  if (!playing || playing.prefetched || state.settings.prefetchNext === false || !navigator.onLine) return;
+  const d = video.duration;
+  if (!isFinite(d) || d - video.currentTime > 150) return;
+  playing.prefetched = true;
+  const n = neighbor(1);
+  const sw = navigator.serviceWorker && navigator.serviceWorker.controller;
+  if (!n || !sw || state.saved.has(n.id) || (LS.get('quota', null) || {}).until > Date.now()) return;
+  downloadUrl(n.id).then((u) => sw.postMessage({ type: 'prefetch', u, k: n.key, s: n.size, blocks: 3 })).catch(() => {});
+}
 video.addEventListener('progress', paintControls);
 video.addEventListener('durationchange', () => { paintControls(); paintMarks(); });
 video.addEventListener('play', () => { paintControls(); wake(); document.body.classList.add('is-playing'); });
@@ -3116,8 +3310,19 @@ ui.tap.addEventListener('pointermove', (e) => {
   const dy = t.y - e.clientY; // hacia arriba es positivo
   if (!t.mode && Math.hypot(dx, dy) > 12) {
     clearTimeout(t.timer);
-    t.mode = Math.abs(dy) > Math.abs(dx) ? 'bright' : 'none';
+    const vertical = Math.abs(dy) > Math.abs(dx);
+    // en pantalla completa deslizar cambia el brillo; en la página, abajo = mini reproductor y arriba = pantalla completa
+    t.mode = !vertical ? 'none' : isFullscreen() ? 'bright' : dy < 0 ? 'down' : 'up';
     if (t.mode === 'bright') { t.y = e.clientY; t.start = bright; }
+  }
+  if (t.mode === 'down') {
+    const d = Math.max(0, e.clientY - t.y);
+    t.dist = d;
+    stage.style.transition = 'none';
+    stage.style.transform = `translateY(${Math.min(d, 220) * 0.6}px) scale(${1 - Math.min(d, 220) / 1100})`;
+    stage.style.opacity = String(1 - Math.min(d, 220) / 600);
+  } else if (t.mode === 'up') {
+    t.dist = Math.max(0, t.y - e.clientY);
   }
   if (t.mode === 'bright') {
     const dy2 = t.y - e.clientY;
@@ -3133,6 +3338,15 @@ function touchEnd(e, cancelled) {
   clearTimeout(t.timer);
   lastTouchEnd = Date.now();
   if (t.hold) endHold();
+  else if (t.mode === 'down') {
+    stage.style.transition = 'transform 0.2s, opacity 0.2s';
+    stage.style.transform = '';
+    stage.style.opacity = '';
+    setTimeout(() => { stage.style.transition = ''; }, 220);
+    if (!cancelled && t.dist > 70 && playing) goBack(playing.ctx.back); // queda en el mini reproductor
+  } else if (t.mode === 'up') {
+    if (!cancelled && t.dist > 60) toggleFullscreen();
+  }
   else if (t.mode === 'bright') LS.set('bright', Number(bright.toFixed(2)));
   else if (!t.mode && !cancelled) handleTouchTap(e.clientX, t.at);
   touch = null;
@@ -3261,6 +3475,9 @@ document.addEventListener('click', async (e) => {
     renderProfiles(visibleProfiles().length > 0);
     sync();
   }
+  else if (act === 'mini-open' && playing) go('#/play/' + encodeURIComponent(playing.ep.id));
+  else if (act === 'mini-toggle') togglePlay();
+  else if (act === 'mini-close') stopPlayback();
   else if (act === 'dir-pick') pickFolder();
   else if (act === 'dir-off') dropFolder();
   else if (act === 'dir-grant') {

@@ -6,7 +6,7 @@
  */
 importScripts('core.js');
 
-const VERSION = 'kai-v6';
+const VERSION = 'kai-v7';
 const SHELL = [
   './', 'index.html', 'styles.css', 'app.js', 'subs.js', 'meta.js', 'core.js',
   'vendor/mega.js', 'manifest.webmanifest', 'icon.svg', 'icon-180.png', 'icon-512.png',
@@ -114,6 +114,164 @@ function parseRange(header, size) {
   return { start, end, partial: !!m };
 }
 
+/* ── video por rangos ──
+ * El archivo se maneja en bloques de 1 MB:
+ *  - cada bloque se pide a MEGA una sola vez y queda en memoria (lo más reciente, hasta un límite),
+ *    así retroceder o volver a una parte ya vista no gasta cuota ni espera;
+ *  - se piden hasta 3 bloques a la vez (MEGA limita la velocidad por conexión);
+ *  - cada bloque se descifra y se entrega mientras llega, sin esperar a tenerlo completo. */
+const BLOCK = 1024 * 1024;
+const PARALLEL = 3;
+const AHEAD = 4; // bloques que se piden por adelantado
+const MEM_LIMIT = ((self.navigator && self.navigator.deviceMemory) || 8) <= 4 ? 64 * BLOCK : 160 * BLOCK;
+const files = new Map(); // clave del archivo -> { url, fk, size, blocks: Map, active }
+let memUsed = 0;
+let useTick = 0;
+
+function megaError(status, headers) {
+  const e = new Error(status === 509 ? 'Límite de transferencia de MEGA alcanzado' : 'MEGA respondió ' + status);
+  e.code = status === 509 ? 'QUOTA' : 'HTTP';
+  e.status = status;
+  const tl = headers && headers.get('x-mega-time-left');
+  if (tl) e.timeLeft = +tl;
+  return e;
+}
+
+async function fileFor(key, url, size) {
+  let f = files.get(key);
+  if (!f) {
+    f = { key, url, size, fk: await MegaCore.fileKey(key), blocks: new Map(), active: 0, queue: [] };
+    files.set(key, f);
+  }
+  if (url) f.url = url; // la dirección de descarga cambia cada cierto tiempo
+  return f;
+}
+
+class Block {
+  constructor(f, i) {
+    this.f = f;
+    this.i = i;
+    this.start = i * BLOCK;
+    this.len = Math.min(BLOCK, f.size - this.start);
+    this.buf = new Uint8Array(this.len);
+    this.filled = 0;
+    this.done = false;
+    this.err = null;
+    this.users = 0;
+    this.started = false;
+    this.ctrl = null;
+    this.idle = null; // temporizador para pausar un bloque que nadie está esperando
+    this.waiters = [];
+    this.used = ++useTick;
+    memUsed += this.len;
+  }
+  notify() { const w = this.waiters; this.waiters = []; w.forEach((r) => r()); }
+  wait() { return new Promise((r) => this.waiters.push(r)); }
+}
+
+function getBlock(f, i, urgent = false) {
+  let b = f.blocks.get(i);
+  if (b && b.err) { memUsed -= b.len; b = null; }
+  if (!b) {
+    b = new Block(f, i);
+    f.blocks.set(i, b);
+    f.queue.push(b);
+  }
+  b.used = ++useTick;
+  clearTimeout(b.idle);
+  if (!b.done && !b.started && !f.queue.includes(b)) f.queue.push(b); // un bloque pausado sigue donde quedó
+  if (urgent && !b.started) { f.queue = f.queue.filter((x) => x !== b); startBlock(b); } // lo que se está viendo no hace fila
+  else pump(f);
+  return b;
+}
+function pump(f) {
+  while (f.active < PARALLEL && f.queue.length) startBlock(f.queue.shift());
+}
+function startBlock(b) {
+  if (b.started || b.done) return;
+  b.started = true;
+  b.ctrl = new AbortController();
+  b.f.active++;
+  runBlock(b, b.ctrl).finally(() => {
+    b.f.active--;
+    b.started = false;
+    // si lo pausaron justo cuando alguien volvió a pedirlo, sigue
+    if (!b.done && !b.err && b.users && !b.f.queue.includes(b)) b.f.queue.unshift(b);
+    pump(b.f);
+  });
+}
+
+async function runBlock(b, ctrl) {
+  const f = b.f;
+  let tries = 0;
+  while (b.filled < b.len) {
+    try {
+      const from = b.start + b.filled;
+      const r = await fetch(f.url + '/' + from + '-' + (b.start + b.len - 1), { signal: ctrl.signal, cache: 'no-store' });
+      if (!r.ok) throw megaError(r.status, r.headers);
+      const reader = r.body.getReader();
+      let pend = new Uint8Array(0);
+      const flush = async (all) => {
+        const n = all ? pend.length : pend.length - (pend.length % 16);
+        if (!n) return;
+        const dec = await MegaCore.decryptAt(f.fk, pend.subarray(0, n), b.start + b.filled);
+        b.buf.set(dec, b.filled);
+        b.filled += n;
+        pend = pend.slice(n);
+        b.notify();
+      };
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (ctrl.signal.aborted) break;
+        reportBytes(value.length);
+        const next = new Uint8Array(pend.length + value.length);
+        next.set(pend); next.set(value, pend.length);
+        pend = next;
+        if (pend.length >= 64 * 1024) await flush(false);
+      }
+      if (ctrl.signal.aborted) { await flush(false); return; } // pausado: se guarda lo que llegó (alineado a 16)
+      await flush(true);
+      if (b.filled < b.len) throw new Error('Respuesta incompleta');
+    } catch (err) {
+      if (ctrl.signal.aborted) return;
+      if (err.code === 'QUOTA') reportQuota(err.timeLeft);
+      if (err.code === 'HTTP' || err.code === 'QUOTA' || ++tries > 3) { b.err = err; b.notify(); return; }
+      await new Promise((r) => setTimeout(r, 600 * tries));
+    }
+  }
+  b.done = true;
+  b.notify();
+  trimMemory();
+}
+
+/* Chrome a veces cancela un pedido y abre otro casi igual: un bloque que nadie espera
+ * se pausa tras un momento (para no gastar cuota) y conserva lo que ya bajó. */
+function release(b) {
+  b.users = Math.max(0, b.users - 1);
+  if (b.users || b.done) return;
+  clearTimeout(b.idle);
+  b.idle = setTimeout(() => {
+    if (b.users || b.done) return;
+    b.f.queue = b.f.queue.filter((x) => x !== b);
+    if (b.started && b.ctrl) b.ctrl.abort();
+  }, 2500);
+}
+
+/** Libera los bloques usados hace más tiempo cuando la memoria pasa del límite. */
+function trimMemory() {
+  if (memUsed <= MEM_LIMIT) return;
+  const all = [];
+  for (const f of files.values()) for (const b of f.blocks.values()) if (!b.users && !b.started) all.push(b);
+  all.sort((a, b) => a.used - b.used);
+  for (const b of all) {
+    if (memUsed <= MEM_LIMIT * 0.85) break;
+    b.f.blocks.delete(b.i);
+    memUsed -= b.len;
+  }
+  for (const [k, f] of files) if (!f.blocks.size && !f.active) files.delete(k);
+}
+
 async function stream(req, url) {
   const src = url.searchParams.get('u');
   const key = url.searchParams.get('k');
@@ -126,37 +284,43 @@ async function stream(req, url) {
     return new Response(null, { status: 416, headers: { 'Content-Range': `bytes */${size}` } });
   }
 
-  const fk = await MegaCore.fileKey(key);
-  const ctrl = new AbortController();
+  const f = await fileFor(key, src, size);
   let pos = start;
-  let chunk = 256 * 1024;
+  const held = new Map(); // bloques que este flujo está usando
 
-  // Lee por pedazos que crecen hasta 4 MB; si el reproductor salta a otro punto,
-  // cancela este flujo y abre uno nuevo en la posición pedida.
+  const hold = (i, urgent) => {
+    if (held.has(i)) { if (urgent) getBlock(f, i, true); return held.get(i); }
+    const b = getBlock(f, i, urgent);
+    b.users++;
+    held.set(i, b);
+    return b;
+  };
+  const drop = (b) => { if (held.get(b.i) === b) { held.delete(b.i); release(b); } };
+
   const body = new ReadableStream({
     async pull(c) {
       if (pos > end) { c.close(); return; }
-      const last = Math.min(end, pos + chunk - 1);
-      let tries = 0;
-      for (;;) {
-        try {
-          const data = await MegaCore.readRange(src, fk, pos, last, ctrl.signal);
-          reportBytes(data.length);
-          c.enqueue(data);
-          pos = last + 1;
-          chunk = Math.min(chunk * 2, 4 * 1024 * 1024);
-          if (pos > end) c.close();
-          return;
-        } catch (err) {
-          if (ctrl.signal.aborted) return;
-          if (err.code === 'QUOTA') reportQuota(err.timeLeft);
-          if (err.code === 'HTTP' || err.code === 'QUOTA' || ++tries > 2) { c.error(err); return; }
-          await new Promise((r) => setTimeout(r, 600 * tries));
-        }
+      const i = Math.floor(pos / BLOCK);
+      const last = Math.floor(end / BLOCK);
+      let b = hold(i, true);
+      for (let k = i + 1; k <= Math.min(last, i + AHEAD); k++) hold(k, false);
+      // el bloque se descarta si falló antes y se vuelve a intentar una vez
+      while (b.filled <= pos - b.start && !b.done && !b.err) await b.wait();
+      if (b.err) {
+        drop(b);
+        b = hold(i, true);
+        while (b.filled <= pos - b.start && !b.done && !b.err) await b.wait();
+        if (b.err) { c.error(b.err); return; }
       }
+      const from = pos - b.start;
+      const to = Math.min(b.filled, end - b.start + 1);
+      c.enqueue(b.buf.slice(from, to));
+      pos = b.start + to;
+      if (pos >= b.start + b.len) drop(b);
+      if (pos > end) c.close();
     },
-    cancel() { ctrl.abort(); },
-  }, { highWaterMark: 2 });
+    cancel() { for (const b of [...held.values()]) drop(b); },
+  }, { highWaterMark: 4 });
 
   const headers = {
     'Content-Type': type,
@@ -167,3 +331,16 @@ async function stream(req, url) {
   if (partial) headers['Content-Range'] = `bytes ${start}-${end}/${size}`;
   return new Response(body, { status: partial ? 206 : 200, headers });
 }
+
+/* Precarga: la app pide bajar en silencio el inicio del siguiente capítulo. */
+self.addEventListener('message', (e) => {
+  const d = e.data || {};
+  if (d.type !== 'prefetch' || !d.u || !d.k || !d.s) return;
+  e.waitUntil((async () => {
+    const f = await fileFor(d.k, d.u, Number(d.s));
+    const n = Math.min(Math.ceil(f.size / BLOCK), d.blocks || 2);
+    const list = [];
+    for (let i = 0; i < n; i++) list.push(getBlock(f, i));
+    await Promise.all(list.map(async (b) => { while (!b.done && !b.err) await b.wait(); }));
+  })());
+});
