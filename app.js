@@ -23,6 +23,7 @@ try {
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
 
 function fmtTime(s) {
   s = Math.max(0, Math.floor(s || 0));
@@ -1584,10 +1585,17 @@ function selectProfile(id) {
 
 /* ── capítulos nuevos ── */
 
-function knownMap() { return LS.get(pkey('known'), null); }
+// se lee una vez y se guarda en memoria: antes se volvía a leer (y descifrar el JSON) por cada serie
+let knownCache = { key: null, val: null };
+function knownMap() {
+  const key = pkey('known');
+  if (knownCache.key !== key) knownCache = { key, val: LS.get(key, null) };
+  return knownCache.val;
+}
+function saveKnown(k) { knownCache = { key: pkey('known'), val: k }; LS.set(pkey('known'), k); }
 function initKnown() {
   if (!state.profile || !state.library || !state.library.series || knownMap()) return;
-  LS.set(pkey('known'), Object.fromEntries(state.library.series.map((s) => [s.name, s.all.map((e) => e.id)])));
+  saveKnown(Object.fromEntries(state.library.series.map((s) => [s.name, s.all.map((e) => e.id)])));
 }
 function newEpisodes(s) {
   const k = knownMap();
@@ -1596,9 +1604,9 @@ function newEpisodes(s) {
   return s.all.filter((e) => !set.has(e.id));
 }
 function markSeriesSeen(s) {
-  const k = knownMap() || {};
+  const k = { ...(knownMap() || {}) };
   k[s.name] = s.all.map((e) => e.id);
-  LS.set(pkey('known'), k);
+  saveKnown(k);
 }
 let lastNew = null;
 /* Al importar varios capítulos, MEGA avisa de cada archivo por separado: los cambios se juntan
@@ -1663,7 +1671,12 @@ function newsHTML() {
 
 /* ── sinopsis e imágenes ── */
 
-function saveMeta() { LS.set('meta', state.meta); }
+// las fichas llegan de a una al buscar en AniList: se juntan y se guardan una sola vez (y al salir, si falta)
+let metaTimer = 0;
+function saveMeta() { clearTimeout(metaTimer); metaTimer = setTimeout(flushMeta, 1500); }
+function flushMeta() { if (metaTimer) { clearTimeout(metaTimer); metaTimer = 0; LS.set('meta', state.meta); } }
+addEventListener('pagehide', flushMeta);
+document.addEventListener('visibilitychange', () => { if (document.hidden) flushMeta(); });
 function metaFor(s) {
   const m = state.meta[s.name];
   return m && !m.none ? m : null;
@@ -2193,7 +2206,7 @@ function renderCatalog() {
   </main>`;
   const form = $('#cat-form');
   form.addEventListener('submit', (e) => { e.preventDefault(); $('#cat-q').blur(); });
-  $('#cat-q').addEventListener('input', paintCatalog);
+  $('#cat-q').addEventListener('input', debounce(paintCatalog, 120));
   $('#cat-filters').addEventListener('change', paintCatalog);
   paintCatalog();
   if (q.get('buscar') === '1') $('#cat-q').focus();
@@ -2207,7 +2220,9 @@ function paintCatalog() {
   if (!box) return;
   const st = catalogState();
   const list = sortEntries(filterEntries(catalogEntries(), st), st.o);
-  box.innerHTML = list.map(entryTile).join('') || '';
+  // si al teclear sigue saliendo lo mismo, no se vuelven a dibujar todos los mosaicos
+  const sig = list.map((e) => e.href || e.si).join('|') + '#' + list.map((e) => e.img || '').join('').length;
+  if (box.dataset.sig !== sig) { box.innerHTML = list.map(entryTile).join('') || ''; box.dataset.sig = sig; }
   $('#cat-count').textContent = list.length ? plural(list.length, 'título', 'títulos') : (state.library ? 'Nada coincide con la búsqueda o los filtros.' : 'Cargando la biblioteca…');
   app.querySelector('[data-act="cat-clear"]').hidden = !(st.g || st.y || st.f || st.q);
   // la dirección refleja la búsqueda (para volver atrás o compartirla), sin redibujar la página
@@ -2226,7 +2241,7 @@ function openHomeSearch() {
   app.querySelector('[data-act="home-search"]').setAttribute('aria-expanded', 'true');
   const input = $('#home-q');
   input.focus();
-  input.oninput = paintHomeSearch;
+  input.oninput = debounce(paintHomeSearch, 120);
   input.onkeydown = (e) => {
     if (e.key === 'Enter') { e.preventDefault(); go('#/catalogo?' + new URLSearchParams({ q: input.value })); }
     else if (e.key === 'Escape') closeHomeSearch();

@@ -84,9 +84,12 @@ svg.solid, svg .solid { fill: currentColor; stroke: none; }
 /* Fondo propio de Kai: vidrio líquido que se tiñe con el color de la serie. Nunca una imagen estirada. */
 .ambient { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; }
 .ambient::before, .ambient::after {
-  content: ''; position: absolute; inset: -25vmax; filter: blur(40px);
-  transition: background 1.2s ease;
+  content: ''; position: absolute; inset: -25vmax;
+  /* los degradados ya son suaves: sin filter: blur, el navegador pinta la capa una vez y solo la mueve (antes la redibujaba en cada cuadro) */
+  transition: background 1.2s ease; will-change: transform;
 }
+/* con un video sonando, el fondo deja de moverse (no se ve y gasta batería) */
+body.is-playing .ambient::before, body.is-playing .ambient::after { animation-play-state: paused; }
 .ambient::before {
   background:
     radial-gradient(36vmax 30vmax at 22% 18%, color-mix(in srgb, var(--tint, var(--blob-1)) 42%, transparent), transparent 70%),
