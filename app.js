@@ -3386,6 +3386,12 @@ function nativeTextTracks() {
 
 /** Busca subtítulos: caché, archivos junto al video, pistas que el navegador ya entiende o pistas dentro del MP4. */
 async function initSubtitles(ep, token) {
+  // mientras no se sepa si el video trae capítulos, Kai no adivina dónde está la intro (ni salta sola con lo aprendido)
+  token.chaptersDone = false;
+  const giveUp = setTimeout(() => { token.chaptersDone = true; }, 10000);
+  try { await loadSubtitles(ep, token); } finally { clearTimeout(giveUp); token.chaptersDone = true; }
+}
+async function loadSubtitles(ep, token) {
   const ctrl = new AbortController();
   subs.ctrl = ctrl;
   const alive = () => playing === token && !ctrl.signal.aborted;
@@ -3531,6 +3537,7 @@ const median = (a) => { const b = [...a].sort((x, y) => x - y); return b.length 
 function setChapters(token, chapters) {
   if (playing !== token) return;
   token.chapters = (chapters || []).map((c) => ({ ...c, end: c.end == null || !isFinite(c.end) ? (video.duration || Infinity) : c.end }));
+  token.chaptersDone = true;
   paintMarks();
   paintControls();
 }
@@ -3582,6 +3589,7 @@ function skipOffer(t, d) {
   const ch = chapterAt(t);
   if (ch && INTRO.test(ch.title) && t < ch.end - 2) return { label: 'Saltar intro', to: ch.end, sure: true };
   if (ch && OUTRO.test(ch.title) && neighbor(1)) return { label: 'Siguiente capítulo', act: 'next' };
+  if (!playing.chaptersDone) return null;
   if (playing.chapters && playing.chapters.some((c) => INTRO.test(c.title))) return null;
   if (d < 400 || t > 360) return null;
   const li = learnedIntro();
@@ -3605,9 +3613,21 @@ function paintSkip(t, d) {
   if (offer.sure && state.settings.autoSkip && !playing.autoSkipped && !video.paused) {
     playing.autoSkipped = true;
     playing.undo = { at: t, until: Date.now() + 6000 };
-    video.currentTime = Math.min(d - 1, offer.to);
+    seekSure(Math.min(d - 1, offer.to));
     paintSkip(video.currentTime, d);
   }
+}
+
+/** Salta a un punto y comprueba que llegó: si el navegador se queda corto (aún no tenía esa parte), lo intenta otra vez. */
+function seekSure(to) {
+  const tok = playing;
+  let tries = 0;
+  const check = () => {
+    if (playing !== tok) return;
+    if (video.currentTime < to - 1.5 && tries < 3) { tries++; video.currentTime = to; video.addEventListener('seeked', check, { once: true }); }
+  };
+  video.currentTime = to;
+  video.addEventListener('seeked', check, { once: true });
 }
 
 function doSkip() {
@@ -3622,7 +3642,7 @@ function doSkip() {
   else {
     const from = video.currentTime;
     playing.autoSkipped = true;
-    video.currentTime = Math.min(video.duration - 1, o.to);
+    seekSure(Math.min(video.duration - 1, o.to));
     if (o.guess) learnIntro(from, o.to);
   }
   paintControls();
