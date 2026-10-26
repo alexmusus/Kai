@@ -1,5 +1,5 @@
 import { Storage } from './vendor/mega.js';
-import { isSubtitleName, parseSubtitleFile, mp4Info, mp4Chapters, mp4Formats, loadTrackCues, langName } from './subs.js';
+import { isSubtitleName, parseSubtitleFile, mp4Info, mp4Chapters, mp4Formats, mp4QuickFormats, loadTrackCues, langName } from './subs.js';
 import { searchAnime, animeById, toMeta, findForSeries, findMovie, translateToSpanish, canTranslate } from './meta.js';
 
 const C = window.MegaCore;
@@ -77,7 +77,7 @@ const ICON = {
 
 /* ───────────────────────── estado ───────────────────────── */
 
-const DEFAULTS = { root: 'Anime', autoRemoveLocal: true, autoplay: true, subs: 'on', subLabel: '', subSize: 'm', autoSkip: true, theme: 'auto' };
+const DEFAULTS = { root: 'Anime', autoplay: true, subs: 'on', subLabel: '', subSize: 'm', autoSkip: true, theme: 'auto' };
 const SHARED_FILE = '.kai-compartido.json';            // perfiles, intros aprendidas e imágenes elegidas
 const profileFile = (id) => `.kai-progreso-${id}.json`;  // progreso de cada perfil
 const LEGACY_PROGRESS = ['.kai-progreso.json', '.yoru-progreso.json'];
@@ -105,6 +105,8 @@ let index = buildIndex(state.library);
 const knownEps = new Map(); // capítulos vistos fuera de la biblioteca (explorar, descargados)
 
 function saveSettings() { LS.set('settings', state.settings); }
+// nada descargado se borra solo: se quita a mano desde Descargados (pedido de Alex, v11)
+delete state.settings.autoRemoveLocal;
 const pkey = (k) => `p.${state.profile ? state.profile.id : '_'}.${k}`;
 function loadProfileState() {
   state.progress = LS.get(pkey('progress'), {});
@@ -521,6 +523,66 @@ function hydrateThumbs(scope = document) {
     el.classList.add('thumb-seen');
     if (thumbObserver) thumbObserver.observe(el); else loadThumb(el);
   });
+  hydrateCodecs(scope);
+}
+
+/* ── códec de cada video, en pequeño sobre la miniatura ──
+ * Se lee una sola vez por archivo (solo el principio del índice del MP4) y se guarda.
+ * El puntito rojo depende de ESTE dispositivo: el mismo AV1 lo lleva en el iPad M2 y no en el iPhone. */
+const codecCache = LS.get('codecs', {}) || {};
+const codecKey = (ep) => `${ep.id}:${ep.size}`;
+const CODEC_NAMES = { avc1: 'H.264', avc3: 'H.264', hvc1: 'HEVC', hev1: 'HEVC', av01: 'AV1', vp09: 'VP9', vp08: 'VP8', mp4v: 'MPEG-4' };
+function codecTagHTML(ep) {
+  if (!/mp4|quicktime/.test(ep.mime || '')) return '';
+  const f = codecCache[codecKey(ep)];
+  if (!f) return `<span class="ep-codec is-pending" data-codec="${esc(ep.id)}"></span>`;
+  return codecTagInner(f);
+}
+function codecTagInner(f) {
+  if (!f.video) return '';
+  const name = CODEC_NAMES[f.video.codec] || f.video.codec.toUpperCase();
+  const prob = formatProblem(f);
+  return `<span class="ep-codec ${prob ? 'is-bad' : ''}" title="${esc(prob ? `${name}: este dispositivo no lo puede reproducir` : name)}">${prob ? '<i aria-hidden="true"></i>' : ''}${esc(name)}</span>`;
+}
+const codecQueue = [];
+let codecActive = 0;
+const codecObserver = 'IntersectionObserver' in window ? new IntersectionObserver((entries) => {
+  for (const e of entries) {
+    if (!e.isIntersecting) continue;
+    codecObserver.unobserve(e.target);
+    const tag = e.target.querySelector('.ep-codec.is-pending');
+    if (tag) codecQueue.push(tag);
+  }
+  pumpCodecs();
+}, { rootMargin: '200px' }) : null;
+function hydrateCodecs(scope = document) {
+  if (!codecObserver || !navigator.onLine) return;
+  // se observa la miniatura (la etiqueta pendiente está oculta y el navegador no avisa de lo oculto)
+  scope.querySelectorAll('.ep-codec.is-pending:not(.codec-seen)').forEach((el) => {
+    el.classList.add('codec-seen');
+    codecObserver.observe(el.closest('.ep-thumb') || el.parentElement);
+  });
+}
+function pumpCodecs() {
+  while (codecActive < 2 && codecQueue.length) {
+    const el = codecQueue.shift();
+    const ep = epById(el.dataset.codec);
+    if (!ep || !el.isConnected) continue;
+    codecActive++;
+    readCodec(ep).then((f) => {
+      if (!f) return;
+      document.querySelectorAll(`.ep-codec[data-codec="${CSS.escape(ep.id)}"]`).forEach((x) => { x.outerHTML = codecTagInner(f); });
+    }).catch(() => {}).finally(() => { codecActive--; pumpCodecs(); });
+  }
+}
+async function readCodec(ep) {
+  const k = codecKey(ep);
+  if (codecCache[k]) return codecCache[k];
+  const f = await mp4QuickFormats(await rangeReader(ep, null), ep.size);
+  if (!f) return null;
+  codecCache[k] = { video: f.video, audio: f.audio };
+  LS.set('codecs', codecCache);
+  return codecCache[k];
 }
 
 function coverHTML(name, ep, cls = '') {
@@ -1327,7 +1389,8 @@ function paintDock() {
   const p = visibleProfiles().find((x) => x.id === state.profile.id) || state.profile;
   const btn = dock.querySelector('.dock-btn');
   btn.innerHTML = `${avatarHTML(p, 'dock-avatar')}<span class="dock-dots" aria-hidden="true"><i></i><i></i><i></i></span>`;
-  btn.setAttribute('aria-label', `Menú (${p.name})`);
+  btn.setAttribute('aria-label', `Menú (${p.name})${hasUnreadNews() ? ', hay novedades' : ''}`);
+  paintNewsDot();
   if (!dock.querySelector('.dock-panel').hidden) fillDock();
 }
 
@@ -1341,7 +1404,7 @@ function fillDock() {
     ${item('#/', ICON.home, 'Inicio', view === 'home' || view === 'serie')}
     ${item('#/explorar', ICON.folder, 'Explorar MEGA', view === 'explorar')}
     ${item('#/descargas', ICON.saved, 'Descargados', view === 'descargas', `<span class="dock-count" id="dock-count">${state.saved.size || ''}</span>`)}
-    ${item('#/ajustes', ICON.gear, 'Ajustes', view === 'ajustes')}
+    ${item('#/ajustes', ICON.gear, 'Ajustes', view === 'ajustes', hasUnreadNews() ? '<span class="dock-news">Novedades</span>' : '')}
     <div class="dock-row">
       <button class="dock-chip" data-act="refresh" role="menuitem">${ICON.refresh}<span>Actualizar</span></button>
       <button class="dock-chip" data-act="theme" role="menuitem">${dark ? ICON.sun : ICON.moon}<span>${dark ? 'Claro' : 'Oscuro'}</span></button>
@@ -1535,35 +1598,54 @@ function markSeriesSeen(s) {
 let lastNew = null;
 /* Al importar varios capítulos, MEGA avisa de cada archivo por separado: los cambios se juntan
  * unos segundos y se muestra un solo aviso ("Hay contenido nuevo: Fate (3), Frieren (1)"). */
-let newPending = {};
-let newTimer = null;
+/* Novedades: lo nuevo que llega a MEGA ya no sale como aviso en el inicio; se anota en Ajustes → Novedades
+ * y el botón del menú muestra un puntito hasta que se mira. Por perfil y por dispositivo. */
+const NEWS_DAYS = 30;
+function newsList() {
+  const l = LS.get(pkey('news'), []);
+  return (Array.isArray(l) ? l : []).filter((x) => x && x.name && Date.now() - (x.at || 0) < NEWS_DAYS * 86400000);
+}
+function noteNews(name, n) {
+  const l = newsList().filter((x) => x.name !== name);
+  l.unshift({ name, n, at: Date.now() });
+  LS.set(pkey('news'), l.slice(0, 60));
+  LS.set(pkey('newsUnread'), true);
+}
+const hasUnreadNews = () => !!(state.profile && LS.get(pkey('newsUnread'), false) && newsList().length);
+function paintNewsDot() {
+  const btn = dock && dock.querySelector('.dock-btn');
+  if (btn) btn.classList.toggle('has-news', hasUnreadNews());
+}
 function announceNew() {
   if (!state.library || !state.library.series || !state.profile) return;
-  const now = Object.fromEntries(state.library.series.map((s) => [s.name, newEpisodes(s).length]));
-  if (lastNew) {
-    for (const [name, n] of Object.entries(now)) {
-      if (n > (lastNew[name] || 0)) newPending[name] = n;
-    }
-    if (Object.keys(newPending).length) {
-      clearTimeout(newTimer);
-      newTimer = setTimeout(flushNew, 4000);
-    }
+  // cuántos nuevos ya se anotaron por serie (guardado: así también cuenta lo que llegó con la app cerrada)
+  const counted = LS.get(pkey('newsCount'), {}) || {};
+  const now = {};
+  for (const s of state.library.series) {
+    const n = newEpisodes(s).length;
+    now[s.name] = n;
+    if (n > (counted[s.name] || 0)) noteNews(s.name, n);
   }
+  LS.set(pkey('newsCount'), now);
   lastNew = now;
+  paintNewsDot();
 }
-function flushNew() {
-  newTimer = null;
-  // solo lo que sigue sin ver (si ya entró a la serie mientras tanto, no se avisa)
-  const cur = state.library && state.library.series ? Object.fromEntries(state.library.series.map((s) => [s.name, newEpisodes(s).length])) : {};
-  const list = Object.entries(newPending).map(([name]) => [name, cur[name] || 0]).filter(([, n]) => n > 0);
-  newPending = {};
-  if (!list.length) return;
-  if (list.length === 1) {
-    const [name, n] = list[0];
-    toast(`${name}: ${n === 1 ? 'un capítulo nuevo' : `${n} capítulos nuevos`}.`);
-  } else {
-    toast(`Hay contenido nuevo: ${list.map(([name, n]) => `${name} (${n})`).join(', ')}.`);
-  }
+function newsHTML() {
+  const lib = state.library && state.library.v === 2 ? state.library : null;
+  const items = newsList();
+  const ago = (t) => {
+    const m = Math.round((Date.now() - t) / 60000);
+    return m < 60 ? `hace ${Math.max(1, m)} min` : m < 1440 ? `hace ${Math.round(m / 60)} h` : `hace ${Math.round(m / 1440)} d`;
+  };
+  const rows = items.map((x) => {
+    const si = lib ? lib.series.findIndex((s) => s.name === x.name) : -1;
+    const what = `${x.n === 1 ? 'un capítulo nuevo' : `${x.n} capítulos nuevos`}`;
+    const label = `<strong>${esc(x.name)}</strong>: ${what} <span class="dim">· ${ago(x.at)}</span>`;
+    return `<li>${si >= 0 ? `<a href="#/serie/${si}">${label}</a>` : label}</li>`;
+  });
+  return `<p class="settings-label">Novedades</p>
+    ${rows.length ? `<ul class="news-list">${rows.join('')}</ul><button class="btn btn-quiet" data-act="news-clear">Limpiar</button>`
+      : '<p class="dim">Aquí aparece lo que se agregue a tu MEGA. Por ahora no hay nada nuevo.</p>'}`;
 }
 
 /* ── sinopsis e imágenes ── */
@@ -1573,10 +1655,10 @@ function metaFor(s) {
   const m = state.meta[s.name];
   return m && !m.none ? m : null;
 }
+// La ficha (imagen y sinopsis) se busca solo con el nombre de la carpeta de la serie, y es la misma
+// para todas sus temporadas, OVA y especiales.
 function searchNames(s) {
-  const titled = s.seasons.find((se) => se.title && se.title !== s.name);
-  const t = titled ? titled.title : '';
-  return [...new Set([t && !t.toLowerCase().includes(s.name.toLowerCase()) ? `${s.name} ${t}` : t, t, s.name].filter(Boolean))];
+  return [s.name];
 }
 
 let metaRunning = false;
@@ -1586,27 +1668,21 @@ async function ensureMeta() {
   let changed = false;
   try {
     for (const s of state.library.series) {
-      const pick = state.shared.picks[s.name];
+      const pick = null; // todo automático: ya no se usan fichas elegidas a mano
       if (isCollection(s)) {
         // cada película por separado; la carpeta no se busca
         let failed = false;
         for (const it of collectionItems(s)) {
           const k = itemMetaKey(s, it.key);
           const c = state.meta[k];
-          const ipick = state.shared.picks[k]; // ficha elegida a mano (se sincroniza entre dispositivos)
           const age = Date.now() - ((c && c.at) || 0);
-          if (ipick) {
-            if (c && (ipick.id ? c.id === ipick.id && age < 30 * 86400000 : c.none)) continue;
-          } else if (c && c.mv === 3) {
-            // lo encontrado se guarda 30 días; lo que no se encontró se vuelve a buscar al día siguiente
-            if (c.none ? age < 86400000 : age < 30 * 86400000) continue;
-          }
+          // todo automático: lo encontrado se guarda 30 días; lo que no se encontró se vuelve a buscar al día siguiente
+          if (c && c.mv === 4 && (c.none ? age < 86400000 : age < 30 * 86400000)) continue;
           let m = null;
           try {
-            if (ipick) m = ipick.id ? await animeById(ipick.id) : null;
-            else if (it.query) m = await findMovie(it.query, () => sleep(400));
+            if (it.query) m = await findMovie(it.query, () => sleep(400));
           } catch (err) { console.warn('anilist', err); failed = true; break; }
-          state.meta[k] = m ? { ...toMeta(m), mv: 3 } : { none: true, id: 0, mv: 3, at: Date.now() };
+          state.meta[k] = m ? { ...toMeta(m), mv: 4 } : { none: true, id: 0, mv: 4, at: Date.now() };
           changed = true;
           saveMeta();
           await sleep(400);
@@ -1615,14 +1691,15 @@ async function ensureMeta() {
         continue;
       }
       const cur = state.meta[s.name];
-      const stale = !cur || Date.now() - (cur.at || 0) > 30 * 86400000 || (pick && pick.id !== (cur.id || 0)) || (!cur.none && cur.v !== 2);
+      // sv: 5 = buscada solo con el nombre de la carpeta (las de antes se vuelven a buscar una vez)
+      const stale = !cur || Date.now() - (cur.at || 0) > (cur.none ? 86400000 : 30 * 86400000) || (pick && pick.id !== (cur.id || 0)) || (!cur.none && cur.v !== 2) || (!pick && cur.sv !== 5);
       if (!stale) continue;
       try {
         let m = null;
         if (pick && pick.id === 0) m = null;
         else if (pick) m = await animeById(pick.id);
-        else m = await findForSeries(searchNames(s));
-        state.meta[s.name] = m ? toMeta(m) : { none: true, id: 0, at: Date.now() };
+        else m = await findForSeries(searchNames(s), s.name);
+        state.meta[s.name] = m ? { ...toMeta(m), sv: 5 } : { none: true, id: 0, sv: 5, at: Date.now() };
         if (m) {
           const meta = state.meta[s.name];
           translateToSpanish(meta.synopsis).then((es) => { if (es) { meta.synopsisEs = es; saveMeta(); if (['home', 'serie'].includes(route().view)) softRender(); } });
@@ -1726,69 +1803,6 @@ function tileHTML(s, si, { href, label = '', sub = '', pct = 0, badge = '' } = {
     <span class="tile-text"><span class="tile-title">${esc(label || s.name)}</span>${sub ? `<span class="tile-sub">${esc(sub)}</span>` : ''}</span>
     ${pct ? `<span class="tile-bar"><span style="width:${pct}%"></span></span>` : ''}
   </a>`;
-}
-
-/** Elegir a mano la ficha de AniList de una serie, o de una película dentro de la colección (`item`). */
-function openMetaPicker(s, item = null) {
-  const sheet = $('#sheet');
-  const key = item ? itemMetaKey(s, item.key) : s.name;
-  const label = item ? (item.title || item.query || item.key) : s.name;
-  const q0 = item ? (item.query || item.title || item.key) : (searchNames(s)[0] || s.name);
-  sheet.innerHTML = `<div class="sheet-back" data-act="close"></div>
-    <div class="sheet-panel picker" role="dialog" aria-modal="true" aria-label="Elegir imagen para ${esc(label)}">
-      <p class="sheet-title">Imagen y sinopsis de ${esc(label)}</p>
-      <form class="picker-search" id="picker-search">
-        <input name="q" value="${esc(q0)}" aria-label="Buscar en AniList" autocomplete="off">
-        <button class="btn" type="submit">Buscar</button>
-      </form>
-      <div class="picker-results" id="picker-results"><p class="dim">Buscando…</p></div>
-      <div class="btn-row picker-foot">
-        <button class="btn btn-quiet" data-act="pick-none">Usar sin imagen</button>
-        <button class="btn" data-act="close">Cerrar</button>
-      </div>
-    </div>`;
-  sheet.hidden = false;
-  requestAnimationFrame(() => sheet.classList.add('is-open'));
-  let results = [];
-  const run = async (q) => {
-    const box = $('#picker-results');
-    box.innerHTML = '<p class="dim">Buscando…</p>';
-    try {
-      results = await searchAnime(q, 12);
-      box.innerHTML = results.length ? results.map((m, i) => {
-        const t = toMeta(m);
-        return `<button class="pick" data-act="pick" data-i="${i}">
-          <span class="pick-img">${t.banner || t.cover ? `<img src="${esc(t.banner || t.cover)}" alt="" loading="lazy">` : ''}</span>
-          <span class="pick-title">${esc(t.title)}</span><span class="pick-sub">${[t.year, t.format].filter(Boolean).join(', ')}</span>
-        </button>`;
-      }).join('') : '<p class="dim">Sin resultados. Prueba con el nombre completo en inglés o japonés.</p>';
-    } catch (err) {
-      box.innerHTML = `<p class="dim">${navigator.onLine ? esc(err.message) : 'Necesitas conexión para buscar.'}</p>`;
-    }
-  };
-  $('#picker-search').addEventListener('submit', (e) => { e.preventDefault(); run(e.target.q.value.trim()); });
-  run($('#picker-search').q.value);
-  sheet.onclick = async (e) => {
-    const el = e.target.closest('[data-act]');
-    if (!el) return;
-    if (el.dataset.act === 'close') { closeSheet(); return; }
-    if (el.dataset.act === 'pick-none') {
-      state.shared.picks[key] = { id: 0, u: Date.now() };
-      state.meta[key] = { none: true, id: 0, mv: 3, at: Date.now() };
-    } else if (el.dataset.act === 'pick') {
-      const m = results[Number(el.dataset.i)];
-      if (!m) return;
-      state.shared.picks[key] = { id: m.id, u: Date.now() };
-      state.meta[key] = { ...toMeta(m), mv: 3 };
-      const meta = state.meta[key];
-      translateToSpanish(meta.synopsis).then((es) => { if (es) { meta.synopsisEs = es; saveMeta(); softRender(); } });
-    } else return;
-    saveShared();
-    saveMeta();
-    closeSheet();
-    softRender();
-    sync();
-  };
 }
 
 /* ── portada estilo TV ── */
@@ -2387,6 +2401,7 @@ function episodeRow(ep, { current = false, extra = '', fresh = false, next = fal
         ${art ? `<img src="${esc(art)}" alt="" loading="lazy" decoding="async">` : ''}
         <span class="ep-num" aria-hidden="true">${movie ? '' : ep.ep != null ? esc(ep.ep) : '·'}</span>
         <span class="ep-flags">${fresh ? '<span class="ep-new">Nuevo</span>' : ''}${state.saved.has(ep.id) ? `<span class="ep-flag" title="Descargado">${ICON.saved}</span>` : ''}${seen ? `<span class="ep-flag is-seen" title="Visto">${ICON.check}</span>` : ''}</span>
+        ${codecTagHTML(ep)}
         <span class="ep-play" aria-hidden="true">${ICON.play}</span>
         ${pct ? `<span class="mini-bar"><span style="width:${pct}%"></span></span>` : ''}
       </span>
@@ -2499,8 +2514,12 @@ async function renderDownloads() {
 
 function renderSettings() {
   const s = state.settings;
+  const unread = hasUnreadNews();
+  LS.set(pkey('newsUnread'), false);
+  paintNewsDot();
   app.innerHTML = header('Ajustes') + `<main class="settings">
-    <section class="settings-group is-first">
+    <section class="settings-group is-first ${unread ? 'has-news' : ''}" id="news">${newsHTML()}</section>
+    <section class="settings-group">
       <p class="settings-label">Apariencia</p>
       <div class="segmented" role="group" aria-label="Tema">${[['auto', 'Automático'], ['light', 'Claro'], ['dark', 'Oscuro']].map(([v, l]) => `<button class="seg ${s.theme === v ? 'is-on' : ''}" data-act="set-theme" data-v="${v}" aria-pressed="${s.theme === v}">${l}</button>`).join('')}</div>
     </section>
@@ -2515,7 +2534,6 @@ function renderSettings() {
       <label class="switch"><input type="checkbox" name="autoSkip" ${s.autoSkip ? 'checked' : ''}><span>Saltar intros solo cuando Kai sepa dónde están</span></label>
       <label class="switch"><input type="checkbox" name="ambient" ${s.ambient !== false ? 'checked' : ''}><span>Luz ambiental alrededor del video</span></label>
       <label class="switch"><input type="checkbox" name="prefetchNext" ${s.prefetchNext !== false ? 'checked' : ''}><span>Preparar el siguiente capítulo para que empiece sin espera (usa unos 3 MB de MEGA)</span></label>
-      <label class="switch"><input type="checkbox" name="autoRemoveLocal" ${s.autoRemoveLocal ? 'checked' : ''}><span>Quitar del dispositivo los capítulos que termine</span></label>
     </form>
     <section class="settings-group" id="dl-where">${downloadsWhereHTML()}</section>
     <section class="settings-group" id="seen-all">
@@ -2549,7 +2567,6 @@ function renderSettings() {
     s.autoSkip = f.autoSkip.checked;
     s.ambient = f.ambient.checked;
     s.prefetchNext = f.prefetchNext.checked;
-    s.autoRemoveLocal = f.autoRemoveLocal.checked;
     saveSettings();
   });
   paintSpace();
@@ -2561,7 +2578,7 @@ function downloadsWhereHTML(perm = '') {
   if (!canFolder) {
     return `<p class="settings-label">Descargas</p>
       <p class="settings-value">Dentro de la app</p>
-      <p class="dim">Este navegador no deja que una página guarde en una carpeta (Chrome y Edge sí lo permiten, en computadora y en Android). Si quieres el archivo aparte, toca ⋯ en un capítulo descargado y elige «Guardar copia en el dispositivo».</p>`;
+      <p class="dim">Este navegador no deja que una página guarde en una carpeta (Chrome y Edge en computadora sí lo permiten). Si quieres el archivo aparte, toca ⋯ en un capítulo descargado y elige «Guardar copia en el dispositivo».</p>`;
   }
   const d = dirHandle;
   if (!d) {
@@ -2601,6 +2618,12 @@ async function paintSpace() {
     const est = await navigator.storage.estimate();
     if (est.quota) extra = ` Espacio disponible para la app: ${fmtSize(Math.max(0, est.quota - est.usage))}.`;
   } catch { /* nada */ }
+  try {
+    let kept = await navigator.storage.persisted();
+    if (!kept) kept = await navigator.storage.persist();
+    extra += kept ? ' El sistema guarda las descargas de forma permanente.'
+      : ' El sistema podría borrar las descargas si se queda sin espacio.';
+  } catch { /* no soportado */ }
   if ($('#space')) $('#space').textContent = `${parts.length ? parts.join(' y ') + '.' : 'Ningún capítulo descargado.'}${extra}`;
 }
 
@@ -2626,7 +2649,6 @@ function openSheet(ep) {
       ${upcoming.length ? `<button class="sheet-btn" data-act="save-next">Descargar ${upcoming.length === 1 ? 'el siguiente' : `los ${upcoming.length} siguientes`}</button>` : ''}
       ${saved && (state.dlMeta.get(ep.id) || {}).where !== 'folder' ? '<button class="sheet-btn" data-act="export">Guardar copia en el dispositivo</button>' : ''}
       ${movie ? `<button class="sheet-btn" data-act="later-movie">${isLater(series, movie.key) ? 'Quitar de Más tarde' : 'Ver más tarde'}</button>` : ''}
-      ${movie ? '<button class="sheet-btn" data-act="pick-movie">Elegir datos de AniList</button>' : ''}
       <button class="sheet-btn is-danger" data-act="trash">Mandar a la papelera de MEGA</button>
       <button class="sheet-btn is-quiet" data-act="close">Cerrar</button>
     </div>`;
@@ -2651,10 +2673,6 @@ function openSheet(ep) {
     else if (act === 'export') exportCopy(ep);
     else if (act === 'trash') trashEpisode(ep, true);
     else if (act === 'later-movie') setLater(series, movie.key, !isLater(series, movie.key));
-    else if (act === 'pick-movie') {
-      const it = collectionItems(series).find((x) => x.key === movie.key);
-      setTimeout(() => openMetaPicker(series, it || movie), 200); // espera a que se cierre este menú
-    }
   };
 }
 function closeSheet() {
@@ -2923,10 +2941,6 @@ function finishCurrent() {
   if (!playing) return;
   savePosition(true);
   const ep = playing.ep;
-  const p = prog(ep);
-  if (p && p.w) {
-    if (state.settings.autoRemoveLocal && state.saved.has(ep.id)) removeDownload(ep.id, true);
-  }
   if (playing.objectUrl) {
     const u = playing.objectUrl;
     setTimeout(() => URL.revokeObjectURL(u), 1500);
@@ -3071,6 +3085,7 @@ function setKaiFullscreen(on) {
   const wide = !video.videoWidth || video.videoWidth >= video.videoHeight;
   stage.classList.toggle('kai-rot', on && wide && matchMedia('(pointer: coarse)').matches);
   document.documentElement.classList.toggle('kai-fs-on', on);
+  paintThemeColor();
   paintControls();
   wake();
 }
@@ -3492,11 +3507,17 @@ function resolvedTheme() {
   const t = state.settings.theme;
   return t === 'light' || t === 'dark' ? t : (darkMQ.matches ? 'dark' : 'light');
 }
+/* color de la barra del sistema; en pantalla completa negro, porque en Android ese color también pinta
+ * el hueco de la cámara (en tema claro salía una franja blanca) */
+function paintThemeColor() {
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (!meta) return;
+  meta.content = isFullscreen() ? '#000000' : resolvedTheme() === 'dark' ? '#0d0e12' : '#eef0f4';
+}
 function applyTheme() {
   const t = resolvedTheme();
   document.documentElement.dataset.theme = t;
-  const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.content = t === 'dark' ? '#0d0e12' : '#eef0f4';
+  paintThemeColor();
   if (dock.classList.contains('is-open')) fillDock();
   document.querySelectorAll('[data-act="theme"]:not(.dock-chip)').forEach((b) => {
     b.innerHTML = t === 'dark' ? ICON.sun : ICON.moon;
@@ -3644,7 +3665,7 @@ function formatProblem(f) {
     if (!canPlay(`video/mp4; codecs="hvc1.${v.bits > 8 ? '2.4.L120' : '1.6.L93'}.B0"`)) return { what, fix: `Este navegador no reproduce HEVC en este equipo. ${isSafariUA ? '' : 'Safari en iPhone, iPad y Mac sí.'}`.trim() };
   } else if (v.codec === 'av01') {
     if (!canPlay(`video/mp4; codecs="av01.0.08M.${v.bits > 8 ? '10' : '08'}"`)) return { what: 'AV1', fix: `Este dispositivo no reproduce AV1. ${elsewhere}` };
-  } else if (!canPlay(`video/mp4; codecs="${v.codec}"`)) {
+  } else if (!canPlay(`video/mp4; codecs="${{ vp09: `vp09.00.10.${v.bits > 8 ? '10' : '08'}`, vp08: 'vp8', mp4v: 'mp4v.20.8' }[v.codec] || v.codec}"`)) {
     const names = { mp4v: 'MPEG-4 Part 2 (XviD/DivX)', mp2v: 'MPEG-2', vp08: 'VP8' };
     return { what: names[v.codec] || `el formato "${v.codec}"`, fix: 'Este navegador no reproduce ese formato de video. Hace falta la versión en H.264.' };
   }
@@ -3714,6 +3735,7 @@ async function explainFormat(ep, code) {
   stage.classList.add('is-loading');
   let f = null;
   try { f = await mp4Formats(await rangeReader(ep, token), ep.size); } catch (err) { console.warn('formato', err); }
+  if (f && f.video) { codecCache[codecKey(ep)] = { video: f.video, audio: f.audio }; LS.set('codecs', codecCache); }
   if (playing !== token) return;
   const prob = formatProblem(f);
   const detail = `Detalle: código ${code}; ${formatSummary(f)}`;
@@ -3950,7 +3972,12 @@ ui.menu.addEventListener('change', (e) => {
 document.addEventListener('pointerdown', (e) => {
   if (!ui.menu.hidden && !ui.menu.contains(e.target) && !e.target.closest('[data-act="cc"],[data-act="speed"]')) closeMenu();
 });
-['fullscreenchange', 'webkitfullscreenchange'].forEach((ev) => document.addEventListener(ev, () => { paintControls(); wake(); }));
+['fullscreenchange', 'webkitfullscreenchange'].forEach((ev) => document.addEventListener(ev, () => {
+  document.documentElement.classList.toggle('kai-fs-on', isFullscreen());
+  paintThemeColor();
+  paintControls();
+  wake();
+}));
 
 if (!(document.pictureInPictureEnabled || video.webkitSupportsPresentationMode)) ui.pip.hidden = true;
 
@@ -4038,8 +4065,8 @@ document.addEventListener('click', async (e) => {
   }
   else if (act === 'pick-mode') { if (picking) endPicking(); else startPicking(); }
   else if (act === 'pick-all' || act === 'pick-unseen' || act === 'pick-dl') pickAction(act);
-  else if (act === 'pick-image') { const sr = state.library.series[Number(el.dataset.si)]; if (sr) openMetaPicker(sr); }
   else if (act === 'seen-all') paintSeenByAll(el);
+  else if (act === 'news-clear') { LS.set(pkey('news'), []); const box = $('#news'); if (box) box.innerHTML = newsHTML(); }
   else if (act === 'later') { const sr = state.library.series[Number(el.dataset.si)]; if (sr) setLater(sr, '', !isLater(sr)); }
   else if (act === 'resume-here') {
     const o = resumeOffer();

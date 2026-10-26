@@ -73,12 +73,22 @@ export function toMeta(m) {
   };
 }
 
-/** Busca probando varios textos (temporada, serie + temporada, serie) y se queda con el primero que encuentre. */
-export async function findForSeries(names) {
+/** ¿El resultado tiene que ver con la carpeta? Alguna palabra del nombre (4+ letras) aparece en sus títulos,
+ * o el nombre se parece lo suficiente a alguno (p. ej. "Mi Heroe Academia" ≈ "My Hero Academia"). */
+export function relatedTo(folder, m) {
+  const titles = [...Object.values(m.title || {}), ...(m.synonyms || [])].map(squash).filter(Boolean);
+  const words = String(folder).split(/[^\p{L}\p{N}]+/u).map(squash).filter((w) => w.length >= 4);
+  if (words.some((w) => titles.some((t) => t.includes(w)))) return true;
+  return titleScore(folder, m) >= 0.6;
+}
+/** Busca probando varios textos (serie + temporada, temporada, serie). De cada búsqueda solo acepta un
+ * resultado que tenga que ver con el nombre de la carpeta: mejor sin imagen que con la de otro anime. */
+export async function findForSeries(names, folder = names[names.length - 1]) {
   for (const q of names) {
     if (!q || q.length < 2) continue;
-    const list = await searchAnime(q, 1);
-    if (list.length) return list[0];
+    const list = await searchAnime(q, 5);
+    const hit = list.find((m) => relatedTo(folder, m));
+    if (hit) return hit;
   }
   return null;
 }

@@ -299,6 +299,63 @@ export async function mp4Formats(read, size) {
   return out;
 }
 
+/** Versión liviana de mp4Formats para mostrar el códec en las tarjetas: busca el moov leyendo solo
+ * cabeceras y baja como mucho sus primeros `limit` bytes. El video casi siempre es la primera pista,
+ * así que aparece aunque el resto (tablas grandes, audio) no alcance a bajar. */
+export async function mp4QuickFormats(read, size, limit = 256 * 1024) {
+  let pos = 0;
+  let moovPos = -1;
+  let moovSize = 0;
+  for (let guard = 0; pos + 8 <= size && guard < 64; guard++) {
+    const h = await read(pos, Math.min(size - 1, pos + 15));
+    let boxSize = u32(h, 0);
+    const type = fourcc(h, 4);
+    if (boxSize === 1) boxSize = u64(h, 8);
+    else if (boxSize === 0) boxSize = size - pos;
+    if (type === 'moov') { moovPos = pos; moovSize = boxSize; break; }
+    if (boxSize < 8) break;
+    pos += boxSize;
+  }
+  if (moovPos < 0) return null;
+  const b = await read(moovPos, moovPos + Math.min(moovSize, limit) - 1);
+  const out = { video: null, audio: null };
+  // recorre cajas sin exigir que quepan completas en lo que se bajó
+  const walk = (start, end, depth) => {
+    let p = start;
+    while (p + 8 <= end && p + 8 <= b.length) {
+      let sz = u32(b, p);
+      const type = fourcc(b, p + 4);
+      let hdr = 8;
+      if (sz === 1) { sz = u64(b, p + 8); hdr = 16; } else if (sz === 0) sz = end - p;
+      if (sz < hdr) return;
+      const box = { type, start: p + hdr, end: Math.min(p + sz, end, b.length) };
+      if (['moov', 'trak', 'mdia', 'minf', 'stbl'].includes(type) && depth < 6) {
+        if (type === 'trak') cur = { handler: '' };
+        walk(box.start, box.end, depth + 1);
+      } else if (type === 'hdlr' && cur && box.start + 12 <= b.length) {
+        cur.handler = fourcc(b, box.start + 8);
+      } else if (type === 'stsd' && cur && box.start + 16 <= b.length) {
+        const entry = box.start + 8;
+        const codec = fourcc(b, entry + 4);
+        if (cur.handler === 'vide' && !out.video) {
+          const v = { codec, bits: 8, profile: 0 };
+          const kids = entry + 8 + 78;
+          const find = (t) => { for (let q = kids; q + 8 <= Math.min(box.end, b.length); ) { const n = u32(b, q); if (fourcc(b, q + 4) === t) return q + 8; if (n < 8) break; q += n; } return -1; };
+          if (/^avc[13]$/.test(codec)) { const c = find('avcC'); if (c > 0) { v.profile = b[c + 1]; if ([110, 122, 244].includes(v.profile)) v.bits = 10; } }
+          else if (/^(hev1|hvc1)$/.test(codec)) { const c = find('hvcC'); if (c > 0) { v.profile = b[c + 1] & 0x1f; v.bits = (b[c + 17] & 7) + 8; } }
+          else if (codec === 'av01') { const c = find('av1C'); if (c > 0) v.bits = (b[c + 2] & 0x40) ? ((b[c + 2] & 0x20) ? 12 : 10) : 8; }
+          out.video = v;
+        } else if (cur.handler === 'soun' && !out.audio) out.audio = { codec };
+      }
+      if (p + sz <= p) return;
+      p += sz;
+    }
+  };
+  let cur = null;
+  walk(8, b.length, 0);
+  return out.video || out.audio ? out : null;
+}
+
 /** Solo las pistas de subtítulos (sin capítulos). */
 export async function mp4TextTracks(read, size) {
   return (await mp4Info(read, size)).tracks;

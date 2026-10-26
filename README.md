@@ -5,8 +5,9 @@ Reproductor web para ver las series y películas de anime guardadas en una cuent
 ## Qué hace
 
 - **Perfiles** tipo Netflix, cada uno con su propio progreso, sincronizado entre dispositivos.
-- **Biblioteca** armada desde la carpeta `Anime` de MEGA: cada carpeta es una serie y sus subcarpetas son temporadas. Una carpeta `Peliculas` se muestra como colección: cada película se busca por el nombre de su archivo, y en su menú ⋯ se puede elegir la ficha a mano.
-- **Sinopsis e imágenes** de AniList para cada serie y película.
+- **Biblioteca** armada desde la carpeta `Anime` de MEGA: cada carpeta es una serie y sus subcarpetas son temporadas. Una carpeta `Peliculas` se muestra como colección: cada película (una subcarpeta o un archivo suelto) se busca por su nombre.
+- **Sinopsis e imágenes** de AniList para cada serie y película, automáticas.
+- **Códec de cada video** en pequeño sobre su miniatura, con un puntito rojo si el dispositivo donde estás no lo puede reproducir (por ejemplo AV1 en un iPad M2).
 - **Inicio** con lo agregado recientemente, lo marcado para **Más tarde** y búsqueda rápida (la lupa). El botón de inicio está en todas las páginas.
 - **Seguir en otro dispositivo:** si dejaste algo a medias en otro dispositivo, el inicio ofrece seguir en ese mismo segundo.
 - **Catálogo** con buscador y filtros por género, año y tipo. El año, el tipo y los géneros de cada ficha son botones que llevan al catálogo filtrado.
@@ -14,8 +15,8 @@ Reproductor web para ver las series y películas de anime guardadas en una cuent
 - **Gestos en el teléfono:** doble toque a los lados para ±10 s, mantener presionado para 2×, deslizar arriba para pantalla completa y abajo para salir de ella o pasar al mini reproductor. En pantalla completa, barra de brillo a la izquierda. En iPhone el video se gira solo, aunque tengas el bloqueo de rotación.
 - **Mini reproductor:** el video sigue sonando mientras navegas por Kai.
 - **Rápido:** lo ya visto queda en memoria (retroceder no gasta cuota de MEGA) y prepara el inicio del siguiente capítulo.
-- **Descargas sin conexión,** de uno en uno o varios a la vez. En Chrome y Edge se pueden guardar en una carpeta como MP4.
-- **Aviso** de contenido nuevo (uno solo aunque lleguen varios capítulos), del uso de la cuota de MEGA y de cuando hay una versión nueva de Kai (también se puede buscar en Ajustes).
+- **Descargas sin conexión,** de uno en uno o varios a la vez. En Chrome y Edge de computadora se pueden guardar en una carpeta como MP4. Nada se borra solo: lo descargado se quita a mano desde Descargados.
+- **Novedades** en Ajustes con lo que se agrega a MEGA (un puntito en el menú avisa que hay algo nuevo). Aviso del uso de la cuota de MEGA y de cuando hay una versión nueva de Kai (también se puede buscar en Ajustes).
 - **Visto por todos:** en Ajustes, lista lo que ya terminaron todos los perfiles, por si quieres liberar espacio en MEGA.
 
 ## Notas
