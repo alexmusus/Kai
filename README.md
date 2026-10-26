@@ -21,4 +21,4 @@ Reproductor web para ver las series y películas de anime guardadas en una cuent
 ## Notas
 
 - La cuota de transferencia de MEGA gratis se renueva sola en unas horas; ver y descargar cuentan para ella. Aunque se agote, los perfiles se pueden elegir igual.
-- Si un video se corta, Kai pide a MEGA un enlace nuevo y sigue donde iba.
+- Si un video se corta, Kai pide a MEGA un enlace nuevo y sigue donde iba. Si un archivo viene en un formato que el navegador no reproduce, Kai dice cuál es.

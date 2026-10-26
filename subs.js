@@ -262,6 +262,43 @@ export async function mp4Info(read, size) {
   return { tracks, chapters: neroChapters(moov, root), chapterTrack };
 }
 
+/** Formato real del video y del audio, leído del encabezado del MP4 (para explicar por qué no se reproduce). */
+export async function mp4Formats(read, size) {
+  const moov = await readMoov(read, size);
+  if (!moov) return null;
+  const out = { video: null, audio: null };
+  for (const trak of boxes(moov, 8, moov.length)) {
+    if (trak.type !== 'trak') continue;
+    const mdia = child(moov, trak, 'mdia');
+    const hdlr = mdia && child(moov, mdia, 'hdlr');
+    const stsd = mdia && path(moov, mdia, 'minf', 'stbl', 'stsd');
+    if (!hdlr || !stsd) continue;
+    const handler = fourcc(moov, hdlr.start + 8);
+    const entry = stsd.start + 8; // versión/banderas (4) y número de entradas (4)
+    const entryEnd = Math.min(stsd.end, entry + u32(moov, entry));
+    const codec = fourcc(moov, entry + 4);
+    const find = (type, from) => { for (const c of boxes(moov, from, entryEnd)) if (c.type === type) return c; return null; };
+    if (handler === 'vide' && !out.video) {
+      const v = { codec, bits: 8, profile: 0 };
+      const kids = entry + 8 + 78; // la entrada de video tiene 78 bytes fijos antes de sus cajas
+      if (/^avc[13]$/.test(codec)) {
+        const c = find('avcC', kids);
+        if (c) { v.profile = moov[c.start + 1]; if ([110, 122, 244].includes(v.profile)) v.bits = 10; }
+      } else if (/^(hev1|hvc1)$/.test(codec)) {
+        const c = find('hvcC', kids);
+        if (c) { v.profile = moov[c.start + 1] & 0x1f; v.bits = (moov[c.start + 17] & 7) + 8; }
+      } else if (codec === 'av01') {
+        const c = find('av1C', kids);
+        if (c) v.bits = (moov[c.start + 2] & 0x40) ? ((moov[c.start + 2] & 0x20) ? 12 : 10) : 8;
+      }
+      out.video = v;
+    } else if (handler === 'soun' && !out.audio) {
+      out.audio = { codec };
+    }
+  }
+  return out;
+}
+
 /** Solo las pistas de subtítulos (sin capítulos). */
 export async function mp4TextTracks(read, size) {
   return (await mp4Info(read, size)).tracks;

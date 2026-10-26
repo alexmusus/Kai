@@ -1,5 +1,5 @@
 import { Storage } from './vendor/mega.js';
-import { isSubtitleName, parseSubtitleFile, mp4Info, mp4Chapters, loadTrackCues, langName } from './subs.js';
+import { isSubtitleName, parseSubtitleFile, mp4Info, mp4Chapters, mp4Formats, loadTrackCues, langName } from './subs.js';
 import { searchAnime, animeById, toMeta, findForSeries, findMovie, translateToSpanish, canTranslate } from './meta.js';
 
 const C = window.MegaCore;
@@ -3619,6 +3619,48 @@ video.addEventListener('ended', () => {
     nextTimer = setTimeout(tick, 1000);
   }
 });
+/* ── formato del video: por qué un navegador no puede reproducir un archivo ── */
+const isSafariUA = /Safari\//.test(navigator.userAgent) && !/Chrome|CriOS|Chromium|Edg|Android|FxiOS/.test(navigator.userAgent);
+function canPlay(type) {
+  try { return !!video.canPlayType(type) || !!(window.MediaSource && MediaSource.isTypeSupported(type)); } catch { return false; }
+}
+/** Si el formato del archivo no se puede reproducir en este navegador: { what, fix }; si no, null.
+ * Se le pregunta al propio navegador por el códec exacto, así el aviso vale para cada dispositivo. */
+const hex2 = (n) => (n & 255).toString(16).padStart(2, '0').toUpperCase();
+function formatProblem(f) {
+  if (!f || !f.video) return null;
+  const v = f.video;
+  const a = f.audio || {};
+  const elsewhere = isSafariUA ? 'En Chrome de la PC quizá sí se vea.' : 'Prueba en otro navegador o dispositivo.';
+  if (/^avc[13]$/.test(v.codec)) {
+    if (!canPlay(`video/mp4; codecs="avc1.${hex2(v.profile || 100)}0028"`)) {
+      return v.bits > 8
+        ? { what: 'H.264 de 10 bits (Hi10P)', fix: `Este navegador no reproduce ese formato. ${elsewhere} Lo seguro es la versión en H.264 normal (8 bits).` }
+        : { what: `H.264 (perfil ${v.profile})`, fix: `Este navegador no reproduce ese perfil de H.264. ${elsewhere}` };
+    }
+  } else if (/^(hev1|hvc1)$/.test(v.codec)) {
+    const what = `HEVC (H.265)${v.bits > 8 ? ' de 10 bits' : ''}`;
+    if (v.codec === 'hev1' && isSafariUA) return { what: what + ' marcado como "hev1"', fix: 'Safari solo acepta HEVC marcado como "hvc1". Se arregla sin perder calidad: ffmpeg -i entrada.mp4 -c copy -tag:v hvc1 salida.mp4' };
+    if (!canPlay(`video/mp4; codecs="hvc1.${v.bits > 8 ? '2.4.L120' : '1.6.L93'}.B0"`)) return { what, fix: `Este navegador no reproduce HEVC en este equipo. ${isSafariUA ? '' : 'Safari en iPhone, iPad y Mac sí.'}`.trim() };
+  } else if (v.codec === 'av01') {
+    if (!canPlay(`video/mp4; codecs="av01.0.08M.${v.bits > 8 ? '10' : '08'}"`)) return { what: 'AV1', fix: `Este dispositivo no reproduce AV1. ${elsewhere}` };
+  } else if (!canPlay(`video/mp4; codecs="${v.codec}"`)) {
+    const names = { mp4v: 'MPEG-4 Part 2 (XviD/DivX)', mp2v: 'MPEG-2', vp08: 'VP8' };
+    return { what: names[v.codec] || `el formato "${v.codec}"`, fix: 'Este navegador no reproduce ese formato de video. Hace falta la versión en H.264.' };
+  }
+  if (/^(ac-3|ec-3)$/.test(a.codec) && !canPlay(`audio/mp4; codecs="${a.codec}"`)) {
+    return { what: `audio Dolby (${a.codec === 'ec-3' ? 'E-AC-3' : 'AC-3'})`, fix: `Este navegador no reproduce ese audio. ${isSafariUA ? '' : 'Safari y Edge sí.'}`.trim() };
+  }
+  if (/^dts/i.test(a.codec || '')) return { what: 'audio DTS', fix: 'Los navegadores no reproducen audio DTS. Hace falta una versión con audio AAC.' };
+  return null;
+}
+function formatSummary(f) {
+  if (!f) return 'formato no leído';
+  const v = f.video;
+  const vs = v ? `${v.codec}${v.profile ? ' perfil ' + v.profile : ''}, ${v.bits} bits` : 'sin video';
+  return `video ${vs}; audio ${(f.audio && f.audio.codec) || 'ninguno'}`;
+}
+
 video.addEventListener('error', async () => {
   if (!playing || !video.getAttribute('src')) return;
   const { ep } = playing;
@@ -3626,7 +3668,11 @@ video.addEventListener('error', async () => {
   // Un tropiezo de MEGA o de la red no termina la reproducción: se pide un enlace nuevo y se sigue
   // en el mismo punto. Hasta 4 intentos en 3 minutos, para no quedar en un ciclo si de verdad no hay forma.
   const now = Date.now();
+  const code = video.error ? video.error.code : 0;
   playing.recover = (playing.recover || []).filter((t) => now - t < 180000);
+  // código 3 (decodificar) o 4 (formato no soportado): repetir no sirve más de una vez; se revisa el formato
+  const formatError = code === 3 || code === 4;
+  if (formatError && (playing.recover.length >= 1 || playing.objectUrl)) { explainFormat(ep, code); return; }
   if (!playing.objectUrl && playing.recover.length < 4 && navigator.onLine) {
     playing.recover.push(now);
     stage.classList.add('is-loading');
@@ -3662,6 +3708,18 @@ video.addEventListener('error', async () => {
   else if (!playing.objectUrl && navigator.onLine) playerMessage('No se pudo reproducir en línea. Puedes descargarlo y verlo desde el dispositivo.', true, false, detail);
   else playerMessage('No se pudo reproducir este capítulo en este navegador.');
 });
+
+async function explainFormat(ep, code) {
+  const token = playing;
+  stage.classList.add('is-loading');
+  let f = null;
+  try { f = await mp4Formats(await rangeReader(ep, token), ep.size); } catch (err) { console.warn('formato', err); }
+  if (playing !== token) return;
+  const prob = formatProblem(f);
+  const detail = `Detalle: código ${code}; ${formatSummary(f)}`;
+  if (prob) playerMessage(`Este video viene en ${prob.what}. ${prob.fix}`, false, false, detail);
+  else playerMessage('Este navegador no pudo reproducir el video, aunque su formato parece normal. El archivo podría estar dañado o incompleto en MEGA.', !token.objectUrl, false, detail);
+}
 
 let seekFrom = null;
 ui.seek.addEventListener('input', () => { if (!seeking) seekFrom = video.currentTime; seeking = true; paintControls(); wake(); });
