@@ -6,7 +6,7 @@
  */
 importScripts('core.js');
 
-const VERSION = 'kai-v8';
+const VERSION = 'kai-v9';
 const SHELL = [
   './', 'index.html', 'styles.css', 'app.js', 'subs.js', 'meta.js', 'core.js',
   'vendor/mega.js', 'manifest.webmanifest', 'icon.svg', 'icon-180.png', 'icon-512.png',
@@ -136,21 +136,53 @@ let useTick = 0;
 
 function megaError(status, headers) {
   const e = new Error(status === 509 ? 'Límite de transferencia de MEGA alcanzado' : 'MEGA respondió ' + status);
-  e.code = status === 509 ? 'QUOTA' : 'HTTP';
+  // 408, 429 y 5xx son tropiezos pasajeros del servidor de MEGA: se reintentan.
+  // 403, 404 o 410 casi siempre es un enlace caducado: lo resuelve la app pidiendo uno nuevo.
+  e.code = status === 509 ? 'QUOTA' : (status === 408 || status === 429 || status >= 500) ? 'BUSY' : 'HTTP';
   e.status = status;
   const tl = headers && headers.get('x-mega-time-left');
   if (tl) e.timeLeft = +tl;
   return e;
 }
 
-async function fileFor(key, url, size) {
+async function fileFor(key, url, size, id = '') {
   let f = files.get(key);
   if (!f) {
-    f = { key, url, size, fk: await MegaCore.fileKey(key), blocks: new Map(), active: 0, queue: [] };
+    f = { key, url, given: url, id, size, fk: await MegaCore.fileKey(key), blocks: new Map(), active: 0, queue: [], renewing: null };
     files.set(key, f);
   }
-  if (url) f.url = url; // la dirección de descarga cambia cada cierto tiempo
+  if (id) f.id = id;
+  // El reproductor repite en cada pedido la dirección con la que empezó. Si ya se renovó aquí,
+  // no se vuelve a la vieja; solo se adopta una dirección que la app mande de verdad nueva.
+  if (url && url !== f.given) { f.given = url; f.url = url; }
   return f;
+}
+
+/** Le cuenta a la app el último error al pedir video, para mostrarlo si la reproducción falla. */
+function tellError(err) {
+  const msg = (err && (err.status ? 'MEGA ' + err.status : err.message)) || 'error';
+  self.clients.matchAll({ type: 'window' }).then((l) => l.forEach((c) => c.postMessage({ type: 'stream-error', msg }))).catch(() => {});
+}
+
+/** El enlace de MEGA caducó: se le pide uno nuevo a la app (una sola vez a la vez por archivo). */
+function renewUrl(f) {
+  if (!f.id) return Promise.resolve(false);
+  if (!f.renewing) {
+    f.renewing = (async () => {
+      const list = await self.clients.matchAll({ type: 'window' });
+      for (const c of list) {
+        const url = await new Promise((resolve) => {
+          const ch = new MessageChannel();
+          const t = setTimeout(() => resolve(''), 8000);
+          ch.port1.onmessage = (e) => { clearTimeout(t); resolve((e.data && e.data.url) || ''); };
+          c.postMessage({ type: 'need-url', id: f.id }, [ch.port2]);
+        });
+        if (url) { f.url = url; return true; }
+      }
+      return false;
+    })().finally(() => { setTimeout(() => { f.renewing = null; }, 15000); });
+  }
+  return f.renewing;
 }
 
 class Block {
@@ -242,8 +274,14 @@ async function runBlock(b, ctrl) {
     } catch (err) {
       if (ctrl.signal.aborted) return;
       if (err.code === 'QUOTA') reportQuota(err.timeLeft);
-      if (err.code === 'HTTP' || err.code === 'QUOTA' || ++tries > 3) { b.err = err; b.notify(); return; }
-      await new Promise((r) => setTimeout(r, 600 * tries));
+      // enlace caducado: se pide uno nuevo a la app y se sigue desde donde iba, sin cortar el video
+      if (err.code === 'HTTP' && !b.renewed) {
+        b.renewed = true;
+        if (await renewUrl(f)) continue;
+      }
+      // cortes de red y tropiezos del servidor: hasta 6 intentos con espera creciente (≈ 20 s en total)
+      if (err.code === 'HTTP' || err.code === 'QUOTA' || ++tries > 6) { b.err = err; b.notify(); tellError(err); return; }
+      await new Promise((r) => setTimeout(r, Math.min(6000, 500 * 2 ** (tries - 1))));
     }
   }
   b.done = true;
@@ -283,6 +321,7 @@ async function stream(req, url) {
   const key = url.searchParams.get('k');
   const size = Number(url.searchParams.get('s'));
   const type = url.searchParams.get('t') || 'video/mp4';
+  const id = url.searchParams.get('i') || '';
   if (!src || !key || !size) return new Response('Faltan datos', { status: 400 });
 
   const { start, end, partial } = parseRange(req.headers.get('range'), size);
@@ -290,7 +329,7 @@ async function stream(req, url) {
     return new Response(null, { status: 416, headers: { 'Content-Range': `bytes */${size}` } });
   }
 
-  const f = await fileFor(key, src, size);
+  const f = await fileFor(key, src, size, id);
   let pos = start;
   const held = new Map(); // bloques que este flujo está usando
 
@@ -343,7 +382,7 @@ self.addEventListener('message', (e) => {
   const d = e.data || {};
   if (d.type !== 'prefetch' || !d.u || !d.k || !d.s) return;
   e.waitUntil((async () => {
-    const f = await fileFor(d.k, d.u, Number(d.s));
+    const f = await fileFor(d.k, d.u, Number(d.s), d.i || '');
     const n = Math.min(Math.ceil(f.size / BLOCK), d.blocks || 2);
     const list = [];
     for (let i = 0; i < n; i++) list.push(getBlock(f, i));

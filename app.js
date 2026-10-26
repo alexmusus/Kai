@@ -1,6 +1,6 @@
 import { Storage } from './vendor/mega.js';
 import { isSubtitleName, parseSubtitleFile, mp4Info, mp4Chapters, loadTrackCues, langName } from './subs.js';
-import { searchAnime, animeById, toMeta, findForSeries, translateToSpanish, canTranslate } from './meta.js';
+import { searchAnime, animeById, toMeta, findForSeries, findMovie, translateToSpanish, canTranslate } from './meta.js';
 
 const C = window.MegaCore;
 const $ = (s, el = document) => el.querySelector(s);
@@ -70,6 +70,8 @@ const ICON = {
   moon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 14.5A8 8 0 0 1 9.5 4.5a8 8 0 1 0 10 10z"/></svg>',
   search: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L20 20"/></svg>',
   close: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  later: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10v16l-5-3.6L7 20z"/></svg>',
+  laterOn: '<svg viewBox="0 0 24 24" aria-hidden="true" class="solid"><path d="M7 4h10v16l-5-3.6L7 20z"/></svg>',
   grid: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5"/></svg>',
 };
 
@@ -583,6 +585,70 @@ function setProgress(ep, t, d, watched) {
   saveProgressLocal();
 }
 
+/* ── este dispositivo: para "Seguir en otro dispositivo" ── */
+const DEVICE = (() => {
+  let d = LS.get('device', null);
+  if (!d) { d = Math.random().toString(36).slice(2, 10); LS.set('device', d); }
+  return d;
+})();
+function deviceName() {
+  const ua = navigator.userAgent;
+  if (/iPad/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) return 'iPad';
+  if (/iPhone/.test(ua)) return 'iPhone';
+  if (/Android/.test(ua)) return /Mobile/.test(ua) ? 'teléfono Android' : 'tablet Android';
+  if (/Windows/.test(ua)) return 'PC';
+  if (/Macintosh/.test(ua)) return 'Mac';
+  return 'otro dispositivo';
+}
+
+/* Entradas especiales dentro del progreso de cada perfil (se sincronizan y fusionan igual, por `u`):
+ *  "@now"               qué se está viendo, en qué segundo y en qué dispositivo
+ *  "@later/<serie>"      la serie está en "Más tarde"; "@later/<serie>/<película>" para una película */
+function markNow(ep, t, d) {
+  const p = prog(ep) || {};
+  state.progress['@now'] = { p: ep.path, t: Math.round(t), d: Math.round(d || 0), w: !!p.w, dev: DEVICE, dn: deviceName(), u: Date.now() };
+}
+/** Lo que quedó viendo este perfil en otro dispositivo hace poco, si conviene ofrecer seguir aquí. */
+function resumeOffer() {
+  const n = state.progress['@now'];
+  if (!n || !n.p || n.dev === DEVICE || n.w || n.t < 15 || Date.now() - n.u > 12 * 3600000) return null;
+  if (playing || LS.get('nowSeen', 0) === n.u) return null;
+  const e = index.byPath.get(n.p);
+  if (!e) return null; // ya no está en MEGA
+  const p = prog(e.ep);
+  if (p && p.w) return null;
+  return { ep: e.ep, s: state.library.series[e.si], n };
+}
+
+const laterKey = (s, itemKey = '') => `@later/${s.name}${itemKey ? '/' + itemKey : ''}`;
+const isLater = (s, itemKey = '') => !!(state.progress[laterKey(s, itemKey)] || {}).on;
+function setLater(s, itemKey, on) {
+  state.progress[laterKey(s, itemKey)] = { on: !!on, u: Date.now() };
+  state.dirty = true;
+  saveProgressLocal();
+  toast(on ? 'Agregado a Más tarde.' : 'Quitado de Más tarde.');
+  softRender();
+  sync();
+}
+/** Lo marcado para más tarde que sigue en MEGA y sin terminar, lo más reciente primero. */
+function laterList() {
+  const lib = state.library;
+  if (!lib || lib.v !== 2) return [];
+  const out = [];
+  lib.series.forEach((s, si) => {
+    const coll = isCollection(s);
+    const items = coll ? collectionItems(s) : [null];
+    for (const it of items) {
+      const v = state.progress[laterKey(s, it ? it.key : '')];
+      if (!v || !v.on) continue;
+      const eps = it ? it.eps : s.all;
+      if (eps.length && eps.every((e) => (prog(e) || {}).w)) continue; // ya lo vio todo
+      out.push({ s, si, it, u: v.u });
+    }
+  });
+  return out.sort((a, b) => b.u - a.u);
+}
+
 function continueList() {
   if (!state.library || state.library.v !== 2) return [];
   const out = [];
@@ -613,6 +679,22 @@ function mergeProgress(a, b) {
     if (!out[k] || v.u > out[k].u) out[k] = v;
   }
   return out;
+}
+
+/* Respaldo de los perfiles en los atributos de la carpeta de la biblioteca: llegan con la lista de
+ * archivos de MEGA, sin descargar nada, así que se pueden ver aunque la cuota esté agotada. */
+const BACKUP_ATTR = 'kaip';
+async function backupProfiles() {
+  const folder = state.storage && findFolder(state.storage, state.settings.root);
+  if (!folder || typeof folder.setAttributes !== 'function') return;
+  const want = visibleProfiles().filter((p) => !p.mergedInto).map((p) => ({ i: p.id, n: p.name, h: p.hue, c: p.created || 0, u: p.u || 0 }));
+  if (!want.length || JSON.stringify((folder.attributes || {})[BACKUP_ATTR]) === JSON.stringify(want)) return;
+  try { await folder.setAttributes({ [BACKUP_ATTR]: want }); } catch (err) { console.warn('respaldo de perfiles', err); }
+}
+function profilesFromBackup() {
+  const folder = state.storage && findFolder(state.storage, state.settings.root);
+  const b = folder && folder.attributes && folder.attributes[BACKUP_ATTR];
+  return Array.isArray(b) ? b.filter((x) => x && x.i && x.n).map((x) => ({ id: x.i, name: x.n, hue: x.h, created: x.c, u: x.u })) : [];
 }
 
 let syncing = null;
@@ -735,6 +817,7 @@ async function doSync() {
     }
     if (!state.sharedLoaded) { state.sharedLoaded = true; LS.set('sharedLoaded', true); }
     state.sharedError = false;
+    await backupProfiles();
 
     // 2) progreso del perfil activo
     let changedHere = false;
@@ -775,6 +858,9 @@ async function doSync() {
     if (!state.sharedLoaded) {
       state.sharedError = true;
       state.sharedErrorMsg = megaMessage((err && err.cause) || err); // el motivo real: cuota, sesión, red…
+      // sin poder leer el archivo de perfiles (p. ej. sin cuota), se muestran los del respaldo para poder entrar;
+      // no se escribe nada en MEGA hasta poder leer el archivo de verdad
+      for (const p of profilesFromBackup()) if (!state.shared.profiles.some((x) => x.id === p.id)) state.shared.profiles.push(p);
       if (!state.profile || route().view === 'perfiles') render();
     }
     console.warn('sync', err);
@@ -1148,16 +1234,39 @@ function route() {
   const [view, ...rest] = path.split('/');
   return { view: view || 'home', arg: decodeURIComponent(rest.join('/')), q: new URLSearchParams(query) };
 }
-let inAppNav = 0;
+/* Historial propio de Kai: "volver" salta las entradas que son la misma página (otra pestaña o
+ * temporada de la misma serie) hasta llegar a una distinta, en vez de retroceder de a un paso. */
+const navStack = [location.hash || '#/'];
+let navBackSteps = 0; // pasos que Kai mismo pidió retroceder
+let navReplacing = false;
+const navPage = (h) => String(h || '#/').split('?')[0];
+function onHashChange() {
+  const h = location.hash || '#/';
+  if (navBackSteps) { navStack.length = Math.max(1, navStack.length - navBackSteps); navBackSteps = 0; navStack[navStack.length - 1] = h; }
+  else if (navReplacing) { navStack[navStack.length - 1] = h; navReplacing = false; }
+  else if (navStack.length > 1 && navStack[navStack.length - 2] === h) navStack.pop(); // botón atrás del navegador
+  else if (navStack[navStack.length - 1] !== h) navStack.push(h);
+}
 function go(hash) { if (location.hash !== hash) location.hash = hash; else render(); }
+function goHome() {
+  if (navPage(location.hash) === '#/' || !location.hash) { render(); return; }
+  // si el inicio está en el historial, se vuelve a él; si no, se va directo
+  const i = navStack.map(navPage).lastIndexOf('#/');
+  if (i >= 0 && i < navStack.length - 1) { navBackSteps = navStack.length - 1 - i; history.go(-navBackSteps); }
+  else go('#/');
+}
 function goBack(fallback = '#/') {
-  if (inAppNav > 0) history.back();
-  else location.replace(fallback);
+  const cur = navPage(navStack[navStack.length - 1]);
+  let i = navStack.length - 2;
+  while (i >= 0 && navPage(navStack[i]) === cur) i--;
+  if (i >= 0) { navBackSteps = navStack.length - 1 - i; history.go(-navBackSteps); }
+  else { navReplacing = true; location.replace(fallback); }
 }
 
 function header(title, { actions = '', overlay = false } = {}) {
   return `<header class="bar ${overlay ? 'is-overlay' : ''}">
     <button class="icon-btn" data-act="back" aria-label="Volver">${ICON.back}</button>
+    <button class="icon-btn" data-act="home" aria-label="Inicio">${ICON.home}</button>
     <h1 class="bar-title">${title}</h1>
     <span id="sync" class="sync" data-state="ok"></span>
     ${actions}
@@ -1229,7 +1338,7 @@ function fillDock() {
   const dark = resolvedTheme() === 'dark';
   dock.querySelector('.dock-panel').innerHTML = `
     <a class="dock-profile" href="#/perfiles" role="menuitem">${avatarHTML(p)}<span><span class="dock-pname">${esc(p.name)}</span><span class="dock-psub">Cambiar perfil</span></span></a>
-    ${item('#/', ICON.home, 'Biblioteca', view === 'home' || view === 'serie')}
+    ${item('#/', ICON.home, 'Inicio', view === 'home' || view === 'serie')}
     ${item('#/explorar', ICON.folder, 'Explorar MEGA', view === 'explorar')}
     ${item('#/descargas', ICON.saved, 'Descargados', view === 'descargas', `<span class="dock-count" id="dock-count">${state.saved.size || ''}</span>`)}
     ${item('#/ajustes', ICON.gear, 'Ajustes', view === 'ajustes')}
@@ -1331,6 +1440,7 @@ function renderProfiles(editing = false, adding = false) {
       ${waiting && first ? '<p class="profiles-lead">Buscando perfiles en tu MEGA…</p>' : ''}
       ${failed ? `<p class="profiles-lead">${navigator.onLine ? 'No pude leer tus perfiles en MEGA.' : 'Conéctate a internet para cargar tus perfiles.'}</p>
         ${navigator.onLine && state.sharedErrorMsg && state.sharedErrorMsg !== 'MFA' ? `<p class="profiles-why">${esc(state.sharedErrorMsg)}${/límite de transferencia/i.test(state.sharedErrorMsg) ? ' MEGA cuenta ese límite por conexión: con datos móviles u otra red suele funcionar de inmediato.' : ''}</p>` : ''}
+        ${navigator.onLine && list.length ? '<p class="profiles-why">Puedes entrar con tu perfil igual: tu progreso se junta con el de MEGA en cuanto se pueda leer.</p>' : ''}
         ${navigator.onLine ? '<button class="btn btn-lamp" data-act="profiles-retry">Reintentar</button>' : ''}` : ''}
       <ul class="profile-grid">
         ${list.map((p) => `<li><button class="profile-tile ${editing ? 'is-editing' : ''}" data-act="${editing ? 'profile-delete' : 'profile-pick'}" data-id="${esc(p.id)}">
@@ -1341,7 +1451,7 @@ function renderProfiles(editing = false, adding = false) {
             <button class="btn btn-lamp" type="submit">Crear</button>
           </form>` : `<button class="profile-tile is-add" data-act="profile-add"><span class="avatar avatar-xl avatar-add" aria-hidden="true">+</span><span class="profile-name">Agregar</span></button>`}</li>` : ''}
       </ul>
-      ${list.length ? `<button class="btn" data-act="${editing ? 'profiles-done' : 'profiles-edit'}">${editing ? 'Listo' : 'Editar perfiles'}</button>` : ''}
+      ${list.length && !blocked ? `<button class="btn" data-act="${editing ? 'profiles-done' : 'profiles-edit'}">${editing ? 'Listo' : 'Editar perfiles'}</button>` : ''}
     </div>
   </main>`;
   const form = $('#profile-new');
@@ -1423,15 +1533,37 @@ function markSeriesSeen(s) {
   LS.set(pkey('known'), k);
 }
 let lastNew = null;
+/* Al importar varios capítulos, MEGA avisa de cada archivo por separado: los cambios se juntan
+ * unos segundos y se muestra un solo aviso ("Hay contenido nuevo: Fate (3), Frieren (1)"). */
+let newPending = {};
+let newTimer = null;
 function announceNew() {
   if (!state.library || !state.library.series || !state.profile) return;
   const now = Object.fromEntries(state.library.series.map((s) => [s.name, newEpisodes(s).length]));
   if (lastNew) {
     for (const [name, n] of Object.entries(now)) {
-      if (n > (lastNew[name] || 0)) toast(`${name}: ${n === 1 ? 'un capítulo nuevo' : `${n} capítulos nuevos`}.`);
+      if (n > (lastNew[name] || 0)) newPending[name] = n;
+    }
+    if (Object.keys(newPending).length) {
+      clearTimeout(newTimer);
+      newTimer = setTimeout(flushNew, 4000);
     }
   }
   lastNew = now;
+}
+function flushNew() {
+  newTimer = null;
+  // solo lo que sigue sin ver (si ya entró a la serie mientras tanto, no se avisa)
+  const cur = state.library && state.library.series ? Object.fromEntries(state.library.series.map((s) => [s.name, newEpisodes(s).length])) : {};
+  const list = Object.entries(newPending).map(([name]) => [name, cur[name] || 0]).filter(([, n]) => n > 0);
+  newPending = {};
+  if (!list.length) return;
+  if (list.length === 1) {
+    const [name, n] = list[0];
+    toast(`${name}: ${n === 1 ? 'un capítulo nuevo' : `${n} capítulos nuevos`}.`);
+  } else {
+    toast(`Hay contenido nuevo: ${list.map(([name, n]) => `${name} (${n})`).join(', ')}.`);
+  }
 }
 
 /* ── sinopsis e imágenes ── */
@@ -1461,14 +1593,20 @@ async function ensureMeta() {
         for (const it of collectionItems(s)) {
           const k = itemMetaKey(s, it.key);
           const c = state.meta[k];
-          if (c && Date.now() - (c.at || 0) < 30 * 86400000 && (c.none || c.v === 2)) continue;
-          let m = null;
-          if (it.query) {
-            let list;
-            try { list = await searchAnime(it.query, 6); } catch (err) { console.warn('anilist', err); failed = true; break; }
-            m = list.find((x) => x.format === 'MOVIE') || list[0] || null;
+          const ipick = state.shared.picks[k]; // ficha elegida a mano (se sincroniza entre dispositivos)
+          const age = Date.now() - ((c && c.at) || 0);
+          if (ipick) {
+            if (c && (ipick.id ? c.id === ipick.id && age < 30 * 86400000 : c.none)) continue;
+          } else if (c && c.mv === 3) {
+            // lo encontrado se guarda 30 días; lo que no se encontró se vuelve a buscar al día siguiente
+            if (c.none ? age < 86400000 : age < 30 * 86400000) continue;
           }
-          state.meta[k] = m ? toMeta(m) : { none: true, id: 0, at: Date.now() };
+          let m = null;
+          try {
+            if (ipick) m = ipick.id ? await animeById(ipick.id) : null;
+            else if (it.query) m = await findMovie(it.query, () => sleep(400));
+          } catch (err) { console.warn('anilist', err); failed = true; break; }
+          state.meta[k] = m ? { ...toMeta(m), mv: 3 } : { none: true, id: 0, mv: 3, at: Date.now() };
           changed = true;
           saveMeta();
           await sleep(400);
@@ -1590,13 +1728,17 @@ function tileHTML(s, si, { href, label = '', sub = '', pct = 0, badge = '' } = {
   </a>`;
 }
 
-function openMetaPicker(s) {
+/** Elegir a mano la ficha de AniList de una serie, o de una película dentro de la colección (`item`). */
+function openMetaPicker(s, item = null) {
   const sheet = $('#sheet');
+  const key = item ? itemMetaKey(s, item.key) : s.name;
+  const label = item ? (item.title || item.query || item.key) : s.name;
+  const q0 = item ? (item.query || item.title || item.key) : (searchNames(s)[0] || s.name);
   sheet.innerHTML = `<div class="sheet-back" data-act="close"></div>
-    <div class="sheet-panel picker" role="dialog" aria-modal="true" aria-label="Elegir imagen para ${esc(s.name)}">
-      <p class="sheet-title">Imagen y sinopsis de ${esc(s.name)}</p>
+    <div class="sheet-panel picker" role="dialog" aria-modal="true" aria-label="Elegir imagen para ${esc(label)}">
+      <p class="sheet-title">Imagen y sinopsis de ${esc(label)}</p>
       <form class="picker-search" id="picker-search">
-        <input name="q" value="${esc(searchNames(s)[0] || s.name)}" aria-label="Buscar en AniList" autocomplete="off">
+        <input name="q" value="${esc(q0)}" aria-label="Buscar en AniList" autocomplete="off">
         <button class="btn" type="submit">Buscar</button>
       </form>
       <div class="picker-results" id="picker-results"><p class="dim">Buscando…</p></div>
@@ -1631,14 +1773,14 @@ function openMetaPicker(s) {
     if (!el) return;
     if (el.dataset.act === 'close') { closeSheet(); return; }
     if (el.dataset.act === 'pick-none') {
-      state.shared.picks[s.name] = { id: 0, u: Date.now() };
-      state.meta[s.name] = { none: true, id: 0, at: Date.now() };
+      state.shared.picks[key] = { id: 0, u: Date.now() };
+      state.meta[key] = { none: true, id: 0, mv: 3, at: Date.now() };
     } else if (el.dataset.act === 'pick') {
       const m = results[Number(el.dataset.i)];
       if (!m) return;
-      state.shared.picks[s.name] = { id: m.id, u: Date.now() };
-      state.meta[s.name] = toMeta(m);
-      const meta = state.meta[s.name];
+      state.shared.picks[key] = { id: m.id, u: Date.now() };
+      state.meta[key] = { ...toMeta(m), mv: 3 };
+      const meta = state.meta[key];
       translateToSpanish(meta.synopsis).then((es) => { if (es) { meta.synopsisEs = es; saveMeta(); softRender(); } });
     } else return;
     saveShared();
@@ -1773,6 +1915,7 @@ function renderHome() {
     return;
   }
   const cont = continueList();
+  const later = laterList();
   const siOf = (s) => lib.series.indexOf(s);
   if (!heroUser || heroSi == null || !lib.series[heroSi]) heroSi = cont[0] ? siOf(cont[0].series) : 0;
   const hs = lib.series[heroSi];
@@ -1780,6 +1923,7 @@ function renderHome() {
   app.innerHTML = `<div class="tv is-home">
     ${tvTop()}
     <main class="tv-main">
+      ${resumeCardHTML()}
       <section class="tv-hero" id="tv-hero">${heroInnerHTML(hs, heroSi)}</section>
       <section class="tv-row" id="home-results" hidden></section>
       ${cont.length ? `<section class="tv-row"><h3 class="tv-row-title">Continuar viendo</h3><div class="tiles is-grid" role="list">
@@ -1787,6 +1931,13 @@ function renderHome() {
           href: '#/serie/' + siOf(c.series), // primero la página de la serie, con "Continuar" listo
           sub: `${episodeLabel(c.ep)}${c.p && c.p.t > 5 ? `, ${fmtLeft(c.p)}` : ''}`,
           pct: c.p && c.p.d ? Math.min(100, (c.p.t / c.p.d) * 100) : 0,
+        })).join('')}
+      </div></section>` : ''}
+      ${later.length ? `<section class="tv-row"><h3 class="tv-row-title">Más tarde</h3><div class="tiles is-grid" role="list">
+        ${later.slice(0, 12).map(({ s, si, it }) => tileHTML(s, si, {
+          href: '#/serie/' + si,
+          label: it ? (it.title || (itemMeta(s, it.key) || {}).title || it.query || it.key) : s.name,
+          sub: it ? 'Película' : plural(s.all.length, 'capítulo', 'capítulos'),
         })).join('')}
       </div></section>` : ''}
       <section class="tv-row">
@@ -1805,6 +1956,62 @@ function renderHome() {
       </div></section>
     </main>
   </div>`;
+}
+
+/** Tarjeta "Estabas viendo … en el iPhone — Seguir aquí". */
+function resumeCardHTML() {
+  const o = resumeOffer();
+  if (!o) return '';
+  const mins = Math.round((Date.now() - o.n.u) / 60000);
+  const when = mins < 2 ? 'hace un momento' : mins < 60 ? `hace ${mins} min` : `hace ${Math.round(mins / 60)} h`;
+  const title = isCollection(o.s) ? episodeLabel(o.ep) : `${o.s.name} · ${episodeLabel(o.ep)}`;
+  return `<section class="resume-card" aria-label="Seguir en este dispositivo">
+    <div class="resume-text"><p class="resume-kicker">En tu ${esc(o.n.dn || 'otro dispositivo')}, ${when}</p>
+      <p class="resume-title">${esc(title)}</p></div>
+    <button class="tv-btn is-primary" data-act="resume-here">${ICON.play}<span>Seguir aquí en ${fmtTime(o.n.t)}</span></button>
+    <button class="icon-btn resume-x" data-act="resume-dismiss" aria-label="Descartar">${ICON.close}</button>
+  </section>`;
+}
+
+/* ── Ajustes: lo que ya vieron todos los perfiles (solo informa; no borra nada) ── */
+async function paintSeenByAll(btn) {
+  const box = $('#seen-all-list');
+  if (!box) return;
+  const profiles = visibleProfiles().filter((p) => !p.mergedInto);
+  if (profiles.length < 2) { box.innerHTML = '<p class="dim">Solo hay un perfil: aquí aparecerá lo que hayan visto todos cuando haya más.</p>'; return; }
+  if (!state.storage || !state.library || state.library.v !== 2) { box.innerHTML = '<p class="dim">Necesitas conexión con MEGA para revisar.</p>'; return; }
+  btn.disabled = true;
+  box.innerHTML = '<p class="dim">Revisando el progreso de cada perfil…</p>';
+  try {
+    const home = state.storage.root;
+    const all = [];
+    for (const p of profiles) {
+      if (state.profile && p.id === state.profile.id) { all.push(state.progress); continue; }
+      let items = {};
+      for (const n of filesNamed(home, profileFile(p.id))) {
+        const data = await readJson(n); // si no se puede leer, falla todo: nunca se supone "no visto"
+        if (data && data.items) items = mergeProgress(items, data.items);
+      }
+      all.push(items);
+    }
+    const rows = [];
+    let bytes = 0;
+    for (const sr of state.library.series) {
+      const done = sr.all.filter((ep) => all.every((pr) => (pr[ep.path] || {}).w));
+      if (!done.length) continue;
+      const size = done.reduce((t, ep) => t + (ep.size || 0), 0);
+      bytes += size;
+      const what = isCollection(sr) ? done.map(episodeLabel).join(', ') : done.length === sr.all.length ? 'todos los capítulos' : done.map((ep) => ep.ep != null ? ep.ep : episodeLabel(ep)).join(', ');
+      rows.push(`<li><strong>${esc(sr.name)}</strong>: ${esc(what)} <span class="dim">(${fmtSize(size)})</span></li>`);
+    }
+    box.innerHTML = rows.length
+      ? `<ul class="seen-all">${rows.join('')}</ul><p class="dim">En total ${fmtSize(bytes)} que ya vieron ${profiles.map((p) => p.name).join(', ')}.</p>`
+      : `<p class="dim">Todavía no hay capítulos que hayan terminado todos (${esc(profiles.map((p) => p.name).join(', '))}).</p>`;
+  } catch (err) {
+    box.innerHTML = `<p class="dim">${esc(megaMessage(err.cause || err))}</p>`;
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 /* ── catálogo: todo lo que hay, con buscador y filtros ── */
@@ -1936,6 +2143,13 @@ function openHomeSearch() {
     else if (e.key === 'Escape') closeHomeSearch();
   };
 }
+// tocar o hacer clic en cualquier otra parte cierra el buscador (sus resultados y la lupa no cuentan)
+document.addEventListener('pointerdown', (e) => {
+  const bar = $('#home-search');
+  if (!bar || bar.hidden) return;
+  if (e.target.closest('#home-search, #home-results, [data-act="home-search"]')) return;
+  closeHomeSearch();
+});
 function closeHomeSearch() {
   const bar = $('#home-search');
   if (!bar) return;
@@ -2002,6 +2216,7 @@ function renderSeries(arg) {
         <div class="tv-actions">
           ${next ? `<a class="tv-btn is-primary" href="#/play/${encodeURIComponent(next.id)}">${ICON.play}<span>${esc(plan.label)}</span></a>` : '<span class="tv-done">Serie terminada</span>'}
           ${upcoming.length ? `<button class="tv-btn" data-act="series-dl" data-si="${si}">${ICON.down}<span>Descargar ${upcoming.length === 1 ? 'el siguiente' : `los ${upcoming.length} siguientes`}</span></button>` : ''}
+          ${flat ? '' : `<button class="tv-btn ${isLater(s) ? 'is-on' : ''}" data-act="later" data-si="${si}" aria-pressed="${isLater(s)}">${isLater(s) ? ICON.laterOn : ICON.later}<span>Más tarde</span></button>`}
         </div>
       </section>
       <section class="ep-section">
@@ -2303,6 +2518,12 @@ function renderSettings() {
       <label class="switch"><input type="checkbox" name="autoRemoveLocal" ${s.autoRemoveLocal ? 'checked' : ''}><span>Quitar del dispositivo los capítulos que termine</span></label>
     </form>
     <section class="settings-group" id="dl-where">${downloadsWhereHTML()}</section>
+    <section class="settings-group" id="seen-all">
+      <p class="settings-label">Visto por todos</p>
+      <p class="dim">Capítulos que ya terminaron todos los perfiles. Es solo un aviso, por si quieres liberar espacio en MEGA; Kai no borra nada.</p>
+      <div id="seen-all-list"></div>
+      <button class="btn" data-act="seen-all">${ICON.refresh}<span>Revisar</span></button>
+    </section>
     <section class="settings-group">
       <p class="dim" id="space">Calculando espacio…</p>
       <p class="dim">${esc(quotaText(true))}</p>
@@ -2392,6 +2613,9 @@ function openSheet(ep) {
   const busy = !!state.dls[ep.id] || state.queue.some((q) => q.ep.id === ep.id);
   const ctx = resolveContext(ep.id);
   const upcoming = ctx ? nextUnseen(ep, ctx.list, 3).filter((x) => !state.saved.has(x.id)) : [];
+  const ie = index.byId.get(ep.id);
+  const series = ie ? state.library.series[ie.si] : null;
+  const movie = series ? itemFor(series, ep) : null; // solo las películas de la colección
   sheet.innerHTML = `<div class="sheet-back" data-act="close"></div>
     <div class="sheet-panel" role="dialog" aria-modal="true" aria-label="${esc(episodeLabel(ep))}">
       <p class="sheet-title">${esc(episodeLabel(ep))}</p>
@@ -2401,6 +2625,8 @@ function openSheet(ep) {
       ${saved || busy ? `<button class="sheet-btn" data-act="unsave">${busy ? 'Cancelar descarga' : 'Quitar del dispositivo'}</button>` : '<button class="sheet-btn" data-act="save">Descargar para ver sin conexión</button>'}
       ${upcoming.length ? `<button class="sheet-btn" data-act="save-next">Descargar ${upcoming.length === 1 ? 'el siguiente' : `los ${upcoming.length} siguientes`}</button>` : ''}
       ${saved && (state.dlMeta.get(ep.id) || {}).where !== 'folder' ? '<button class="sheet-btn" data-act="export">Guardar copia en el dispositivo</button>' : ''}
+      ${movie ? `<button class="sheet-btn" data-act="later-movie">${isLater(series, movie.key) ? 'Quitar de Más tarde' : 'Ver más tarde'}</button>` : ''}
+      ${movie ? '<button class="sheet-btn" data-act="pick-movie">Elegir datos de AniList</button>' : ''}
       <button class="sheet-btn is-danger" data-act="trash">Mandar a la papelera de MEGA</button>
       <button class="sheet-btn is-quiet" data-act="close">Cerrar</button>
     </div>`;
@@ -2424,6 +2650,11 @@ function openSheet(ep) {
     else if (act === 'unsave') removeDownload(ep.id);
     else if (act === 'export') exportCopy(ep);
     else if (act === 'trash') trashEpisode(ep, true);
+    else if (act === 'later-movie') setLater(series, movie.key, !isLater(series, movie.key));
+    else if (act === 'pick-movie') {
+      const it = collectionItems(series).find((x) => x.key === movie.key);
+      setTimeout(() => openMetaPicker(series, it || movie), 200); // espera a que se cierre este menú
+    }
   };
 }
 function closeSheet() {
@@ -2546,7 +2777,7 @@ async function startPlayback(ctx) {
   if (playing) finishCurrent();
   clearTimeout(nextTimer);
   const ep = ctx.ep;
-  const token = { ep, ctx, objectUrl: null, lastSaved: 0, lastSync: Date.now(), retried: false, source: null, chapters: [], autoSkipped: false, learned: false, undo: null, offer: null };
+  const token = { ep, ctx, objectUrl: null, lastSaved: 0, lastSync: Date.now(), recover: [], source: null, chapters: [], autoSkipped: false, learned: false, undo: null, offer: null };
   playing = token;
   ui.msg.hidden = true;
   ui.nextCard.hidden = true;
@@ -2607,13 +2838,13 @@ async function streamUrl(ep) {
     if (!navigator.serviceWorker.controller) throw new Error('NOSW');
   }
   const url = await downloadUrl(ep.id);
-  const q = new URLSearchParams({ u: url, k: ep.key, s: String(ep.size), t: ep.mime });
+  const q = new URLSearchParams({ u: url, k: ep.key, s: String(ep.size), t: ep.mime, i: ep.id });
   return '__stream?' + q.toString();
 }
 
-function playerMessage(text, offerDownload = false, offerFolder = false) {
+function playerMessage(text, offerDownload = false, offerFolder = false, detail = '') {
   stage.classList.remove('is-loading');
-  ui.msg.innerHTML = `<p>${esc(text)}</p><div class="btn-row">
+  ui.msg.innerHTML = `<p>${esc(text)}</p>${detail ? `<p class="p-detail">${esc(detail)}</p>` : ''}<div class="btn-row">
     ${offerDownload ? '<button class="btn btn-lamp" data-act="p-dl">Descargar y ver</button>' : ''}
     ${offerFolder ? '<button class="btn btn-lamp" data-act="p-folder">Permitir acceso</button>' : ''}
     <a class="btn" href="${playing ? playing.ctx.back : '#/'}">Volver</a></div>`;
@@ -2681,6 +2912,7 @@ function savePosition(force = false) {
   if (!force && now - playing.lastSaved < 4000) return;
   playing.lastSaved = now;
   setProgress(playing.ep, video.currentTime, video.duration);
+  markNow(playing.ep, video.currentTime, video.duration);
   if (force || now - playing.lastSync > 60000) {
     playing.lastSync = now;
     sync();
@@ -2835,6 +3067,9 @@ const isFullscreen = () => !!(document.fullscreenElement || document.webkitFulls
  * propia: el reproductor ocupa toda la pantalla (sin barras si Kai está en la pantalla de inicio). */
 function setKaiFullscreen(on) {
   stage.classList.toggle('kai-fs', on);
+  // en el teléfono (sin girar la pantalla) el video horizontal se muestra girado; ver styles.css
+  const wide = !video.videoWidth || video.videoWidth >= video.videoHeight;
+  stage.classList.toggle('kai-rot', on && wide && matchMedia('(pointer: coarse)').matches);
   document.documentElement.classList.toggle('kai-fs-on', on);
   paintControls();
   wake();
@@ -3323,10 +3558,17 @@ async function refreshAccountInfo() {
     paintQuota();
   } catch { /* nada */ }
 }
+let lastStreamError = '';
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('message', (e) => {
     if (e.data && e.data.type === 'mega-bytes') countBytes(e.data.n);
     if (e.data && e.data.type === 'mega-quota') noteQuota(e.data.timeLeft || 3600);
+    if (e.data && e.data.type === 'stream-error') lastStreamError = String(e.data.msg || '').slice(0, 80);
+    // el service worker encontró el enlace de MEGA caducado: se pide otro y se le responde por su canal
+    if (e.data && e.data.type === 'need-url' && e.ports && e.ports[0]) {
+      const port = e.ports[0];
+      downloadUrl(e.data.id, true).then((url) => port.postMessage({ url }), () => port.postMessage({ url: '' }));
+    }
   });
 }
 
@@ -3343,7 +3585,7 @@ function maybePrefetchNext() {
   const n = neighbor(1);
   const sw = navigator.serviceWorker && navigator.serviceWorker.controller;
   if (!n || !sw || state.saved.has(n.id) || (LS.get('quota', null) || {}).until > Date.now()) return;
-  downloadUrl(n.id).then((u) => sw.postMessage({ type: 'prefetch', u, k: n.key, s: n.size, blocks: 3 })).catch(() => {});
+  downloadUrl(n.id).then((u) => sw.postMessage({ type: 'prefetch', u, k: n.key, s: n.size, i: n.id, blocks: 3 })).catch(() => {});
 }
 video.addEventListener('progress', paintControls);
 video.addEventListener('durationchange', () => { paintControls(); paintMarks(); });
@@ -3381,12 +3623,29 @@ video.addEventListener('error', async () => {
   if (!playing || !video.getAttribute('src')) return;
   const { ep } = playing;
   const at = video.currentTime;
-  if (!playing.objectUrl && !playing.retried && navigator.onLine) {
-    // La URL de MEGA pudo vencer: se pide otra y se sigue en el mismo punto.
-    playing.retried = true;
+  // Un tropiezo de MEGA o de la red no termina la reproducción: se pide un enlace nuevo y se sigue
+  // en el mismo punto. Hasta 4 intentos en 3 minutos, para no quedar en un ciclo si de verdad no hay forma.
+  const now = Date.now();
+  playing.recover = (playing.recover || []).filter((t) => now - t < 180000);
+  if (!playing.objectUrl && playing.recover.length < 4 && navigator.onLine) {
+    playing.recover.push(now);
+    stage.classList.add('is-loading');
+    if (playing.recover.length > 1) await sleep(1500 * (playing.recover.length - 1));
+    if (!playing || playing.ep !== ep) return;
     try {
-      const fresh = await downloadUrl(ep.id, true);
-      await C.readRange(fresh, await C.fileKey(ep.key), 0, 15);
+      // se comprueba el enlace nuevo; un tropiezo pasajero de MEGA aquí no cuenta como fallo
+      for (let tries = 1; ; tries++) {
+        try {
+          const fresh = await downloadUrl(ep.id, true);
+          await C.readRange(fresh, await C.fileKey(ep.key), 0, 15);
+          break;
+        } catch (err) {
+          const passing = !err.status || err.status === 408 || err.status === 429 || err.status >= 500;
+          if (!passing || tries >= 3 || /QUOTA|509/.test(String(err.code || err.message))) throw err;
+          await sleep(1500 * tries);
+          if (!playing || playing.ep !== ep) return;
+        }
+      }
       video.src = await streamUrl(ep);
       video.addEventListener('loadedmetadata', () => { if (at) video.currentTime = at; }, { once: true });
       video.play().catch(() => {});
@@ -3396,8 +3655,11 @@ video.addEventListener('error', async () => {
       return;
     }
   }
+  // detalle para saber la causa si vuelve a pasar (código del navegador y último error del service worker)
+  const me = video.error;
+  const detail = `Detalle: ${me ? `código ${me.code}${me.message ? `, ${me.message.slice(0, 80)}` : ''}` : 'sin código'}${lastStreamError ? `; ${lastStreamError}` : ''}; ${playing.recover.length} intentos`;
   if (/\.mkv$/i.test(ep.name)) playerMessage('Este navegador no reproduce archivos MKV. Usa la versión MP4 del capítulo.');
-  else if (!playing.objectUrl && navigator.onLine) playerMessage('No se pudo reproducir en línea. Puedes descargarlo y verlo desde el dispositivo.', true);
+  else if (!playing.objectUrl && navigator.onLine) playerMessage('No se pudo reproducir en línea. Puedes descargarlo y verlo desde el dispositivo.', true, false, detail);
   else playerMessage('No se pudo reproducir este capítulo en este navegador.');
 });
 
@@ -3416,36 +3678,71 @@ ui.seek.addEventListener('pointerup', () => { if (seeking) { video.currentTime =
 /* Gestos sobre el video.
  * Mouse: un clic pausa, doble clic pantalla completa.
  * Táctil: un toque muestra u oculta los controles; doble toque a la izquierda o derecha salta 10 s
- * (cada toque rápido extra suma otros 10 s); deslizar arriba o abajo cambia el brillo;
- * mantener presionado reproduce a 2× mientras no se suelte. */
+ * (cada toque rápido extra suma otros 10 s); mantener presionado reproduce a 2× mientras no se suelte.
+ * Deslizar: en la página, arriba = pantalla completa y abajo = mini reproductor; en pantalla completa,
+ * abajo = salir. El brillo se cambia con la barra de la izquierda (solo en pantalla completa). */
 let lastTap = 0;
 let lastTapSide = '';
 let tapTimer;
 let lastTouchEnd = 0;
 let bright = Math.min(1.6, Math.max(0.35, Number(LS.get('bright', 1)) || 1));
-const levelEl = $('#st-level');
+const brightEl = $('#st-bright');
 const holdEl = $('#st-hold');
-let levelTimer;
 
-function applyBright() { video.style.filter = Math.abs(bright - 1) < 0.02 ? '' : `brightness(${bright.toFixed(2)})`; }
-applyBright();
-function showLevel(side) {
-  levelEl.dataset.side = side;
-  levelEl.style.setProperty('--lv', String(Math.round(((bright - 0.35) / 1.25) * 100)));
-  levelEl.classList.add('is-on');
-  clearTimeout(levelTimer);
-  levelTimer = setTimeout(() => levelEl.classList.remove('is-on'), 700);
+/** ¿El reproductor está girado 90° con CSS (iPhone vertical en pantalla completa)? */
+const isRotated = () => stage.classList.contains('kai-rot') && stage.classList.contains('kai-fs') && matchMedia('(orientation: portrait)').matches;
+/** Punto del toque en coordenadas del video (x hacia la derecha, y hacia abajo del video), aunque esté girado. */
+function videoPoint(e) {
+  if (isRotated()) return { x: e.clientY, y: innerWidth - e.clientX, w: innerHeight, h: innerWidth };
+  const r = stage.getBoundingClientRect();
+  return { x: e.clientX - r.left, y: e.clientY - r.top, w: r.width, h: r.height };
 }
 
-function tapSide(clientX) {
-  const rect = stage.getBoundingClientRect();
-  const x = (clientX - rect.left) / rect.width;
-  return x < 0.4 ? 'left' : x > 0.6 ? 'right' : 'center';
+function applyBright() {
+  video.style.filter = Math.abs(bright - 1) < 0.02 ? '' : `brightness(${bright.toFixed(2)})`;
+  brightEl.style.setProperty('--lv', String(Math.round(((bright - 0.35) / 1.25) * 100)));
+  brightEl.setAttribute('aria-valuenow', String(Math.round(bright * 100)));
+}
+applyBright();
+function setBrightFrom(e) {
+  const r = brightEl.querySelector('.st-bright-track').getBoundingClientRect();
+  // girado, lo de abajo del video queda a la izquierda de la pantalla
+  const f = isRotated() ? (e.clientX - r.left) / r.width : (r.bottom - e.clientY) / r.height;
+  bright = 0.35 + Math.min(1, Math.max(0, f)) * 1.25;
+  applyBright();
+  wake();
+}
+let brightDrag = null;
+brightEl.addEventListener('pointerdown', (e) => {
+  e.stopPropagation();
+  brightDrag = e.pointerId;
+  try { brightEl.setPointerCapture(e.pointerId); } catch { /* nada */ }
+  setBrightFrom(e);
+});
+brightEl.addEventListener('pointermove', (e) => { if (brightDrag === e.pointerId) setBrightFrom(e); });
+['pointerup', 'pointercancel'].forEach((ev) => brightEl.addEventListener(ev, (e) => {
+  if (brightDrag !== e.pointerId) return;
+  brightDrag = null;
+  LS.set('bright', Number(bright.toFixed(2)));
+}));
+brightEl.addEventListener('click', (e) => e.stopPropagation());
+brightEl.addEventListener('keydown', (e) => {
+  const d = { ArrowUp: 0.05, ArrowRight: 0.05, ArrowDown: -0.05, ArrowLeft: -0.05 }[e.key];
+  if (!d) return;
+  e.preventDefault(); e.stopPropagation();
+  bright = Math.min(1.6, Math.max(0.35, bright + d));
+  applyBright();
+  LS.set('bright', Number(bright.toFixed(2)));
+  wake();
+});
+
+function tapSide(fx) {
+  return fx < 0.4 ? 'left' : fx > 0.6 ? 'right' : 'center';
 }
 // como en Android e iOS: el doble toque se mide desde que se soltó el primero hasta que empieza el segundo
 const DOUBLE_TAP = 300;
-function handleTouchTap(clientX, downAt = Date.now()) {
-  const side = tapSide(clientX);
+function handleTouchTap(fx, downAt = Date.now()) {
+  const side = tapSide(fx);
   const now = Date.now();
   const gap = downAt - lastTap;
   // racha de toques: tras un doble toque, cada toque rápido del mismo lado suma otros 10 s
@@ -3480,9 +3777,9 @@ function endHold() {
 ui.tap.addEventListener('pointerdown', (e) => {
   if (e.pointerType !== 'touch' || !e.isPrimary) return;
   try { ui.tap.setPointerCapture(e.pointerId); } catch { /* nada */ }
-  const rect = stage.getBoundingClientRect();
+  const p = videoPoint(e);
   if (Date.now() - lastTap < DOUBLE_TAP) clearTimeout(tapTimer); // puede ser el segundo toque: no ocultar controles todavía
-  touch = { id: e.pointerId, x: e.clientX, y: e.clientY, h: rect.height, mode: null, hold: false, start: bright, at: Date.now(), side: e.clientX - rect.left < rect.width / 2 ? 'left' : 'right' };
+  touch = { id: e.pointerId, x: p.x, y: p.y, w: p.w, h: p.h, mode: null, hold: false, at: Date.now() };
   const t = touch;
   t.timer = setTimeout(() => {
     if (touch !== t || t.mode || !video.currentSrc || video.paused || video.ended) return;
@@ -3496,30 +3793,26 @@ ui.tap.addEventListener('pointerdown', (e) => {
 ui.tap.addEventListener('pointermove', (e) => {
   const t = touch;
   if (!t || e.pointerId !== t.id) return;
-  const dx = e.clientX - t.x;
-  const dy = t.y - e.clientY; // hacia arriba es positivo
+  const p = videoPoint(e);
+  const dx = p.x - t.x;
+  const dy = t.y - p.y; // hacia arriba del video es positivo
   if (!t.mode && Math.hypot(dx, dy) > 12) {
     clearTimeout(t.timer);
     const vertical = Math.abs(dy) > Math.abs(dx);
-    // en pantalla completa deslizar cambia el brillo; en la página, abajo = mini reproductor y arriba = pantalla completa
-    t.mode = !vertical ? 'none' : isFullscreen() ? 'bright' : dy < 0 ? 'down' : 'up';
-    if (t.mode === 'bright') { t.y = e.clientY; t.start = bright; }
+    // en pantalla completa, abajo = salir; en la página, abajo = mini reproductor y arriba = pantalla completa
+    t.mode = !vertical ? 'none' : isFullscreen() ? (dy < 0 ? 'fs-down' : 'none') : dy < 0 ? 'down' : 'up';
   }
-  if (t.mode === 'down') {
-    const d = Math.max(0, e.clientY - t.y);
+  if (t.mode === 'down' || t.mode === 'fs-down') {
+    const d = Math.max(0, p.y - t.y);
     t.dist = d;
+    // el video sigue al dedo; girado, "abajo" del video es hacia la izquierda de la pantalla
+    const k = Math.min(d, 220);
+    const base = isRotated() ? 'rotate(90deg) ' : '';
     stage.style.transition = 'none';
-    stage.style.transform = `translateY(${Math.min(d, 220) * 0.6}px) scale(${1 - Math.min(d, 220) / 1100})`;
-    stage.style.opacity = String(1 - Math.min(d, 220) / 600);
+    stage.style.transform = `${base}translateY(${k * 0.6}px) scale(${1 - k / 1100})`;
+    stage.style.opacity = String(1 - k / 600);
   } else if (t.mode === 'up') {
-    t.dist = Math.max(0, t.y - e.clientY);
-  }
-  if (t.mode === 'bright') {
-    const dy2 = t.y - e.clientY;
-    // recorrer el alto del video cambia el brillo por completo
-    bright = Math.min(1.6, Math.max(0.35, t.start + (dy2 / Math.max(160, t.h)) * 1.25));
-    applyBright();
-    showLevel(t.side);
+    t.dist = Math.max(0, t.y - p.y);
   }
 });
 function touchEnd(e, cancelled) {
@@ -3528,17 +3821,19 @@ function touchEnd(e, cancelled) {
   clearTimeout(t.timer);
   lastTouchEnd = Date.now();
   if (t.hold) endHold();
-  else if (t.mode === 'down') {
+  else if (t.mode === 'down' || t.mode === 'fs-down') {
     stage.style.transition = 'transform 0.2s, opacity 0.2s';
     stage.style.transform = '';
     stage.style.opacity = '';
     setTimeout(() => { stage.style.transition = ''; }, 220);
-    if (!cancelled && t.dist > 70 && playing) goBack(playing.ctx.back); // queda en el mini reproductor
+    if (!cancelled && t.dist > 70) {
+      if (t.mode === 'fs-down') exitFullscreen(); // vuelve al reproductor normal
+      else if (playing) goBack(playing.ctx.back); // queda en el mini reproductor
+    }
   } else if (t.mode === 'up') {
     if (!cancelled && t.dist > 60) toggleFullscreen();
   }
-  else if (t.mode === 'bright') LS.set('bright', Number(bright.toFixed(2)));
-  else if (!t.mode && !cancelled) handleTouchTap(e.clientX, t.at);
+  else if (!t.mode && !cancelled) handleTouchTap(t.x / Math.max(1, t.w), t.at);
   touch = null;
 }
 ui.tap.addEventListener('pointerup', (e) => touchEnd(e, false));
@@ -3553,7 +3848,8 @@ ui.tap.addEventListener('click', (e) => {
     wake();
     return;
   }
-  handleTouchTap(e.clientX);
+  const p = videoPoint(e);
+  handleTouchTap(p.x / Math.max(1, p.w));
 });
 ui.tap.addEventListener('dblclick', (e) => {
   if (!matchMedia('(hover: hover)').matches) return;
@@ -3685,6 +3981,18 @@ document.addEventListener('click', async (e) => {
   else if (act === 'pick-mode') { if (picking) endPicking(); else startPicking(); }
   else if (act === 'pick-all' || act === 'pick-unseen' || act === 'pick-dl') pickAction(act);
   else if (act === 'pick-image') { const sr = state.library.series[Number(el.dataset.si)]; if (sr) openMetaPicker(sr); }
+  else if (act === 'seen-all') paintSeenByAll(el);
+  else if (act === 'later') { const sr = state.library.series[Number(el.dataset.si)]; if (sr) setLater(sr, '', !isLater(sr)); }
+  else if (act === 'resume-here') {
+    const o = resumeOffer();
+    if (!o) { render(); return; }
+    LS.set('nowSeen', o.n.u);
+    const p = prog(o.ep);
+    // se empieza justo donde quedó el otro dispositivo
+    if (!p || Math.abs((p.t || 0) - o.n.t) > 5) setProgress(o.ep, o.n.t, o.n.d || (p && p.d) || 0, false);
+    go('#/play/' + encodeURIComponent(o.ep.id));
+  }
+  else if (act === 'resume-dismiss') { const o = resumeOffer(); if (o) LS.set('nowSeen', o.n.u); render(); }
   else if (act === 'series-dl') {
     const sr = state.library.series[Number(el.dataset.si)];
     const nx = sr && nextFor(sr);
@@ -3715,6 +4023,7 @@ document.addEventListener('click', async (e) => {
   else if (act === 'lights') setLights(false);
 
   else if (act === 'back') goBack(playing ? playing.ctx.back : '#/');
+  else if (act === 'home') goHome();
   else if (act === 'dl' && ep) {
     if (state.dls[ep.id] || state.queue.some((q) => q.ep.id === ep.id)) removeDownload(ep.id);
     else if (state.saved.has(ep.id)) { if (confirm(`¿Quitar ${episodeLabel(ep)} del dispositivo?`)) removeDownload(ep.id); }
@@ -3813,7 +4122,7 @@ app.addEventListener('keydown', (e) => {
   if (best) { e.preventDefault(); best.focus(); best.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' }); }
 });
 
-window.addEventListener('hashchange', () => { inAppNav++; render(); });
+window.addEventListener('hashchange', () => { onHashChange(); render(); });
 window.addEventListener('online', async () => {
   paintSync();
   try { if (!state.storage) { await connect(); refreshLibrary(); } } catch { /* nada */ }
@@ -3898,6 +4207,11 @@ async function boot() {
   }
   await refreshSaved().catch(() => {});
   render();
+  // Samsung Internet oscurece las páginas a su manera y Kai no lo puede evitar desde aquí: se avisa una vez
+  if (/SamsungBrowser/.test(navigator.userAgent) && !LS.get('samsungHint', false)) {
+    LS.set('samsungHint', true);
+    setTimeout(() => toast('Si Kai se ve con colores raros aquí, desactiva el modo oscuro de Samsung Internet o usa Chrome.'), 2500);
+  }
   getDir().then((d) => { if (d) flushFolder(); }).catch(() => {}); // si la carpeta ya tiene permiso, termina lo pendiente
   if (!LS.get('session', null) || !navigator.onLine) return;
   try {

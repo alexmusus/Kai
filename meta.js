@@ -5,6 +5,7 @@
 const API = 'https://graphql.anilist.co';
 const FIELDS = `id
   title { romaji english native userPreferred }
+  synonyms
   description(asHtml: false)
   bannerImage
   coverImage { extraLarge large color }
@@ -80,6 +81,62 @@ export async function findForSeries(names) {
     if (list.length) return list[0];
   }
   return null;
+}
+
+/* ── películas: buscar por el nombre del archivo, aunque no esté escrito igual que en AniList ──
+ * AniList busca palabra por palabra, así que "Kimi No Nawa" no encuentra "Kimi no Na wa." y
+ * "Joze to Tora…" no encuentra "Josee to Tora…". Se prueban variantes del nombre y cada resultado
+ * se compara letra a letra sin espacios ni signos, con margen para una o dos letras distintas. */
+const squash = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^0-9a-z぀-ヿ一-鿿]+/g, '');
+function editDistance(a, b) {
+  if (a === b) return 0;
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    for (let j = 1; j <= b.length; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    prev = cur;
+  }
+  return prev[b.length];
+}
+/** Qué tanto se parece un resultado al nombre buscado (0 a 1). */
+export function titleScore(name, m) {
+  const q = squash(name);
+  if (!q) return 0;
+  const titles = [...Object.values(m.title || {}), ...(m.synonyms || [])].map(squash).filter(Boolean);
+  let best = 0;
+  for (const t of titles) {
+    const d = editDistance(q, t);
+    best = Math.max(best, 1 - d / Math.max(q.length, t.length));
+    // "Kimi no Na wa" dentro de "Kimi no Na wa. (2016)" o al revés también vale
+    if (q.length >= 6 && (t.startsWith(q) || q.startsWith(t))) best = Math.max(best, 0.85);
+  }
+  return best + (m.format === 'MOVIE' ? 0.04 : 0);
+}
+/** Variantes de búsqueda de un nombre: completo, sin las últimas palabras, sin las primeras,
+ * y pares de palabras seguidas (basta con que dos palabras estén bien escritas). */
+function movieQueries(name) {
+  const w = String(name).split(/\s+/).filter(Boolean);
+  const out = [w.join(' ')];
+  for (let n = w.length - 1; n >= 2; n--) out.push(w.slice(0, n).join(' '));
+  for (let i = 0; i + 1 < w.length; i++) out.push(w[i] + ' ' + w[i + 1]);
+  for (let k = 1; k <= w.length - 2; k++) out.push(w.slice(k).join(' '));
+  return [...new Set(out)].filter((q) => q.replace(/\s/g, '').length >= 5).slice(0, 7);
+}
+/** Busca una película por el nombre de su archivo. Devuelve el resultado de AniList o null. */
+export async function findMovie(name, pause = () => Promise.resolve()) {
+  let best = null;
+  let bestScore = 0;
+  const qs = movieQueries(name);
+  for (let i = 0; i < qs.length; i++) {
+    if (i) await pause();
+    const list = await searchAnime(qs[i], 10);
+    for (const m of list) {
+      const sc = titleScore(name, m);
+      if (sc > bestScore) { best = m; bestScore = sc; }
+    }
+    if (bestScore >= 0.84) break; // ya hay uno claramente igual
+  }
+  return bestScore >= 0.72 ? best : null;
 }
 
 /** Traducción en el propio navegador (Chrome reciente). Devuelve null si no se puede sin intervención. */

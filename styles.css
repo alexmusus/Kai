@@ -450,20 +450,21 @@ body.lights-off .bar { z-index: 1; }
 .st-flash.is-on { animation: flash 0.6s ease-out; }
 @keyframes flash { 0% { opacity: 0; } 20% { opacity: 1; } 100% { opacity: 0; } }
 
-/* brillo al deslizar: una cápsula de vidrio con el nivel, del lado donde se desliza */
-.st-level {
-  position: absolute; top: 50%; transform: translateY(-50%);
-  display: grid; justify-items: center; gap: 8px; padding: 12px 10px; border-radius: 999px;
-  background: rgba(22, 24, 30, 0.42); border: 1px solid rgba(255, 255, 255, 0.2);
+/* brillo: una barra delgada a la izquierda, solo en pantalla completa; se oculta con los controles */
+.st-bright {
+  position: absolute; left: max(14px, env(safe-area-inset-left)); top: 50%; transform: translateY(-50%);
+  display: none; justify-items: center; gap: 8px; padding: 12px 7px 9px; border-radius: 999px;
+  background: rgba(22, 24, 30, 0.38); border: 1px solid rgba(255, 255, 255, 0.16);
   -webkit-backdrop-filter: blur(18px) saturate(160%); backdrop-filter: blur(18px) saturate(160%);
-  opacity: 0; pointer-events: none; transition: opacity 0.25s; --lv: 50;
+  touch-action: none; cursor: ns-resize; transition: opacity 0.25s; --lv: 50;
 }
-.st-level[data-side='left'] { left: 6%; }
-.st-level[data-side='right'] { right: 6%; }
-.st-level.is-on { opacity: 1; transition: opacity 0.1s; }
-.st-level svg { width: 18px; height: 18px; fill: none; stroke: #fff; stroke-width: 1.8; stroke-linecap: round; }
-.st-level-bar { position: relative; display: block; width: 5px; height: 96px; border-radius: 5px; background: rgba(255, 255, 255, 0.22); overflow: hidden; }
-.st-level-bar i { position: absolute; left: 0; right: 0; bottom: 0; height: calc(var(--lv) * 1%); background: #fff; border-radius: 5px; }
+.stage.is-fs .st-bright { display: grid; }
+.stage.is-idle .st-bright { opacity: 0; pointer-events: none; visibility: hidden; transition: opacity 0.25s, visibility 0s 0.25s; }
+.st-bright svg { width: 15px; height: 15px; fill: none; stroke: rgba(255, 255, 255, 0.85); stroke-width: 1.8; stroke-linecap: round; }
+.st-bright-track { position: relative; display: block; width: 4px; height: min(150px, 34vh); border-radius: 4px; background: rgba(255, 255, 255, 0.22); }
+.st-bright-track i { position: absolute; left: 0; right: 0; bottom: 0; height: calc(var(--lv) * 1%); background: #fff; border-radius: 4px; }
+.st-bright-track b { position: absolute; left: 50%; bottom: calc(var(--lv) * 1%); width: 12px; height: 12px; margin: 0 0 -6px -6px; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4); }
+.st-bright:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* mantener presionado: 2× mientras no se suelte */
 .st-hold {
@@ -490,6 +491,21 @@ html.kai-fs-on .dock, html.kai-fs-on .ambi { display: none; }
   bottom: calc(10px + env(safe-area-inset-bottom, 0px));
 }
 .stage.kai-fs .st-skip { right: max(16px, env(safe-area-inset-right)); }
+/* iPhone con el teléfono vertical (con o sin bloqueo de rotación): el reproductor se gira 90° para verse horizontal.
+ * Lo de arriba del video queda del lado derecho de la pantalla, así que se gira el teléfono hacia la izquierda.
+ * Si se quita el bloqueo y se gira el teléfono, la pantalla ya está horizontal y no se gira nada. */
+@media (orientation: portrait) {
+  .stage.kai-fs.kai-rot {
+    inset: auto; top: 0; left: 100vw; width: 100vh; width: 100dvh; height: 100vw;
+    transform-origin: top left; transform: rotate(90deg);
+  }
+  /* la muesca y la barra de inicio quedan a los lados del video girado */
+  .stage.kai-fs.kai-rot .st-bar, .stage.kai-fs.kai-rot:not(:fullscreen) .st-bar {
+    left: max(12px, env(safe-area-inset-top)); right: max(12px, env(safe-area-inset-bottom)); bottom: 10px;
+  }
+  .stage.kai-fs.kai-rot .st-skip { right: max(16px, env(safe-area-inset-bottom)); }
+  .stage.kai-fs.kai-rot .st-bright { left: max(14px, env(safe-area-inset-top)); }
+}
 
 .st-skip {
   position: absolute; right: 16px; bottom: 96px;
@@ -538,6 +554,7 @@ html.kai-fs-on .dock, html.kai-fs-on .ambi { display: none; }
 }
 .p-card p { margin: 0; font: 700 21px/1.25 var(--font-display); letter-spacing: -0.02em; }
 #p-msg p { font: 500 16px/1.45 var(--font); }
+#p-msg p.p-detail { font: 400 12px/1.4 var(--font); opacity: .55; margin-top: 6px; }
 .p-card .btn { color: #fff; background: rgba(255, 255, 255, 0.12); border-color: rgba(255, 255, 255, 0.2); }
 .p-card .btn-lamp { background: #fff; color: #111; border-color: #fff; }
 
@@ -646,6 +663,24 @@ html.kai-fs-on .dock, html.kai-fs-on .ambi { display: none; }
 }
 .tv-btn svg { width: 22px; height: 22px; }
 .tv-btn.is-primary { background: var(--primary); color: var(--primary-ink); border-color: transparent; }
+.tv-btn.is-on svg { color: var(--accent); }
+
+/* "Estabas viendo … en el iPhone — Seguir aquí" */
+.resume-card {
+  display: flex; align-items: center; gap: 14px; margin: 0 0 18px; padding: 12px 12px 12px 18px; border-radius: 22px;
+  background: var(--glass-strong); border: 1px solid var(--glass-edge);
+  -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur);
+}
+.resume-text { flex: 1; min-width: 0; }
+.resume-kicker { margin: 0; font-size: 13px; color: var(--dim); }
+.resume-title { margin: 2px 0 0; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.resume-card .tv-btn { flex: none; }
+@media (max-width: 600px) {
+  .resume-card { flex-wrap: wrap; padding: 12px 12px 12px 16px; }
+  .resume-text { flex-basis: calc(100% - 56px); }
+  .resume-x { order: 2; }
+  .resume-card .tv-btn { order: 3; flex: 1; justify-content: center; }
+}
 @media (hover: hover) { .tv-btn:hover { transform: scale(1.03); } }
 .tv-btn:focus-visible { outline: none; transform: scale(1.05); box-shadow: 0 0 0 3px var(--text), 0 14px 40px var(--shadow); }
 .tv-done { color: var(--dim); font-weight: 600; }
@@ -1135,3 +1170,6 @@ html.has-mini body { padding-bottom: var(--mini-space); }
 /* película resaltada al llegar desde el catálogo */
 .ep.is-flash { animation: ep-flash 1.6s ease-out; }
 @keyframes ep-flash { 0%, 30% { box-shadow: inset 0 0 0 2px var(--accent), 0 0 0 6px color-mix(in srgb, var(--accent) 30%, transparent); } }
+
+/* Ajustes: visto por todos */
+.seen-all { margin: 4px 0 8px; padding-left: 18px; display: grid; gap: 4px; }
