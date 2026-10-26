@@ -2829,7 +2829,6 @@ function openSheet(ep) {
       ${upcoming.length ? `<button class="sheet-btn" data-act="save-next">Descargar ${upcoming.length === 1 ? 'el siguiente' : `los ${upcoming.length} siguientes`}</button>` : ''}
       ${saved && (state.dlMeta.get(ep.id) || {}).where !== 'folder' ? '<button class="sheet-btn" data-act="export">Guardar copia en el dispositivo</button>' : ''}
       ${movie ? `<button class="sheet-btn" data-act="later-movie">${isLater(series, movie.key) ? 'Quitar de Más tarde' : 'Ver más tarde'}</button>` : ''}
-      <button class="sheet-btn is-danger" data-act="trash">Mandar a la papelera de MEGA</button>
       <button class="sheet-btn is-quiet" data-act="close">Cerrar</button>
     </div>`;
   sheet.hidden = false;
@@ -2851,7 +2850,6 @@ function openSheet(ep) {
     else if (act === 'save-next') { upcoming.forEach((x) => queueDownload(x, ctx.title)); toast(`${plural(upcoming.length, 'capítulo', 'capítulos')} en cola de descarga.`); }
     else if (act === 'unsave') removeDownload(ep.id);
     else if (act === 'export') exportCopy(ep);
-    else if (act === 'trash') trashEpisode(ep, true);
     else if (act === 'later-movie') setLater(series, movie.key, !isLater(series, movie.key));
   };
 }
@@ -2860,22 +2858,6 @@ function closeSheet() {
   if (sheet.hidden) return;
   sheet.classList.remove('is-open');
   setTimeout(() => { sheet.hidden = true; sheet.innerHTML = ''; }, 180);
-}
-
-async function trashEpisode(ep, ask) {
-  if (ask && !confirm(`¿Mandar ${episodeLabel(ep)} a la papelera de MEGA? Podrás recuperarlo desde mega.nz.`)) return;
-  if (!state.storage) { toast('Necesitas conexión para esto.'); return; }
-  const node = state.storage.files[ep.id];
-  if (!node) return;
-  try {
-    await node.delete(false);
-    goneNodes.add(ep.id);
-    await removeDownload(ep.id, true);
-    toast(`${episodeLabel(ep)} está en la papelera de MEGA.`);
-    refreshLibrary();
-  } catch (err) {
-    toast(megaMessage(err));
-  }
 }
 
 /* ───────────────────────── página de reproducción ───────────────────────── */
