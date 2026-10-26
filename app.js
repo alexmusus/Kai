@@ -346,6 +346,7 @@ async function login(email, password, code) {
   delete json.options.password;
   delete json.options.secondFactorCode;
   LS.set('session', json);
+  loginNote = '';
   state.storage = st;
   watchStorage(st);
 }
@@ -355,7 +356,11 @@ async function connect() {
   if (!sess || state.connecting) return false;
   state.connecting = true;
   try {
-    const st = Storage.fromJSON(JSON.parse(JSON.stringify(sess)));
+    // una sesión incompleta (vieja o dañada) no se puede restaurar: se pide entrar de nuevo.
+    // Solo se borra la sesión; el progreso y los perfiles siguen en MEGA.
+    if (!sess.key || !sess.sid || !sess.options) throw new Error('ESID');
+    let st;
+    try { st = Storage.fromJSON(JSON.parse(JSON.stringify(sess))); } catch { throw new Error('ESID'); }
     await st.reload(true);
     st.status = 'ready';
     if (state.storage && state.storage !== st) {
@@ -1247,7 +1252,8 @@ document.addEventListener('keydown', (e) => {
 
 /* ── entrar ── */
 
-function renderLogin(message = '', needCode = false, email = '') {
+let loginNote = ''; // aviso que se mantiene en la pantalla de entrar aunque se vuelva a dibujar
+function renderLogin(message = loginNote, needCode = false, email = '') {
   app.innerHTML = `<main class="login">
     <div class="login-mark" aria-hidden="true"><span class="orb"></span></div>
     <h1 class="login-title">Kai</h1>
@@ -3433,6 +3439,7 @@ async function boot() {
     const m = megaMessage(err);
     if (/venció/.test(m)) {
       LS.del('session');
+      loginNote = m;
       renderLogin(m);
     } else {
       toast(m);
