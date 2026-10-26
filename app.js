@@ -610,7 +610,7 @@ function resolveContext(id) {
     return {
       ep: e.ep, list: s.all, shown: season.episodes, title: s.name,
       sub: season.title && season.title !== s.name ? season.title : (season.num != null ? `Temporada ${season.num}` : ''),
-      back: '#/serie/' + e.si, si: e.si,
+      back: isCollection(s) ? movieHref(e.si, itemFor(s, e.ep).key) : '#/serie/' + e.si, si: e.si,
     };
   }
   const node = state.storage && state.storage.files[id];
@@ -1362,6 +1362,7 @@ function render() {
     if (playing && video.currentSrc) enterMini(); else stopPlayback();
     setTint(null);
     if (view === 'serie') renderSeries(arg);
+    else if (view === 'pelicula') renderMovie(arg);
     else if (view === 'explorar') renderExplorer(arg);
     else if (view === 'catalogo') renderCatalog();
     else if (view === 'descargas') renderDownloads();
@@ -1702,7 +1703,7 @@ async function ensureMeta() {
         state.meta[s.name] = m ? { ...toMeta(m), sv: 5 } : { none: true, id: 0, sv: 5, at: Date.now() };
         if (m) {
           const meta = state.meta[s.name];
-          translateToSpanish(meta.synopsis).then((es) => { if (es) { meta.synopsisEs = es; saveMeta(); if (['home', 'serie'].includes(route().view)) softRender(); } });
+          translateToSpanish(meta.synopsis).then((es) => { if (es) { meta.synopsisEs = es; saveMeta(); if (['home', 'serie', 'pelicula'].includes(route().view)) softRender(); } });
         }
         changed = true;
         saveMeta();
@@ -1715,7 +1716,7 @@ async function ensureMeta() {
   } finally {
     metaRunning = false;
   }
-  if (changed && ['home', 'serie'].includes(route().view)) softRender();
+  if (changed && ['home', 'serie', 'pelicula'].includes(route().view)) softRender();
 }
 
 function synopsisOf(m) { return m ? (m.synopsisEs || m.synopsis || '') : ''; }
@@ -1747,6 +1748,17 @@ function itemFor(s, ep) {
   if (!e || !isCollection(s)) return null;
   const se = s.seasons[e.ki];
   return se && se.name ? { key: se.name, title: se.title || se.name, eps: se.episodes } : { key: baseName(ep.name), title: '', eps: [ep] };
+}
+function movieImage(s, it) {
+  const m = itemMeta(s, it.key);
+  return (m && (m.banner || m.cover)) || '';
+}
+/** Dirección de la página de una película de la colección. */
+const movieHref = (si, key) => `#/pelicula/${si}/${encodeURIComponent(key)}`;
+/** Nombre que se muestra de una película: el de su carpeta, o el de AniList si es un archivo suelto. */
+function movieTitle(s, it) {
+  const m = itemMeta(s, it.key);
+  return it.title || (m && m.title) || it.query || it.eps[0].name.replace(/\.[^.]+$/, '');
 }
 function itemMeta(s, key) {
   const m = state.meta[itemMetaKey(s, key)];
@@ -1793,9 +1805,9 @@ function setTint(color) {
   if (color) r.setProperty('--tint', color); else r.removeProperty('--tint');
 }
 
-function tileHTML(s, si, { href, label = '', sub = '', pct = 0, badge = '' } = {}) {
-  const m = displayMeta(s);
-  const img = m && (m.banner || m.cover);
+function tileHTML(s, si, { href, label = '', sub = '', pct = 0, badge = '', img: own = '' } = {}) {
+  const m = own ? null : displayMeta(s);
+  const img = own || (m && (m.banner || m.cover));
   const coverEp = s.all.find((e) => e.fa);
   return `<a class="tile" href="${href}" data-si="${si}" style="--h:${hue(s.name)}">
     ${m && m.collage && m.collage.length ? collageHTML(m.collage, 'tile-img') : img ? `<img class="tile-img" src="${esc(img)}" alt="" loading="lazy" decoding="async">` : `<span class="tile-img is-fallback" ${coverEp ? `data-thumb="${esc(coverEp.id)}"` : ''}><span class="cover-glyph">${esc([...s.name.trim()][0] || '·')}</span></span>`}
@@ -1931,7 +1943,12 @@ function renderHome() {
   const cont = continueList();
   const later = laterList();
   const siOf = (s) => lib.series.indexOf(s);
-  if (!heroUser || heroSi == null || !lib.series[heroSi]) heroSi = cont[0] ? siOf(cont[0].series) : 0;
+  // la portada muestra una serie (la carpeta de películas no tiene una ficha propia que mostrar)
+  if (!heroUser || heroSi == null || !lib.series[heroSi] || isCollection(lib.series[heroSi])) {
+    const c = cont.find((x) => !isCollection(x.series));
+    const first = lib.series.findIndex((x) => !isCollection(x));
+    heroSi = c ? siOf(c.series) : Math.max(0, first);
+  }
   const hs = lib.series[heroSi];
   setTint(seriesColor(hs));
   app.innerHTML = `<div class="tv is-home">
@@ -1942,15 +1959,19 @@ function renderHome() {
       <section class="tv-row" id="home-results" hidden></section>
       ${cont.length ? `<section class="tv-row"><h3 class="tv-row-title">Continuar viendo</h3><div class="tiles is-grid" role="list">
         ${cont.slice(0, 8).map((c) => tileHTML(c.series, siOf(c.series), {
-          href: '#/serie/' + siOf(c.series), // primero la página de la serie, con "Continuar" listo
+          // primero la página de la serie (o de la película), con "Continuar" listo
+          href: isCollection(c.series) ? movieHref(siOf(c.series), itemFor(c.series, c.ep).key) : '#/serie/' + siOf(c.series),
+          label: isCollection(c.series) ? movieTitle(c.series, itemFor(c.series, c.ep)) : '',
+          img: isCollection(c.series) ? movieImage(c.series, itemFor(c.series, c.ep)) : '',
           sub: `${episodeLabel(c.ep)}${c.p && c.p.t > 5 ? `, ${fmtLeft(c.p)}` : ''}`,
           pct: c.p && c.p.d ? Math.min(100, (c.p.t / c.p.d) * 100) : 0,
         })).join('')}
       </div></section>` : ''}
       ${later.length ? `<section class="tv-row"><h3 class="tv-row-title">Más tarde</h3><div class="tiles is-grid" role="list">
         ${later.slice(0, 12).map(({ s, si, it }) => tileHTML(s, si, {
-          href: '#/serie/' + si,
-          label: it ? (it.title || (itemMeta(s, it.key) || {}).title || it.query || it.key) : s.name,
+          href: it ? movieHref(si, it.key) : '#/serie/' + si,
+          label: it ? movieTitle(s, it) : s.name,
+          img: it ? movieImage(s, it) : '',
           sub: it ? 'Película' : plural(s.all.length, 'capítulo', 'capítulos'),
         })).join('')}
       </div></section>` : ''}
@@ -2050,8 +2071,8 @@ function catalogEntries() {
         const m = itemMeta(s, it.key);
         const title = it.title || (m && m.title) || it.eps[0].name.replace(/\.[^.]+$/, '');
         out.push({
-          si, title, m, img: m && (m.banner || m.cover), year: m && m.year, genres: (m && m.genres) || [], format: 'Película',
-          added: Math.max(0, ...it.eps.map((e) => e.ts || 0)), focus: it.eps[0].id,
+          si, title: movieTitle(s, it), m, img: m && (m.banner || m.cover), year: m && m.year, genres: (m && m.genres) || [], format: 'Película',
+          added: Math.max(0, ...it.eps.map((e) => e.ts || 0)), href: movieHref(si, it.key),
           words: norm([title, m && m.title, m && m.romaji, m && m.native, s.name].join(' ')),
         });
       }
@@ -2079,7 +2100,7 @@ function sortEntries(list, o) {
 }
 function entryTile(e) {
   const sub = [e.year, e.format, e.count ? plural(e.count, 'capítulo', 'capítulos') : ''].filter(Boolean).join(' · ');
-  return `<a class="tile" href="#/serie/${e.si}" ${e.focus ? `data-focus="${esc(e.focus)}"` : ''} style="--h:${hue(e.title)}">
+  return `<a class="tile" href="${e.href || '#/serie/' + e.si}" style="--h:${hue(e.title)}">
     ${e.img ? `<img class="tile-img" src="${esc(e.img)}" alt="" loading="lazy" decoding="async">` : `<span class="tile-img is-fallback"><span class="cover-glyph">${esc([...e.title.trim()][0] || '·')}</span></span>`}
     <span class="tile-text"><span class="tile-title">${esc(e.title)}</span>${sub ? `<span class="tile-sub">${esc(sub)}</span>` : ''}</span>
   </a>`;
@@ -2195,6 +2216,7 @@ function renderSeries(arg) {
   const si = Number(arg);
   const s = lib && lib.series && lib.series[si];
   if (!s) { go('#/'); return; }
+  if (isCollection(s)) { renderShelf(s, si); return; }
   heroSi = si;
   heroUser = true;
   const m = displayMeta(s);
@@ -2264,6 +2286,104 @@ function renderSeries(arg) {
   if (fli) requestAnimationFrame(() => { fli.scrollIntoView({ block: 'center' }); fli.classList.add('is-flash'); });
   // los "nuevos" se muestran esta vez y quedan vistos
   if (fresh.size) { markSeriesSeen(s); lastNew = null; announceNew(); }
+}
+
+/* ── películas: el estante (la carpeta) y la página de cada una ── */
+
+/** Lo siguiente que conviene ver de una película (o de sus partes) y cómo decirlo en el botón. */
+function moviePlan(it) {
+  const eps = it.eps;
+  const next = eps.find((e) => !(prog(e) || {}).w) || null;
+  const ep = next || eps[0];
+  const p = prog(ep);
+  const part = eps.length > 1 ? ` parte ${eps.indexOf(ep) + 1}` : '';
+  const label = !next ? 'Ver de nuevo' : p && p.t > 5 ? `Continuar${part} en ${fmtTime(p.t)}` : `Ver${part}`;
+  const pct = p && p.d ? (p.w ? 100 : Math.min(100, (p.t / p.d) * 100)) : 0;
+  return { ep, label, pct, seen: !next, left: next && p && p.t > 5 ? fmtLeft(p) : '' };
+}
+
+function renderShelf(s, si) {
+  setTint(seriesColor(s));
+  const fresh = new Set(newEpisodes(s).map((e) => e.id));
+  const items = collectionItems(s).map((it) => ({ it, m: itemMeta(s, it.key), plan: moviePlan(it), added: Math.max(0, ...it.eps.map((e) => e.ts || 0)) }))
+    .sort((a, b) => b.added - a.added || movieTitle(s, a.it).localeCompare(movieTitle(s, b.it), 'es', { numeric: true }));
+  app.innerHTML = header(esc(s.name)) + `<main class="shelf-main">
+    <p class="dim shelf-count">${plural(items.length, 'película', 'películas')}</p>
+    <ul class="shelf" role="list">
+      ${items.map(({ it, m, plan }) => {
+        const t = movieTitle(s, it);
+        const isNew = it.eps.some((e) => fresh.has(e.id));
+        const sub = [m && m.year, plan.seen ? 'Vista' : plan.left].filter(Boolean).join(' · ');
+        return `<li><a class="shelf-item" href="${movieHref(si, it.key)}" style="--h:${hue(t)}">
+          <span class="shelf-poster">
+            ${m && m.cover ? `<img src="${esc(m.cover)}" alt="" loading="lazy" decoding="async">` : `<span class="is-fallback" data-thumb="${esc(it.eps[0].id)}"><span class="cover-glyph">${esc([...t.trim()][0] || '·')}</span></span>`}
+            ${isNew ? '<span class="tile-badge">Nueva</span>' : ''}
+            ${plan.pct && !plan.seen ? `<span class="tile-bar"><span style="width:${plan.pct}%"></span></span>` : ''}
+          </span>
+          <span class="shelf-title">${esc(t)}</span>
+          ${sub ? `<span class="shelf-sub">${esc(sub)}</span>` : ''}
+        </a></li>`;
+      }).join('')}
+    </ul>
+  </main>`;
+  if (fresh.size) { markSeriesSeen(s); lastNew = null; announceNew(); }
+}
+
+function renderMovie(arg) {
+  const lib = state.library;
+  const cut = arg.indexOf('/');
+  const si = Number(arg.slice(0, cut));
+  const key = arg.slice(cut + 1);
+  const s = lib && lib.series && lib.series[si];
+  const it = s && isCollection(s) ? collectionItems(s).find((x) => x.key === key) : null;
+  if (!it) { go(s ? '#/serie/' + si : '#/'); return; }
+  heroSi = si;
+  const m = itemMeta(s, it.key);
+  const t = movieTitle(s, it);
+  const plan = moviePlan(it);
+  const syn = synopsisOf(m);
+  const pending = it.eps.filter((e) => !state.saved.has(e.id));
+  const busy = it.eps.some((e) => state.dls[e.id] || state.queue.some((q) => q.ep.id === e.id));
+  const dur = (prog(plan.ep) || {}).d;
+  const chip = (label, params) => `<a class="fact" href="#/catalogo?${new URLSearchParams(params)}">${esc(label)}</a>`;
+  const facts = [
+    m && m.year ? chip(m.year, { y: m.year }) : '',
+    chip('Película', { f: 'Película' }),
+    dur ? `<span>${Math.round(dur / 60)} min</span>` : '',
+    it.eps.length > 1 ? `<span>${it.eps.length} partes</span>` : '',
+    ...((m && m.genres) || []).slice(0, 3).map((g) => chip(g, { g })),
+  ].join('');
+  const later = isLater(s, it.key);
+  setTint((m && m.color) || seriesColor(s));
+  app.innerHTML = header('', { overlay: true }) + `<div class="tv is-series is-movie">
+    <div class="series-wash" aria-hidden="true">${m && m.cover ? `<img src="${esc(m.cover)}" alt="">` : ''}</div>
+    <main class="tv-main series-main">
+      <section class="series-hero ${m && m.banner ? 'has-banner' : ''}">
+        ${m && m.banner ? `<div class="banner"><img src="${esc(m.banner)}" alt="" decoding="async"></div>` : ''}
+        <div class="series-top">
+          ${m && m.cover ? `<img class="poster" src="${esc(m.cover)}" alt="" decoding="async">` : `<span class="poster is-thumb" data-thumb="${esc(it.eps[0].id)}"></span>`}
+          <div class="series-info">
+            <h2 class="tv-title">${esc(t)}</h2>
+            ${m && m.title && m.title.toLowerCase() !== t.toLowerCase() ? `<p class="tv-alt">${esc(m.title)}${m.native ? ` <span lang="ja">${esc(m.native)}</span>` : ''}</p>` : ''}
+            <p class="tv-facts">${facts}</p>
+          </div>
+        </div>
+        ${syn ? `<p class="tv-synopsis is-long" id="synopsis">${esc(syn)}</p>` : ''}
+        ${m && !m.synopsisEs && m.synopsis && canTranslate() ? `<button class="link-btn" data-act="translate" data-key="${esc(it.key)}">Traducir sinopsis al español</button>` : ''}
+        <div class="tv-actions">
+          <a class="tv-btn is-primary" href="#/play/${encodeURIComponent(plan.ep.id)}">${ICON.play}<span>${esc(plan.label)}</span></a>
+          ${busy ? `<span class="tv-btn is-quiet">${ICON.queued}<span>Descargando…</span></span>`
+            : pending.length ? `<button class="tv-btn" data-act="movie-dl" data-si="${si}" data-key="${esc(it.key)}">${ICON.down}<span>Descargar</span></button>`
+            : `<span class="tv-btn is-quiet">${ICON.saved}<span>Descargada</span></span>`}
+          <button class="tv-btn ${later ? 'is-on' : ''}" data-act="later-item" data-si="${si}" data-key="${esc(it.key)}" aria-pressed="${later}">${later ? ICON.laterOn : ICON.later}<span>Más tarde</span></button>
+        </div>
+      </section>
+      ${it.eps.length > 1 ? `<section class="ep-section">
+        <div class="ep-head"><h3 class="ep-heading">Partes</h3></div>
+        <ol class="episodes is-grid" id="season-eps">${it.eps.map((ep) => episodeRow(ep, { next: ep.id === plan.ep.id && !plan.seen })).join('')}</ol>
+      </section>` : ''}
+    </main>
+  </div>`;
 }
 
 /* ── selección de varios capítulos de una temporada para descargarlos juntos ── */
@@ -4067,6 +4187,13 @@ document.addEventListener('click', async (e) => {
   else if (act === 'pick-all' || act === 'pick-unseen' || act === 'pick-dl') pickAction(act);
   else if (act === 'seen-all') paintSeenByAll(el);
   else if (act === 'news-clear') { LS.set(pkey('news'), []); const box = $('#news'); if (box) box.innerHTML = newsHTML(); }
+  else if (act === 'movie-dl' || act === 'later-item') {
+    const sr = state.library.series[Number(el.dataset.si)];
+    const it = sr && collectionItems(sr).find((x) => x.key === el.dataset.key);
+    if (!it) return;
+    if (act === 'later-item') setLater(sr, it.key, !isLater(sr, it.key));
+    else { it.eps.filter((e) => !state.saved.has(e.id)).forEach((e) => queueDownload(e, movieTitle(sr, it))); softRender(); }
+  }
   else if (act === 'later') { const sr = state.library.series[Number(el.dataset.si)]; if (sr) setLater(sr, '', !isLater(sr)); }
   else if (act === 'resume-here') {
     const o = resumeOffer();
@@ -4089,7 +4216,7 @@ document.addEventListener('click', async (e) => {
   }
   else if (act === 'translate') {
     const sr = state.library.series[heroSi];
-    const m = sr && state.meta[sr.name];
+    const m = sr && state.meta[el.dataset.key ? itemMetaKey(sr, el.dataset.key) : sr.name];
     if (!m) return;
     el.textContent = 'Traduciendo…';
     const es = await translateToSpanish(m.synopsis, true);
