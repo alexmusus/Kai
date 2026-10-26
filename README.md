@@ -2,8 +2,6 @@
 
 Reproductor web para ver las series y películas de anime guardadas en una cuenta de MEGA. Funciona en el navegador de la PC, Mac, iPhone, iPad y Android, sin servidores propios: todo pasa entre el navegador y MEGA.
 
-**Abrir:** https://alexmusus.github.io/kai/ y entrar con la cuenta de MEGA.
-
 ## Qué hace
 
 - **Perfiles** tipo Netflix, cada uno con su propio progreso, sincronizado entre dispositivos.
@@ -21,5 +19,3 @@ Reproductor web para ver las series y películas de anime guardadas en una cuent
 ## Notas
 
 - La cuota de transferencia de MEGA gratis se renueva sola en unas horas; ver y descargar cuentan para ella.
-- En iPhone, conviene agregar Kai a la pantalla de inicio (Compartir → Agregar a pantalla de inicio): se ve en pantalla completa y iOS no borra las descargas.
-- Probarla en local: en la carpeta del proyecto, `python3 -m http.server 8000` y abrir http://localhost:8000.
