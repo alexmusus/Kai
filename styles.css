@@ -1234,23 +1234,21 @@ html.has-mini body { padding-bottom: var(--mini-space); }
 .shelf.is-row > li { scroll-snap-align: start; }
 @media (max-width: 600px) { .shelf.is-row { grid-template-columns: none; grid-auto-columns: 30%; gap: 10px; } }
 
-/* ───────── Kai, el gatito del inicio ───────── */
-.tv.has-cat .tv-main { padding-bottom: calc(120px + env(safe-area-inset-bottom)); }
-.kcat { position: absolute; right: 0; bottom: calc(14px + env(safe-area-inset-bottom)); width: 0; height: 0; z-index: 3; pointer-events: none; }
-.kcat img { position: absolute; bottom: 0; display: block; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
-.kcat-body { position: absolute; right: 0; bottom: 0; transition: opacity .35s ease; }
-.kcat-body img { opacity: 0; transition: opacity .35s ease; transform-origin: 50% 100%; pointer-events: none; }
-.kcat-body img.is-on { opacity: 1; pointer-events: auto; cursor: pointer; }
-.kcat-body.is-away { opacity: 0; }
-.kcat-body.is-away img { pointer-events: none; }
-.kcat-body.is-asleep img.is-on { animation: kcat-breathe 3.6s ease-in-out infinite; }
-@keyframes kcat-breathe { 50% { transform: scale(1.012, 1.028); } }
-.kcat-peek { position: fixed; right: 0; bottom: 34vh; overflow: hidden; pointer-events: none; }
-.kcat-peek img { right: 0; width: 100%; height: 100%; transform: translateX(102%); transition: transform .7s cubic-bezier(.3, .7, .3, 1); }
-.kcat-peek.is-out img { transform: translateX(0); }
-.kcat-yarn { position: absolute; bottom: 0; overflow: hidden; pointer-events: none; opacity: 0; transition: opacity .4s ease; }
-.kcat-yarn img { right: 0; width: 100%; height: 100%; transform: translateY(-100%); transition: transform .8s cubic-bezier(.25, .8, .3, 1); }
-.kcat-yarn.is-down { opacity: 1; }
-.kcat-yarn.is-down img { transform: translateY(0); }
-body.is-playing .kcat, body.lights-off .kcat { display: none; }
-@media (prefers-reduced-motion: reduce) { .kcat-body img, .kcat-body { transition: none; } .kcat-body.is-asleep img.is-on { animation: none; } }
+/* ───────── Kai, el gatito: en el teléfono asomado detrás del título; en PC echado sobre la fecha ───────── */
+.tv-title .tvt { position: relative; display: inline-block; isolation: isolate; }
+.kcat-sit { position: absolute; height: var(--kh); aspect-ratio: 337 / 464; pointer-events: none; }
+.kcat-sit img { position: absolute; inset: 0; width: 100%; height: 100%; user-select: none; -webkit-user-select: none; }
+.kcat-sit img.is-blink { opacity: 0; }
+.kcat-sit.is-closed img.is-blink { opacity: 1; }
+/* teléfono: sentado detrás del nombre, la parte de abajo se pierde detrás de las letras */
+.kcat-sit.is-title {
+  --kh: 78px; z-index: -1; left: 50%; top: calc(0.42em - var(--kh)); transform: translateX(-50%);
+  -webkit-mask-image: linear-gradient(#000 72%, transparent 97%); mask-image: linear-gradient(#000 72%, transparent 97%);
+}
+.kcat-sit.is-top { display: none; }
+@media (min-width: 900px) {
+  .kcat-sit.is-title { display: none; }
+  /* PC: echado encima de la fecha, más o menos de su mismo ancho */
+  .tv-date { position: relative; }
+  .kcat-sit.is-top { display: block; left: 50%; bottom: calc(100% - 6px); width: 105%; min-width: 130px; height: auto; aspect-ratio: 520 / 224; transform: translateX(-50%); }
+}

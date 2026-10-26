@@ -1345,13 +1345,13 @@ function softRender() {
 
 function render() {
   closeDrawer();
-  if (!LS.get('session', null)) { stopPlayback(); renderLogin(); paintCat('login'); return; }
+  if (!LS.get('session', null)) { stopPlayback(); renderLogin(); return; }
   const { view, arg } = route();
   if (!state.profile || !visibleProfiles().some((p) => p.id === state.profile.id) && state.sharedLoaded) {
     if (state.profile && state.sharedLoaded) { state.profile = null; LS.del('profile'); }
-    if (!state.profile) { stopPlayback(); renderProfiles(); paintCat('perfiles'); paintDock(); lastRouteKey = 'perfiles'; return; }
+    if (!state.profile) { stopPlayback(); renderProfiles(); paintDock(); lastRouteKey = 'perfiles'; return; }
   }
-  if (view === 'perfiles') { stopPlayback(); renderProfiles(); paintCat('perfiles'); paintDock(); lastRouteKey = 'perfiles'; return; }
+  if (view === 'perfiles') { stopPlayback(); renderProfiles(); paintDock(); lastRouteKey = 'perfiles'; return; }
   if (picking && (view !== 'serie' || String(picking.si) !== String(arg))) endPicking(false);
   if (view === 'play') {
     const c = resolveContext(arg);
@@ -1369,7 +1369,6 @@ function render() {
     else if (view === 'ajustes') renderSettings();
     else renderHome();
   }
-  paintCat(view);
   paintSync();
   paintDock();
   hydrateThumbs(app);
@@ -1377,14 +1376,6 @@ function render() {
   if (key !== lastRouteKey && view !== 'play') window.scrollTo(0, 0);
   if (key !== lastRouteKey && view === 'play' && lastRouteKey.split('/')[0] !== 'play') window.scrollTo(0, 0);
   lastRouteKey = key;
-}
-
-/** El gatito vive solo en la portada (gato.js). */
-function paintCat(view) {
-  if (!window.KaiCat) return;
-  const home = view !== 'play' && app.querySelector('.tv.is-home');
-  if (home) window.KaiCat.mount(home, state.settings.cat !== false);
-  else window.KaiCat.unmount();
 }
 
 /* ── botón flotante (reemplaza el menú lateral) ── */
@@ -1833,17 +1824,26 @@ function greeting() {
   const g = h < 12 ? 'Buenos días' : h < 19 ? 'Buenas tardes' : 'Buenas noches';
   return state.profile ? `${g}, ${state.profile.name}` : g;
 }
-function clockHTML() {
+function clockParts() {
   const d = new Date();
   const time = new Intl.DateTimeFormat('es', { hour: 'numeric', minute: '2-digit', hour12: true }).formatToParts(d);
   const hm = time.filter((p) => p.type !== 'dayPeriod').map((p) => p.value).join('').trim();
   const ap = (time.find((p) => p.type === 'dayPeriod') || {}).value || '';
   const date = new Intl.DateTimeFormat('es', { weekday: 'long', day: 'numeric', month: 'long' }).format(d);
-  return `<span class="tv-hm">${esc(hm)}</span><span class="tv-ap">${esc(ap)}</span><span class="tv-sep" aria-hidden="true"></span><span class="tv-date">${esc(date)}</span>`;
+  return { hm, ap, date };
+}
+function clockHTML() {
+  const { hm, ap, date } = clockParts();
+  // en la PC, Kai va echado encima de la fecha
+  return `<span class="tv-hm">${esc(hm)}</span><span class="tv-ap">${esc(ap)}</span><span class="tv-sep" aria-hidden="true"></span><span class="tv-date"><span class="tv-date-t">${esc(date)}</span>${catHTML('top')}</span>`;
 }
 setInterval(() => {
+  // solo cambia el texto (así Kai no se vuelve a cargar cada vez)
   const el = $('#tv-clock');
-  if (el) el.innerHTML = clockHTML();
+  if (el) {
+    const p = clockParts();
+    for (const [sel, v] of [['.tv-hm', p.hm], ['.tv-ap', p.ap], ['.tv-date-t', p.date]]) { const x = el.querySelector(sel); if (x && x.textContent !== v) x.textContent = v; }
+  }
   const g = $('#tv-greet');
   if (g) g.textContent = greeting();
 }, 20000);
@@ -1889,6 +1889,24 @@ function factsHTML(s, m, extra = '') {
 function countLabel(s, m) {
   return m && m.collection ? plural(m.count, 'película', 'películas') : plural(s.all.length, 'capítulo', 'capítulos');
 }
+/** Kai, el gatito: sentado detrás del título de la portada, parpadeando de vez en cuando. */
+function catHTML(where) {
+  if (state.settings.cat === false) return '';
+  if (where === 'top') return '<span class="kcat-sit is-top" aria-hidden="true"><img src="gato/echado.webp" alt="" decoding="async"></span>';
+  return `<span class="kcat-sit is-${where}" aria-hidden="true"><img src="gato/sentado.webp" alt="" decoding="async"><img class="is-blink" src="gato/sentado-cierra.webp" alt="" decoding="async"></span>`;
+}
+(function blinkLoop() {
+  setTimeout(() => {
+    // en el teléfono parpadea el del título; en la PC, el echado sobre la fecha todavía no tiene dibujo con ojos cerrados
+    const el = !document.hidden && !matchMedia('(prefers-reduced-motion: reduce)').matches && [...document.querySelectorAll('.kcat-sit.is-title')].find((x) => x.offsetParent);
+    if (el) {
+      const blink = (then) => { el.classList.add('is-closed'); setTimeout(() => { el.classList.remove('is-closed'); if (then) setTimeout(then, 180); }, 150); };
+      blink(Math.random() < 0.25 ? () => blink() : null); // a veces dos seguidas
+    }
+    blinkLoop();
+  }, 3000 + Math.random() * 3000);
+})();
+
 function heroInnerHTML(s, si) {
   const m = displayMeta(s);
   const plan = heroPlan(s);
@@ -1901,7 +1919,7 @@ function heroInnerHTML(s, si) {
     : m && m.cover
     ? `<a class="hero-poster" href="#/serie/${si}" aria-hidden="true" tabindex="-1"><img src="${esc(m.cover)}" alt="" decoding="async"></a>`
     : (coverEp ? `<a class="hero-poster is-thumb" href="#/serie/${si}" aria-hidden="true" tabindex="-1"><span data-thumb="${esc(coverEp.id)}"></span></a>` : '');
-  return `${poster}<div class="tvh-text"><h2 class="tv-title">${esc(s.name)}</h2>
+  return `${poster}<div class="tvh-text"><h2 class="tv-title"><span class="tvt">${esc(s.name)}${catHTML('title')}</span></h2>
     ${m && m.title && m.title.toLowerCase() !== s.name.toLowerCase() ? `<p class="tv-alt">${esc(m.title)}</p>` : ''}
     <p class="tv-facts">${factsHTML(s, m, fresh ? `<span class="tv-new">${fresh === 1 ? '1 nuevo' : `${fresh} nuevos`}</span>` : '')}</p>
     ${syn ? `<p class="tv-synopsis">${esc(syn.replace(/\s*\n+\s*/g, ' '))}</p>` : ''}

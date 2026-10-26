@@ -6,11 +6,11 @@
  */
 importScripts('core.js');
 
-const VERSION = 'kai-v13';
+const VERSION = 'kai-v14';
 const SHELL = [
   './', 'index.html', 'styles.css', 'app.js', 'subs.js', 'meta.js', 'core.js',
-  'vendor/mega.js', 'manifest.webmanifest', 'icon-32.png', 'icon-180.png', 'icon-192.png', 'icon-512.png', 'gato.js',
-  ...['dormido', 'sentado', 'sentado-cierra', 'estira', 'echado', 'parado', 'lame', 'cara', 'frente', 'asoma', 'estambre', 'estambre-1', 'estambre-2', 'estambre-3', 'estambre-4'].map((n) => 'gato/' + n + '.webp'),
+  'vendor/mega.js', 'manifest.webmanifest', 'icon-32.png', 'icon-180.png', 'icon-192.png', 'icon-512.png',
+  'gato/sentado.webp', 'gato/sentado-cierra.webp', 'gato/echado.webp',
 ];
 const FONT_CACHE = 'kai-fonts';
 const ART_CACHE = 'kai-art';
