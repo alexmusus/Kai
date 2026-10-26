@@ -71,11 +71,23 @@ Si los subtítulos están "quemados" en la imagen, se ven siempre y no hay nada 
 
 Toca la flecha de un capítulo para guardarlo en el dispositivo. Al terminar de verlo se quita solo del dispositivo; puedes cambiarlo en Ajustes. Mientras descarga, la app mantiene la pantalla encendida, y si se corta, sigue desde donde iba la próxima vez que la abras con internet.
 
+**Varios a la vez:** en la página de la serie toca **Seleccionar** junto a "Episodios", marca los capítulos que quieras (o **Todos** / **Sin ver**) y toca **Descargar**. Se bajan uno tras otro, en orden. Los que ya están descargados no se pueden marcar.
+
+### Guardar las descargas en una carpeta (Chrome y Edge en computadora)
+
+En **Ajustes → Descargas → Elegir carpeta** escoges una carpeta de tu PC o Mac. Desde ahí, cada capítulo queda como un MP4 normal en `Tu carpeta/Serie/Temporada/archivo.mp4` (lo puedes abrir con VLC u otro reproductor), y lo que ya tenías descargado se pasa a esa carpeta. Mientras baja, el capítulo se guarda primero dentro de la app (para poder reanudar) y al terminar se mueve.
+
+- Al cerrar el navegador, Chrome puede volver a pedir permiso para la carpeta. Kai lo pide solo cuando tocas descargar o reproducir; también hay un botón **Permitir acceso** en Ajustes y en Descargados. Si Chrome ofrece "Permitir en cada visita", elígelo y no vuelve a preguntar.
+- Si borras un archivo a mano, Kai lo nota al intentar reproducirlo.
+- **Quitar del dispositivo** (o terminar el capítulo, si está activado) borra el archivo de la carpeta y la carpeta de la temporada si queda vacía.
+- **Safari (Mac y iPhone) y Firefox no permiten que una página guarde en una carpeta.** Ahí las descargas siguen dentro de la app. Si quieres una copia aparte, toca ⋯ en un capítulo descargado → **Guardar copia en el dispositivo** (en iPhone queda en la app Archivos → Descargas). Esa copia es para otros reproductores: Kai no la lee de vuelta.
+
 ## En iPhone
 
 - Funciona en Safari sin instalar nada.
 - iOS puede borrar los capítulos descargados de un sitio que no abres en unos 7 días. Si la usas a diario no pasa. Si quieres evitarlo del todo, en Safari toca **Compartir → Agregar a pantalla de inicio**.
 - Las descargas se pausan si sales de Safari o bloqueas el teléfono, y continúan al volver.
+- La pantalla completa del iPhone es la de Kai (no la del reproductor de iOS), para que los gestos sigan funcionando. Se ve mejor con Kai agregado a la pantalla de inicio, porque ahí no aparecen las barras de Safari.
 - Si un capítulo no reproduce en línea, el reproductor ofrece **Descargar y ver**.
 
 ## Límites
@@ -89,7 +101,13 @@ En la portada, las flechas del teclado se mueven entre las series como un contro
 
 En el reproductor: espacio: pausa · ← / →: 10 s · F: pantalla completa · M: silencio · C: subtítulos · S: saltar intro · B: apagar la luz · N / P: siguiente y anterior
 
-En el teléfono: un toque muestra los controles, doble toque a la derecha o izquierda salta 10 s.
+En el teléfono, sobre el video:
+
+- Un toque muestra u oculta los controles.
+- Doble toque a la derecha o a la izquierda salta 10 s; cada toque rápido extra suma otros 10 s.
+- Deslizar arriba o abajo (en cualquier lado) cambia el brillo del video. Es el brillo de la imagen, no el de la pantalla del teléfono, que una página web no puede cambiar. Se recuerda en cada dispositivo.
+- Mantener presionado reproduce a 2× mientras no sueltes.
+- Para desplazar la página, desliza fuera del video.
 
 ## Actualizar la app
 

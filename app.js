@@ -797,6 +797,7 @@ function queueDownload(ep, title) {
   if (state.dls[ep.id] || state.saved.has(ep.id) || state.queue.some((q) => q.ep.id === ep.id)) return;
   if (!navigator.onLine) { toast('Necesitas conexión para descargar.'); return; }
   state.queue.push({ ep, title: title || titleFor(ep) });
+  askFolderIfNeeded();
   paintEpisode(ep.id);
   pumpDownloads();
 }
@@ -878,8 +879,17 @@ async function runDownload(ep, title) {
     await idb.put('dl', meta);
     state.saved.add(ep.id);
     state.dlMeta.set(ep.id, meta);
-    toast(`${episodeLabel(ep)} listo para ver sin conexión.`);
     cacheEmbeddedSubs(ep).catch(() => {});
+    let where = '';
+    if (await getDir()) {
+      try {
+        where = (await moveToFolder(ep.id)) ? ' en tu carpeta' : '';
+        if (!where) toast(`${episodeLabel(ep)} quedó dentro de la app: Kai no tiene permiso para tu carpeta ahora (Ajustes → Permitir acceso).`);
+      } catch {
+        toast(`No se pudo guardar ${episodeLabel(ep)} en tu carpeta; quedó dentro de la app.`);
+      }
+    }
+    if (where || !(await getDir())) toast(`${episodeLabel(ep)} listo para ver sin conexión${where}.`);
   } catch (err) {
     if (!task.ctrl.signal.aborted) toast(megaMessage(err));
   } finally {
@@ -894,6 +904,11 @@ async function removeDownload(id, quiet = false) {
   const t = state.dls[id];
   if (t) t.ctrl.abort();
   state.queue = state.queue.filter((q) => q.ep.id !== id);
+  const meta = state.dlMeta.get(id) || (await idb.get('dl', id).catch(() => null));
+  if (meta && meta.where === 'folder' && meta.rel) {
+    // sin permiso ahora: se borra la próxima vez que Kai pueda entrar a la carpeta
+    if (!(await deleteFromFolder(meta.rel, meta.dirKey))) LS.set('folderTrash', [...LS.get('folderTrash', []), { rel: meta.rel, dirKey: meta.dirKey }]);
+  }
   await idb.dropChunks(id).catch(() => {});
   await idb.del('dl', id).catch(() => {});
   state.saved.delete(id);
@@ -915,12 +930,185 @@ async function resumePendingDownloads() {
   }
 }
 
-async function localBlob(ep) {
+const playType = (ep) => (ep.mime === 'video/x-matroska' ? 'video/webm' : ep.mime);
+
+/** El capítulo descargado: de la carpeta elegida o de la app. Lanza NOFOLDER / NOFILE si está en una carpeta que no se puede abrir. */
+async function localBlob(ep, ask = false) {
   if (!state.saved.has(ep.id)) return null;
+  const meta = state.dlMeta.get(ep.id) || (await idb.get('dl', ep.id).catch(() => null));
+  if (meta && meta.where === 'folder') {
+    const dir = await dirAccess(meta.dirKey, ask);
+    if (!dir) throw new Error('NOFOLDER');
+    try {
+      const { file } = await fileAt(dir, meta.rel, false);
+      const f = await file.getFile();
+      return f.slice(0, f.size, playType(ep)); // sin copiar: solo le pone el tipo
+    } catch { throw new Error('NOFILE'); }
+  }
   const chunks = await idb.chunks(ep.id);
   if (!chunks.length) return null;
   chunks.sort((a, b) => a.i - b.i);
-  return new Blob(chunks.map((c) => c.blob), { type: ep.mime === 'video/x-matroska' ? 'video/webm' : ep.mime });
+  return new Blob(chunks.map((c) => c.blob), { type: playType(ep) });
+}
+
+/* ── carpeta de descargas ──
+ * Chrome y Edge en computadora dejan que la página escriba en una carpeta que tú eliges.
+ * Cada capítulo se baja primero a la app (así se puede reanudar) y al terminar se pasa a la
+ * carpeta como un MP4 normal (Serie/Temporada/archivo.mp4); la copia de la app se borra.
+ * Safari (Mac y iPhone) y Firefox no lo permiten: ahí se puede guardar una copia aparte. */
+const canFolder = typeof window.showDirectoryPicker === 'function';
+// El acceso a cada carpeta elegida se guarda en 'subcache' (para no cambiar la versión de la base)
+// con una clave propia; las descargas solo anotan esa clave. La carpeta actual va en localStorage.
+const handleCache = new Map();
+let dirHandle = null; // carpeta actual ya leída (para mostrar su nombre sin esperar)
+
+async function loadHandle(key) {
+  if (!key || !canFolder) return null;
+  if (!handleCache.has(key)) handleCache.set(key, (await idb.get('subcache', key).catch(() => null)) || null);
+  return handleCache.get(key);
+}
+async function getDir() {
+  dirHandle = await loadHandle(LS.get('dirKey', ''));
+  return dirHandle;
+}
+async function dirPermission(d) {
+  try { return await d.queryPermission({ mode: 'readwrite' }); } catch { return 'denied'; }
+}
+/** La carpeta lista para usar, o null. Con `ask` pide permiso (solo funciona justo después de un toque). */
+async function dirAccess(d, ask = false) {
+  if (typeof d === 'string') d = await loadHandle(d);
+  d = d || (await getDir());
+  if (!d) return null;
+  if ((await dirPermission(d)) === 'granted') return d;
+  if (!ask) return null;
+  try { return (await d.requestPermission({ mode: 'readwrite' })) === 'granted' ? d : null; } catch { return null; }
+}
+/** Si hay carpeta sin permiso y el usuario acaba de tocar algo, aprovecha para pedirlo. */
+function askFolderIfNeeded() {
+  if (!canFolder || !(navigator.userActivation && navigator.userActivation.isActive)) return;
+  getDir().then(async (d) => {
+    if (d && (await dirPermission(d)) === 'prompt' && (await dirAccess(d, true))) flushFolder();
+  });
+}
+
+const safeName = (s) => String(s || '').replace(/[\\/:*?"<>|\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').trim().replace(/[. ]+$/, '') || 'Kai';
+/** Ruta dentro de la carpeta: la misma de MEGA sin la carpeta de series, p. ej. Fate/1. Fate UBW/472_0_SUB.mp4 */
+function folderRel(ep, title) {
+  let p = String(ep.path || ep.name);
+  const root = String(state.settings.root || '').replace(/^\/+|\/+$/g, '');
+  if (root && p.toLowerCase().startsWith(root.toLowerCase() + '/')) p = p.slice(root.length + 1);
+  const parts = p.split('/').filter(Boolean);
+  if (parts.length < 2) parts.unshift(title || 'Kai');
+  return parts.map(safeName);
+}
+async function fileAt(dir, rel, create) {
+  let d = dir;
+  const dirs = [d];
+  for (const part of rel.slice(0, -1)) { d = await d.getDirectoryHandle(part, { create }); dirs.push(d); }
+  return { dirs, file: await d.getFileHandle(rel[rel.length - 1], { create }) };
+}
+
+/** Pasa un capítulo ya descargado en la app a la carpeta. */
+async function moveToFolder(id) {
+  const meta = await idb.get('dl', id);
+  if (!meta || !meta.done || meta.where === 'folder' || !meta.ep) return false;
+  const dir = await dirAccess(null);
+  if (!dir) return false;
+  const ep = meta.ep;
+  const rel = folderRel(ep, meta.title);
+  const { file } = await fileAt(dir, rel, true);
+  const w = await file.createWritable();
+  try {
+    const n = Math.ceil(ep.size / CHUNK);
+    for (let i = 0; i < n; i++) {
+      const c = await idb.get('chunks', [id, i]);
+      if (!c) throw new Error('Falta una parte del capítulo');
+      await w.write(c.blob);
+    }
+    await w.close();
+  } catch (err) {
+    try { await w.abort(); } catch { /* nada */ }
+    throw err;
+  }
+  Object.assign(meta, { where: 'folder', rel, dirKey: LS.get('dirKey', '') });
+  await idb.put('dl', meta);
+  state.dlMeta.set(id, meta);
+  await idb.dropChunks(id).catch(() => {});
+  return true;
+}
+
+let flushing = null;
+/** Mueve a la carpeta lo que quedó en la app y borra lo que estaba pendiente de borrar. */
+function flushFolder() {
+  if (flushing) return flushing;
+  flushing = (async () => {
+    if (!(await dirAccess(null))) return 0;
+    let moved = 0;
+    for (const m of await idb.all('dl').catch(() => [])) {
+      if (!m.done || m.where === 'folder' || (playing && playing.ep.id === m.id)) continue;
+      try { if (await moveToFolder(m.id)) moved++; } catch { /* queda en la app */ }
+    }
+    const trash = LS.get('folderTrash', []);
+    const left = [];
+    for (const t of trash) { if (!(await deleteFromFolder(t.rel, t.dirKey))) left.push(t); }
+    LS.set('folderTrash', left);
+    if (moved) { toast(`${plural(moved, 'capítulo pasó', 'capítulos pasaron')} a tu carpeta.`); paintSpace(); }
+    return moved;
+  })().finally(() => { flushing = null; });
+  return flushing;
+}
+
+/** Borra un archivo de la carpeta y las carpetas de serie y temporada si quedan vacías. */
+async function deleteFromFolder(rel, d) {
+  const dir = await dirAccess(d);
+  if (!dir) return false;
+  try {
+    const { dirs } = await fileAt(dir, rel, false);
+    await dirs[dirs.length - 1].removeEntry(rel[rel.length - 1]);
+    for (let i = dirs.length - 1; i > 0; i--) {
+      let empty = true;
+      for await (const _ of dirs[i].keys()) { empty = false; break; } // eslint-disable-line no-unused-vars
+      if (!empty) break;
+      await dirs[i - 1].removeEntry(rel[i - 1]);
+    }
+  } catch (err) {
+    if (err && err.name !== 'NotFoundError') return false;
+  }
+  return true;
+}
+
+async function pickFolder() {
+  let d;
+  try { d = await window.showDirectoryPicker({ id: 'kai-descargas', mode: 'readwrite', startIn: 'videos' }); } catch { return; } // canceló
+  if (!(await dirAccess(d, true))) { toast('Kai necesita permiso para guardar en esa carpeta.'); return; }
+  const key = 'kai:carpeta:' + Date.now().toString(36);
+  await idb.put('subcache', d, key);
+  handleCache.set(key, d);
+  LS.set('dirKey', key);
+  dirHandle = d;
+  toast(`Las descargas se guardarán en «${d.name}».`);
+  if (route().view === 'ajustes') renderSettings();
+  flushFolder();
+}
+async function dropFolder() {
+  if (!confirm('Las descargas nuevas se guardarán dentro de la app. Lo que ya está en la carpeta se queda ahí y Kai lo sigue usando.')) return;
+  LS.del('dirKey'); // el acceso guardado se queda: lo usan las descargas que ya están en esa carpeta
+  dirHandle = null;
+  if (route().view === 'ajustes') renderSettings();
+}
+
+/** Copia aparte del capítulo (Safari, iPhone, Firefox): el navegador la guarda en Descargas o en Archivos. */
+async function exportCopy(ep) {
+  const blob = await localBlob(ep, true).catch(() => null);
+  if (!blob) { toast('Primero descarga el capítulo.'); return; }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = ep.name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 120000);
 }
 
 function nextUnseen(ep, list, n) {
@@ -968,6 +1156,7 @@ function render() {
     if (!state.profile) { stopPlayback(); renderProfiles(); paintDock(); lastRouteKey = 'perfiles'; return; }
   }
   if (view === 'perfiles') { stopPlayback(); renderProfiles(); paintDock(); lastRouteKey = 'perfiles'; return; }
+  if (picking && (view !== 'serie' || String(picking.si) !== String(arg))) endPicking(false);
   if (view === 'play') {
     const c = resolveContext(arg);
     const si = c && c.si;
@@ -1525,21 +1714,124 @@ function renderSeries(arg) {
       <section class="ep-section">
         <div class="ep-head">
           <h3 class="ep-heading">Episodios</h3>
+          <button class="pick-toggle" data-act="pick-mode" id="pick-toggle" aria-pressed="false">${ICON.check}<span>Seleccionar</span></button>
           ${s.seasons.length > 1 ? `<nav class="seasons" aria-label="Temporadas">${s.seasons.map((se, i) => `<button class="season ${i === ki ? 'is-on' : ''}" data-act="season" data-i="${i}" aria-pressed="${i === ki}">${esc(se.num != null ? `Temporada ${se.num}` : se.name)}</button>`).join('')}</nav>` : ''}
         </div>
         ${season.title && season.title !== s.name ? `<p class="season-title">${esc(season.title)}</p>` : ''}
-        <ol class="episodes is-grid">${season.episodes.map((ep) => episodeRow(ep, { fresh: fresh.has(ep.id), next: next && ep.id === next.id })).join('')}</ol>
+        <ol class="episodes is-grid" id="season-eps">${season.episodes.map((ep) => episodeRow(ep, { fresh: fresh.has(ep.id), next: next && ep.id === next.id })).join('')}</ol>
       </section>
     </main>
+    <div class="pick-bar" id="pick-bar" role="toolbar" aria-label="Capítulos seleccionados" hidden>
+      <span class="pick-count" id="pick-count" aria-live="polite"></span>
+      <button class="pick-btn" data-act="pick-all">Todos</button>
+      <button class="pick-btn" data-act="pick-unseen">Sin ver</button>
+      <button class="pick-btn is-primary" data-act="pick-dl" disabled>${ICON.down}<span>Descargar</span></button>
+    </div>
   </div>`;
   app.querySelectorAll('[data-act="season"]').forEach((b) => b.addEventListener('click', () => {
     currentSeason[s.name] = Number(b.dataset.i);
+    if (picking) picking = { si, ki: Number(b.dataset.i), ids: new Set() };
     renderSeries(arg);
     hydrateThumbs(app);
   }));
+  if (picking && (picking.si !== si || picking.ki !== ki)) picking = { si, ki, ids: new Set() };
+  paintPick();
   // los "nuevos" se muestran esta vez y quedan vistos
   if (fresh.size) { markSeriesSeen(s); lastNew = null; announceNew(); }
 }
+
+/* ── selección de varios capítulos de una temporada para descargarlos juntos ── */
+
+let picking = null; // { si, ki, ids: Set } mientras se eligen capítulos
+
+function pickSeason() {
+  const s = picking && state.library && state.library.series[picking.si];
+  return s ? s.seasons[picking.ki] || null : null;
+}
+/** Se puede elegir lo que no está descargado ni en camino. */
+const pickable = (ep) => !state.saved.has(ep.id) && !state.dls[ep.id] && !state.queue.some((q) => q.ep.id === ep.id);
+
+function startPicking() {
+  const s = state.library && state.library.series[heroSi];
+  if (!s) return;
+  const ki = Math.min(currentSeason[s.name] ?? 0, s.seasons.length - 1);
+  const cur = $('.season.is-on');
+  picking = { si: heroSi, ki: cur ? Number(cur.dataset.i) : ki, ids: new Set() };
+  paintPick();
+}
+function endPicking(repaint = true) {
+  picking = null;
+  document.documentElement.classList.remove('is-picking');
+  if (repaint) paintPick();
+}
+
+function paintPick() {
+  const on = !!picking;
+  document.documentElement.classList.toggle('is-picking', on);
+  const list = $('#season-eps');
+  const bar = $('#pick-bar');
+  const btn = $('#pick-toggle');
+  if (!list || !bar) return;
+  list.classList.toggle('is-picking', on);
+  if (btn) {
+    btn.setAttribute('aria-pressed', String(on));
+    btn.classList.toggle('is-on', on);
+    btn.querySelector('span').textContent = on ? 'Cancelar' : 'Seleccionar';
+  }
+  bar.hidden = !on;
+  list.querySelectorAll('.ep').forEach((li) => {
+    const ep = epById(li.dataset.id);
+    const picked = on && picking.ids.has(li.dataset.id);
+    li.classList.toggle('is-picked', picked);
+    li.classList.toggle('is-unpickable', on && !!ep && !pickable(ep));
+    const a = li.querySelector('.ep-main');
+    if (on) { a.setAttribute('role', 'checkbox'); a.setAttribute('aria-checked', String(picked)); } else { a.removeAttribute('role'); a.removeAttribute('aria-checked'); }
+  });
+  if (!on) return;
+  const eps = [...picking.ids].map(epById).filter(Boolean);
+  const size = eps.reduce((a, e) => a + (e.size || 0), 0);
+  $('#pick-count').textContent = eps.length ? `${plural(eps.length, 'capítulo', 'capítulos')}, ${fmtSize(size)}` : 'Toca los capítulos que quieras';
+  bar.querySelector('[data-act="pick-dl"]').disabled = !eps.length;
+  const season = pickSeason();
+  const all = season ? season.episodes.filter(pickable) : [];
+  bar.querySelector('[data-act="pick-all"]').textContent = all.length && all.every((e) => picking.ids.has(e.id)) ? 'Ninguno' : 'Todos';
+}
+
+function pickAction(act) {
+  const season = pickSeason();
+  if (!picking || !season) return;
+  const avail = season.episodes.filter(pickable);
+  if (act === 'pick-all') {
+    const allOn = avail.length && avail.every((e) => picking.ids.has(e.id));
+    picking.ids = allOn ? new Set() : new Set(avail.map((e) => e.id));
+  } else if (act === 'pick-unseen') {
+    picking.ids = new Set(avail.filter((e) => !(prog(e) || {}).w).map((e) => e.id));
+    if (!picking.ids.size) toast('No hay capítulos sin ver para descargar en esta temporada.');
+  } else if (act === 'pick-dl') {
+    const s = state.library.series[picking.si];
+    const eps = season.episodes.filter((e) => picking.ids.has(e.id) && pickable(e)); // en el orden de la temporada
+    if (!navigator.onLine) { toast('Necesitas conexión para descargar.'); return; }
+    eps.forEach((e) => queueDownload(e, s.name));
+    if (eps.length) toast(`${plural(eps.length, 'capítulo', 'capítulos')} en cola de descarga.`);
+    endPicking();
+    return;
+  }
+  paintPick();
+}
+
+// en modo selección, tocar un capítulo lo marca en vez de abrirlo
+app.addEventListener('click', (e) => {
+  if (!picking) return;
+  const li = e.target.closest('#season-eps.is-picking .ep');
+  if (!li) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const ep = epById(li.dataset.id);
+  if (!ep) return;
+  if (!pickable(ep)) { toast(state.saved.has(ep.id) ? 'Ya está descargado.' : 'Ya se está descargando.'); return; }
+  if (picking.ids.has(ep.id)) picking.ids.delete(ep.id); else picking.ids.add(ep.id);
+  paintPick();
+}, true);
 
 function nextFor(s) {
   const c = continueList().find((x) => x.series === s);
@@ -1662,6 +1954,9 @@ async function renderDownloads() {
     groups.get(t).push(m.ep);
   }
   const total = metas.filter((m) => m.done).reduce((a, m) => a + (m.size || 0), 0);
+  const folderN = metas.filter((m) => m.done && m.where === 'folder').length;
+  const dir = await getDir();
+  const perm = dir ? await dirPermission(dir) : '';
   let free = '';
   try {
     const est = await navigator.storage.estimate();
@@ -1669,7 +1964,8 @@ async function renderDownloads() {
   } catch { /* nada */ }
   if (route().view !== 'descargas') return;
   app.innerHTML = header('Descargados') + `<main class="downloads">
-    ${metas.length ? `<p class="dim downloads-sum">${plural(state.saved.size, 'capítulo', 'capítulos')} en este dispositivo, ${fmtSize(total)}${free}.</p>` : ''}
+    ${metas.length ? `<p class="dim downloads-sum">${plural(state.saved.size, 'capítulo', 'capítulos')} en este dispositivo, ${fmtSize(total)}${folderN ? ` (${folderN === state.saved.size ? 'todos' : folderN} en tu carpeta${dir ? ` «${esc(dir.name)}»` : ''})` : ''}${free}.</p>` : ''}
+    ${dir && perm === 'prompt' ? '<p class="downloads-sum"><button class="btn btn-lamp" data-act="dir-grant">Permitir acceso a tu carpeta de descargas</button></p>' : ''}
     ${!metas.length ? `<section class="empty"><p>No hay capítulos descargados.</p>
       <p class="dim">Toca la flecha junto a un capítulo para verlo sin conexión.</p></section>` : ''}
     ${[...groups.entries()].sort((a, b) => a[0].localeCompare(b[0], 'es')).map(([t, eps]) => `<section class="block">
@@ -1704,6 +2000,7 @@ function renderSettings() {
       <label class="switch"><input type="checkbox" name="autoRemoveLocal" ${s.autoRemoveLocal ? 'checked' : ''}><span>Quitar del dispositivo los capítulos que termine</span></label>
       <label class="switch"><input type="checkbox" name="trashOnFinish" ${s.trashOnFinish ? 'checked' : ''}><span>Mandar a la papelera de MEGA los capítulos que termine</span></label>
     </form>
+    <section class="settings-group" id="dl-where">${downloadsWhereHTML()}</section>
     <section class="settings-group">
       <p class="dim" id="space">Calculando espacio…</p>
       <p class="dim">${esc(quotaText(true))}</p>
@@ -1728,19 +2025,54 @@ function renderSettings() {
     saveSettings();
   });
   paintSpace();
+  paintDownloadsWhere();
+}
+
+function downloadsWhereHTML(perm = '') {
+  if (!canFolder) {
+    return `<p class="settings-label">Descargas</p>
+      <p class="settings-value">Dentro de la app</p>
+      <p class="dim">Este navegador no deja que una página guarde en una carpeta (eso solo lo permiten Chrome y Edge en computadora). Si quieres el archivo aparte, toca ⋯ en un capítulo descargado y elige «Guardar copia en el dispositivo».</p>`;
+  }
+  const d = dirHandle;
+  if (!d) {
+    return `<p class="settings-label">Descargas</p>
+      <p class="settings-value">Dentro de la app</p>
+      <p class="dim">Puedes elegir una carpeta de tu computadora: los capítulos quedarán ahí como MP4 normales, ordenados por serie y temporada.</p>
+      <button class="btn" data-act="dir-pick">${ICON.folder}<span>Elegir carpeta</span></button>`;
+  }
+  return `<p class="settings-label">Descargas</p>
+    <p class="settings-value">${ICON.folder} ${esc(d.name)}</p>
+    <p class="dim">Cada capítulo queda como MP4 en <span class="mono">${esc(d.name)}/Serie/Temporada/</span>.${perm === 'prompt' ? ' Kai necesita que le vuelvas a dar permiso para usarla.' : ''}</p>
+    <div class="btn-row">
+      ${perm === 'prompt' ? '<button class="btn btn-lamp" data-act="dir-grant">Permitir acceso</button>' : ''}
+      <button class="btn" data-act="dir-pick">Cambiar carpeta</button>
+      <button class="btn" data-act="dir-off">Guardar dentro de la app</button>
+    </div>`;
+}
+async function paintDownloadsWhere() {
+  const d = await getDir();
+  const perm = d ? await dirPermission(d) : '';
+  const el = $('#dl-where');
+  if (el) el.innerHTML = downloadsWhereHTML(perm);
 }
 
 async function paintSpace() {
   const el = $('#space');
   if (!el) return;
   const metas = await refreshSaved();
-  const used = metas.filter((m) => m.done).reduce((a, m) => a + (m.size || 0), 0);
+  const sum = (list) => list.reduce((a, m) => a + (m.size || 0), 0);
+  const inApp = metas.filter((m) => m.done && m.where !== 'folder');
+  const inFolder = metas.filter((m) => m.done && m.where === 'folder');
+  const parts = [];
+  if (inApp.length) parts.push(`${plural(inApp.length, 'capítulo', 'capítulos')} dentro de la app (${fmtSize(sum(inApp))})`);
+  if (inFolder.length) parts.push(`${plural(inFolder.length, 'capítulo', 'capítulos')} en tu carpeta (${fmtSize(sum(inFolder))})`);
   let extra = '';
   try {
     const est = await navigator.storage.estimate();
     if (est.quota) extra = ` Espacio disponible para la app: ${fmtSize(Math.max(0, est.quota - est.usage))}.`;
   } catch { /* nada */ }
-  if ($('#space')) $('#space').textContent = `${plural(state.saved.size, 'capítulo', 'capítulos')} sin conexión (${fmtSize(used)}).${extra}`;
+  if ($('#space')) $('#space').textContent = `${parts.length ? parts.join(' y ') + '.' : 'Ningún capítulo descargado.'}${extra}`;
 }
 
 /* ── hoja de opciones de un capítulo ── */
@@ -1760,6 +2092,7 @@ function openSheet(ep) {
       ${p && p.t > 5 && !p.w ? '<button class="sheet-btn" data-act="restart">Ver desde el principio</button>' : ''}
       ${saved || busy ? `<button class="sheet-btn" data-act="unsave">${busy ? 'Cancelar descarga' : 'Quitar del dispositivo'}</button>` : '<button class="sheet-btn" data-act="save">Descargar para ver sin conexión</button>'}
       ${upcoming.length ? `<button class="sheet-btn" data-act="save-next">Descargar ${upcoming.length === 1 ? 'el siguiente' : `los ${upcoming.length} siguientes`}</button>` : ''}
+      ${saved && (state.dlMeta.get(ep.id) || {}).where !== 'folder' ? '<button class="sheet-btn" data-act="export">Guardar copia en el dispositivo</button>' : ''}
       <button class="sheet-btn is-danger" data-act="trash">Mandar a la papelera de MEGA</button>
       <button class="sheet-btn is-quiet" data-act="close">Cerrar</button>
     </div>`;
@@ -1781,6 +2114,7 @@ function openSheet(ep) {
     } else if (act === 'save') queueDownload(ep);
     else if (act === 'save-next') { upcoming.forEach((x) => queueDownload(x, ctx.title)); toast(`${plural(upcoming.length, 'capítulo', 'capítulos')} en cola de descarga.`); }
     else if (act === 'unsave') removeDownload(ep.id);
+    else if (act === 'export') exportCopy(ep);
     else if (act === 'trash') trashEpisode(ep, true);
   };
 }
@@ -1917,7 +2251,8 @@ async function startPlayback(ctx) {
   paintControls();
 
   let src = null;
-  const blob = await localBlob(ep).catch(() => null);
+  let localErr = null;
+  const blob = await localBlob(ep, true).catch((err) => { localErr = err; return null; });
   if (playing !== token) return;
   if (blob) {
     src = token.objectUrl = URL.createObjectURL(blob);
@@ -1932,6 +2267,10 @@ async function startPlayback(ctx) {
         ? 'La app se está preparando. Recarga la página y vuelve a intentarlo.'
         : megaMessage(err));
     }
+  } else if (localErr && localErr.message === 'NOFOLDER') {
+    return playerMessage('Kai necesita permiso para abrir tu carpeta de descargas.', false, true);
+  } else if (localErr && localErr.message === 'NOFILE') {
+    return playerMessage('El archivo ya no está en tu carpeta de descargas.');
   } else {
     return playerMessage('Este capítulo no está descargado y no hay conexión.');
   }
@@ -1963,10 +2302,11 @@ async function streamUrl(ep) {
   return '__stream?' + q.toString();
 }
 
-function playerMessage(text, offerDownload = false) {
+function playerMessage(text, offerDownload = false, offerFolder = false) {
   stage.classList.remove('is-loading');
   ui.msg.innerHTML = `<p>${esc(text)}</p><div class="btn-row">
     ${offerDownload ? '<button class="btn btn-lamp" data-act="p-dl">Descargar y ver</button>' : ''}
+    ${offerFolder ? '<button class="btn btn-lamp" data-act="p-folder">Permitir acceso</button>' : ''}
     <a class="btn" href="${playing ? playing.ctx.back : '#/'}">Volver</a></div>`;
   ui.msg.hidden = false;
 }
@@ -2116,8 +2456,18 @@ function seekBy(s) {
   wake();
 }
 
-const isFullscreen = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+const isFullscreen = () => !!(document.fullscreenElement || document.webkitFullscreenElement || stage.classList.contains('kai-fs'));
+/* iPhone no deja poner en pantalla completa un elemento de la página, solo el reproductor
+ * nativo de iOS, que tapa los controles y gestos de Kai. Ahí se usa una pantalla completa
+ * propia: el reproductor ocupa toda la pantalla (sin barras si Kai está en la pantalla de inicio). */
+function setKaiFullscreen(on) {
+  stage.classList.toggle('kai-fs', on);
+  document.documentElement.classList.toggle('kai-fs-on', on);
+  paintControls();
+  wake();
+}
 function exitFullscreen() {
+  if (stage.classList.contains('kai-fs')) { setKaiFullscreen(false); return; }
   const fn = document.exitFullscreen || document.webkitExitFullscreen;
   if (fn) fn.call(document).catch?.(() => {});
 }
@@ -2127,9 +2477,9 @@ function toggleFullscreen() {
   if (req) {
     Promise.resolve(req.call(stage)).then(() => {
       try { screen.orientation.lock('landscape').catch(() => {}); } catch { /* nada */ }
-    }).catch(() => { if (video.webkitEnterFullscreen) video.webkitEnterFullscreen(); });
-  } else if (video.webkitEnterFullscreen) {
-    video.webkitEnterFullscreen(); // iPhone: reproductor nativo de iOS
+    }).catch(() => setKaiFullscreen(true));
+  } else {
+    setKaiFullscreen(true);
   }
 }
 
@@ -2673,29 +3023,127 @@ ui.seek.addEventListener('change', () => {
 });
 ui.seek.addEventListener('pointerup', () => { if (seeking) { video.currentTime = Number(ui.seek.value); seeking = false; } });
 
-// toques sobre el video: un toque muestra u oculta controles, doble toque a los lados salta 10 s
+/* Gestos sobre el video.
+ * Mouse: un clic pausa, doble clic pantalla completa.
+ * Táctil: un toque muestra u oculta los controles; doble toque a la izquierda o derecha salta 10 s
+ * (cada toque rápido extra suma otros 10 s); deslizar arriba o abajo cambia el brillo;
+ * mantener presionado reproduce a 2× mientras no se suelte. */
 let lastTap = 0;
+let lastTapSide = '';
 let tapTimer;
+let lastTouchEnd = 0;
+let bright = Math.min(1.6, Math.max(0.35, Number(LS.get('bright', 1)) || 1));
+const levelEl = $('#st-level');
+const holdEl = $('#st-hold');
+let levelTimer;
+
+function applyBright() { video.style.filter = Math.abs(bright - 1) < 0.02 ? '' : `brightness(${bright.toFixed(2)})`; }
+applyBright();
+function showLevel(side) {
+  levelEl.dataset.side = side;
+  levelEl.style.setProperty('--lv', String(Math.round(((bright - 0.35) / 1.25) * 100)));
+  levelEl.classList.add('is-on');
+  clearTimeout(levelTimer);
+  levelTimer = setTimeout(() => levelEl.classList.remove('is-on'), 700);
+}
+
+function tapSide(clientX) {
+  const rect = stage.getBoundingClientRect();
+  const x = (clientX - rect.left) / rect.width;
+  return x < 0.4 ? 'left' : x > 0.6 ? 'right' : 'center';
+}
+// como en Android e iOS: el doble toque se mide desde que se soltó el primero hasta que empieza el segundo
+const DOUBLE_TAP = 300;
+function handleTouchTap(clientX, downAt = Date.now()) {
+  const side = tapSide(clientX);
+  const now = Date.now();
+  const gap = downAt - lastTap;
+  // racha de toques: tras un doble toque, cada toque rápido del mismo lado suma otros 10 s
+  if (lastTapSide === side + '-streak' && gap < 650 && side !== 'center') {
+    lastTap = now;
+    seekBy(side === 'left' ? -10 : 10);
+    return;
+  }
+  if (gap < DOUBLE_TAP && lastTapSide === side) {
+    clearTimeout(tapTimer);
+    lastTap = now;
+    if (side === 'center') { lastTapSide = ''; togglePlay(); return; }
+    lastTapSide = side + '-streak';
+    seekBy(side === 'left' ? -10 : 10);
+    return;
+  }
+  lastTap = now;
+  lastTapSide = side;
+  clearTimeout(tapTimer);
+  tapTimer = setTimeout(() => {
+    if (stage.classList.contains('is-idle') || video.paused) wake(); else stage.classList.add('is-idle');
+  }, DOUBLE_TAP + 60);
+}
+
+let touch = null; // gesto táctil en curso
+function endHold() {
+  if (!touch || !touch.hold) return;
+  touch.hold = false;
+  video.playbackRate = speed;
+  holdEl.classList.remove('is-on');
+}
+ui.tap.addEventListener('pointerdown', (e) => {
+  if (e.pointerType !== 'touch' || !e.isPrimary) return;
+  try { ui.tap.setPointerCapture(e.pointerId); } catch { /* nada */ }
+  const rect = stage.getBoundingClientRect();
+  if (Date.now() - lastTap < DOUBLE_TAP) clearTimeout(tapTimer); // puede ser el segundo toque: no ocultar controles todavía
+  touch = { id: e.pointerId, x: e.clientX, y: e.clientY, h: rect.height, mode: null, hold: false, start: bright, at: Date.now(), side: e.clientX - rect.left < rect.width / 2 ? 'left' : 'right' };
+  const t = touch;
+  t.timer = setTimeout(() => {
+    if (touch !== t || t.mode || !video.currentSrc || video.paused || video.ended) return;
+    t.hold = true;
+    t.mode = 'hold';
+    video.playbackRate = 2;
+    holdEl.classList.add('is-on');
+    clearTimeout(tapTimer);
+  }, 500);
+});
+ui.tap.addEventListener('pointermove', (e) => {
+  const t = touch;
+  if (!t || e.pointerId !== t.id) return;
+  const dx = e.clientX - t.x;
+  const dy = t.y - e.clientY; // hacia arriba es positivo
+  if (!t.mode && Math.hypot(dx, dy) > 12) {
+    clearTimeout(t.timer);
+    t.mode = Math.abs(dy) > Math.abs(dx) ? 'bright' : 'none';
+    if (t.mode === 'bright') { t.y = e.clientY; t.start = bright; }
+  }
+  if (t.mode === 'bright') {
+    const dy2 = t.y - e.clientY;
+    // recorrer el alto del video cambia el brillo por completo
+    bright = Math.min(1.6, Math.max(0.35, t.start + (dy2 / Math.max(160, t.h)) * 1.25));
+    applyBright();
+    showLevel(t.side);
+  }
+});
+function touchEnd(e, cancelled) {
+  const t = touch;
+  if (!t || e.pointerId !== t.id) return;
+  clearTimeout(t.timer);
+  lastTouchEnd = Date.now();
+  if (t.hold) endHold();
+  else if (t.mode === 'bright') LS.set('bright', Number(bright.toFixed(2)));
+  else if (!t.mode && !cancelled) handleTouchTap(e.clientX, t.at);
+  touch = null;
+}
+ui.tap.addEventListener('pointerup', (e) => touchEnd(e, false));
+ui.tap.addEventListener('pointercancel', (e) => touchEnd(e, true));
+ui.tap.addEventListener('contextmenu', (e) => e.preventDefault()); // mantener presionado no abre el menú del sistema
+
 ui.tap.addEventListener('click', (e) => {
+  if (Date.now() - lastTouchEnd < 800) return; // ya lo manejaron los gestos táctiles
   if (e.pointerType === 'mouse' || (!e.pointerType && matchMedia('(hover: hover)').matches)) {
     clearTimeout(tapTimer);
     tapTimer = setTimeout(() => { togglePlay(); }, 200);
     wake();
     return;
   }
-  const rect = stage.getBoundingClientRect();
-  const x = (e.clientX - rect.left) / rect.width;
-  const now = Date.now();
-  if (now - lastTap < 300) {
-    clearTimeout(tapTimer);
-    lastTap = 0;
-    if (x < 0.4) seekBy(-10); else if (x > 0.6) seekBy(10); else togglePlay();
-    return;
-  }
-  lastTap = now;
-  tapTimer = setTimeout(() => {
-    if (stage.classList.contains('is-idle') || video.paused) wake(); else stage.classList.add('is-idle');
-  }, 300);
+  handleTouchTap(e.clientX);
 });
 ui.tap.addEventListener('dblclick', (e) => {
   if (!matchMedia('(hover: hover)').matches) return;
@@ -2727,6 +3175,10 @@ stage.addEventListener('click', (e) => {
   else if (act === 'p-next-now') { ui.nextCard.hidden = true; clearTimeout(nextTimer); playNext(); }
   else if (act === 'p-next-cancel') { clearTimeout(nextTimer); ui.nextCard.hidden = true; }
   else if (act === 'p-dl') downloadThenPlay();
+  else if (act === 'p-folder' && playing) {
+    const ctx = playing.ctx;
+    dirAccess(state.dlMeta.get(playing.ep.id)?.dirKey, true).then((d) => { if (d) { playing = null; startPlayback(ctx); flushFolder(); } });
+  }
 });
 ui.menu.addEventListener('change', (e) => {
   if (e.target.matches('[data-act="m-file"]') && e.target.files[0]) loadSubFile(e.target.files[0]);
@@ -2740,7 +3192,7 @@ if (!(document.pictureInPictureEnabled || video.webkitSupportsPresentationMode))
 
 document.addEventListener('keydown', (e) => {
   if (route().view !== 'play' || !playing) {
-    if (e.key === 'Escape') { closeSheet(); closeDrawer(); }
+    if (e.key === 'Escape') { closeSheet(); closeDrawer(); if (picking) endPicking(); }
     return;
   }
   if (e.target.closest('input:not([type="range"]), textarea, select')) return;
@@ -2755,7 +3207,7 @@ document.addEventListener('keydown', (e) => {
   else if (k === 'b') setLights(!document.body.classList.contains('lights-off'));
   else if (k === 's' && playing && playing.offer) doSkip();
   else if (k === 'p') playPrev();
-  else if (k === 'escape') { if (!ui.menu.hidden) closeMenu(); }
+  else if (k === 'escape') { if (!ui.menu.hidden) closeMenu(); else if (stage.classList.contains('kai-fs')) setKaiFullscreen(false); }
   else return;
   wake();
 });
@@ -2803,6 +3255,14 @@ document.addEventListener('click', async (e) => {
     renderProfiles(visibleProfiles().length > 0);
     sync();
   }
+  else if (act === 'dir-pick') pickFolder();
+  else if (act === 'dir-off') dropFolder();
+  else if (act === 'dir-grant') {
+    if (await dirAccess(null, true)) { flushFolder(); if (route().view === 'ajustes') paintDownloadsWhere(); else softRender(); }
+    else toast('Sin permiso, Kai guarda las descargas dentro de la app.');
+  }
+  else if (act === 'pick-mode') { if (picking) endPicking(); else startPicking(); }
+  else if (act === 'pick-all' || act === 'pick-unseen' || act === 'pick-dl') pickAction(act);
   else if (act === 'pick-image') { const sr = state.library.series[Number(el.dataset.si)]; if (sr) openMetaPicker(sr); }
   else if (act === 'series-dl') {
     const sr = state.library.series[Number(el.dataset.si)];
@@ -2879,6 +3339,9 @@ document.addEventListener('click', async (e) => {
     if (!confirm('¿Quitar todos los capítulos descargados de este dispositivo?')) return;
     Object.values(state.dls).forEach((t) => t.ctrl.abort());
     state.queue = [];
+    for (const m of await idb.all('dl').catch(() => [])) {
+      if (m.where === 'folder' && m.rel && !(await deleteFromFolder(m.rel, m.dirKey))) LS.set('folderTrash', [...LS.get('folderTrash', []), { rel: m.rel, dirKey: m.dirKey }]);
+    }
     await idb.clear('chunks'); await idb.clear('dl');
     state.saved.clear(); state.dlMeta.clear();
     toast('Descargas quitadas.');
@@ -2955,6 +3418,7 @@ async function boot() {
   }
   await refreshSaved().catch(() => {});
   render();
+  getDir().then((d) => { if (d) flushFolder(); }).catch(() => {}); // si la carpeta ya tiene permiso, termina lo pendiente
   if (!LS.get('session', null) || !navigator.onLine) return;
   try {
     await connect();
