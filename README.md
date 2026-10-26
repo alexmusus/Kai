@@ -8,7 +8,7 @@ Reproductor web para ver las series y películas de anime guardadas en una cuent
 - **Biblioteca** armada desde la carpeta `Anime` de MEGA: cada carpeta es una serie y sus subcarpetas son temporadas. Una carpeta `Peliculas` se muestra como un estante de pósters, y cada película (una subcarpeta o un archivo suelto) tiene su propia página con imagen y sinopsis; en el catálogo y la búsqueda salen sueltas.
 - **Sinopsis e imágenes** de AniList para cada serie y película, automáticas.
 - **Códec de cada video** en pequeño sobre su miniatura, con un puntito rojo si el dispositivo donde estás no lo puede reproducir (por ejemplo AV1 en un iPad M2).
-- **Inicio** con lo agregado recientemente, lo marcado para **Más tarde** y búsqueda rápida (la lupa). El botón de inicio está en todas las páginas.
+- **Inicio** con las 10 series agregadas más recientemente, una fila de **Películas**, lo marcado para **Más tarde** y búsqueda rápida (la lupa). El botón de inicio está en todas las páginas.
 - **Seguir en otro dispositivo:** si dejaste algo a medias en otro dispositivo, el inicio ofrece seguir en ese mismo segundo.
 - **Catálogo** con buscador y filtros por género, año y tipo. El año, el tipo y los géneros de cada ficha son botones que llevan al catálogo filtrado.
 - **Reproductor propio:** marcas de capítulos, ±10 s, velocidad, subtítulos, ventana flotante, pantalla completa, salta la intro sola y pasa al siguiente capítulo.

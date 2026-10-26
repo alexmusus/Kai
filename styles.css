@@ -1223,3 +1223,8 @@ html.has-mini body { padding-bottom: var(--mini-space); }
 .tv-btn.is-quiet { opacity: 0.7; pointer-events: none; }
 .shelf-poster .has-img .cover-glyph { display: none; }
 .shelf-poster .cover-glyph { position: static; font-size: 64px; }
+/* fila de películas en el inicio: una sola fila que se desliza de lado */
+.shelf.is-row { grid-auto-flow: column; grid-template-columns: none; grid-auto-columns: clamp(130px, 13vw, 170px); overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity; padding: 4px 2px 14px; margin: 0 -2px; scrollbar-width: none; }
+.shelf.is-row::-webkit-scrollbar { display: none; }
+.shelf.is-row > li { scroll-snap-align: start; }
+@media (max-width: 600px) { .shelf.is-row { grid-template-columns: none; grid-auto-columns: 30%; gap: 10px; } }

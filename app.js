@@ -1977,7 +1977,7 @@ function renderHome() {
       </div></section>` : ''}
       <section class="tv-row">
         <div class="tv-row-head"><h3 class="tv-row-title">Agregados recientemente</h3>
-          <a class="tv-more" href="#/catalogo">${ICON.grid}<span>Ver catálogo${lib.series.length > HOME_RECENT ? ` (${catalogEntries().length})` : ''}</span></a></div>
+          <a class="tv-more" href="#/catalogo">${ICON.grid}<span>Ver catálogo${lib.series.filter((x) => !isCollection(x)).length > HOME_RECENT ? ` (${catalogEntries().length})` : ''}</span></a></div>
         <div class="tiles is-grid" role="list">
         ${recentSeries(lib).map(({ s, si }) => {
           const fresh = newEpisodes(s).length;
@@ -1989,8 +1989,23 @@ function renderHome() {
           });
         }).join('')}
       </div></section>
+      ${homeMoviesHTML(lib)}
     </main>
   </div>`;
+}
+/** Fila "Películas" del inicio: las 10 más recientes y el enlace al estante completo. */
+function homeMoviesHTML(lib) {
+  const si = lib.series.findIndex((x) => isCollection(x));
+  if (si < 0) return '';
+  const s = lib.series[si];
+  const items = shelfItems(s);
+  if (!items.length) return '';
+  const fresh = new Set(newEpisodes(s).map((e) => e.id));
+  return `<section class="tv-row">
+    <div class="tv-row-head"><h3 class="tv-row-title">Películas</h3>
+      <a class="tv-more" href="#/serie/${si}">${ICON.grid}<span>Ver todas${items.length > HOME_MOVIES ? ` (${items.length})` : ''}</span></a></div>
+    <ul class="shelf is-row" role="list">${items.slice(0, HOME_MOVIES).map((x) => moviePosterHTML(s, si, x, fresh)).join('')}</ul>
+  </section>`;
 }
 
 /** Tarjeta "Estabas viendo … en el iPhone — Seguir aquí". */
@@ -2051,11 +2066,12 @@ async function paintSeenByAll(btn) {
 
 /* ── catálogo: todo lo que hay, con buscador y filtros ── */
 
-const HOME_RECENT = 20;
+const HOME_RECENT = 10;
+const HOME_MOVIES = 10;
 const norm = (t) => String(t ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
 function recentSeries(lib) {
-  return lib.series.map((s, si) => ({ s, si }))
+  return lib.series.map((s, si) => ({ s, si })).filter(({ s }) => !isCollection(s))
     .sort((a, b) => (b.s.added || 0) - (a.s.added || 0) || a.s.name.localeCompare(b.s.name, 'es', { numeric: true }))
     .slice(0, HOME_RECENT);
 }
@@ -2302,29 +2318,33 @@ function moviePlan(it) {
   return { ep, label, pct, seen: !next, left: next && p && p.t > 5 ? fmtLeft(p) : '' };
 }
 
+/** Las películas de la colección, las agregadas más recientemente primero. */
+function shelfItems(s) {
+  return collectionItems(s).map((it) => ({ it, m: itemMeta(s, it.key), plan: moviePlan(it), added: Math.max(0, ...it.eps.map((e) => e.ts || 0)) }))
+    .sort((a, b) => b.added - a.added || movieTitle(s, a.it).localeCompare(movieTitle(s, b.it), 'es', { numeric: true }));
+}
+function moviePosterHTML(s, si, { it, m, plan }, fresh) {
+  const t = movieTitle(s, it);
+  const isNew = it.eps.some((e) => fresh.has(e.id));
+  const sub = [m && m.year, plan.seen ? 'Vista' : plan.left].filter(Boolean).join(' · ');
+  return `<li><a class="shelf-item" href="${movieHref(si, it.key)}" style="--h:${hue(t)}">
+    <span class="shelf-poster">
+      ${m && m.cover ? `<img src="${esc(m.cover)}" alt="" loading="lazy" decoding="async">` : `<span class="is-fallback" data-thumb="${esc(it.eps[0].id)}"><span class="cover-glyph">${esc([...t.trim()][0] || '·')}</span></span>`}
+      ${isNew ? '<span class="tile-badge">Nueva</span>' : ''}
+      ${plan.pct && !plan.seen ? `<span class="tile-bar"><span style="width:${plan.pct}%"></span></span>` : ''}
+    </span>
+    <span class="shelf-title">${esc(t)}</span>
+    ${sub ? `<span class="shelf-sub">${esc(sub)}</span>` : ''}
+  </a></li>`;
+}
+
 function renderShelf(s, si) {
   setTint(seriesColor(s));
   const fresh = new Set(newEpisodes(s).map((e) => e.id));
-  const items = collectionItems(s).map((it) => ({ it, m: itemMeta(s, it.key), plan: moviePlan(it), added: Math.max(0, ...it.eps.map((e) => e.ts || 0)) }))
-    .sort((a, b) => b.added - a.added || movieTitle(s, a.it).localeCompare(movieTitle(s, b.it), 'es', { numeric: true }));
+  const items = shelfItems(s);
   app.innerHTML = header(esc(s.name)) + `<main class="shelf-main">
     <p class="dim shelf-count">${plural(items.length, 'película', 'películas')}</p>
-    <ul class="shelf" role="list">
-      ${items.map(({ it, m, plan }) => {
-        const t = movieTitle(s, it);
-        const isNew = it.eps.some((e) => fresh.has(e.id));
-        const sub = [m && m.year, plan.seen ? 'Vista' : plan.left].filter(Boolean).join(' · ');
-        return `<li><a class="shelf-item" href="${movieHref(si, it.key)}" style="--h:${hue(t)}">
-          <span class="shelf-poster">
-            ${m && m.cover ? `<img src="${esc(m.cover)}" alt="" loading="lazy" decoding="async">` : `<span class="is-fallback" data-thumb="${esc(it.eps[0].id)}"><span class="cover-glyph">${esc([...t.trim()][0] || '·')}</span></span>`}
-            ${isNew ? '<span class="tile-badge">Nueva</span>' : ''}
-            ${plan.pct && !plan.seen ? `<span class="tile-bar"><span style="width:${plan.pct}%"></span></span>` : ''}
-          </span>
-          <span class="shelf-title">${esc(t)}</span>
-          ${sub ? `<span class="shelf-sub">${esc(sub)}</span>` : ''}
-        </a></li>`;
-      }).join('')}
-    </ul>
+    <ul class="shelf" role="list">${items.map((x) => moviePosterHTML(s, si, x, fresh)).join('')}</ul>
   </main>`;
   if (fresh.size) { markSeriesSeen(s); lastNew = null; announceNew(); }
 }
