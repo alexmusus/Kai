@@ -1621,18 +1621,26 @@ function paintNewsDot() {
   const btn = dock && dock.querySelector('.dock-btn');
   if (btn) btn.classList.toggle('has-news', hasUnreadNews());
 }
+/* Se recuerda qué capítulos ya se anunciaron (por su id), no cuántos había: así, si MEGA entrega la lista
+ * a medias al abrir (unos segundos con menos capítulos), al completarse no se vuelve a anunciar lo mismo. */
+const NEWS_IDS_MAX = 4000;
 function announceNew() {
   if (!state.library || !state.library.series || !state.profile) return;
-  // cuántos nuevos ya se anotaron por serie (guardado: así también cuenta lo que llegó con la app cerrada)
-  const counted = LS.get(pkey('newsCount'), {}) || {};
-  const now = {};
+  let told = LS.get(pkey('newsIds'), null);
+  const first = !Array.isArray(told);
+  const seen = new Set(first ? [] : told);
+  const added = [];
   for (const s of state.library.series) {
-    const n = newEpisodes(s).length;
-    now[s.name] = n;
-    if (n > (counted[s.name] || 0)) noteNews(s.name, n);
+    const fresh = newEpisodes(s);
+    const unseen = fresh.filter((e) => !seen.has(e.id));
+    if (!unseen.length) continue;
+    unseen.forEach((e) => { seen.add(e.id); added.push(e.id); });
+    // la primera vez (al pasar a esta versión) solo se toma nota, sin anunciar lo que ya se avisó antes
+    if (!first) noteNews(s.name, fresh.length);
   }
-  LS.set(pkey('newsCount'), now);
-  lastNew = now;
+  if (first || added.length) LS.set(pkey('newsIds'), [...seen].slice(-NEWS_IDS_MAX));
+  LS.del(pkey('newsCount'));
+  lastNew = null;
   paintNewsDot();
 }
 function newsHTML() {
