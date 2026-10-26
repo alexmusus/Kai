@@ -3930,30 +3930,35 @@ function videoPoint(e) {
 }
 
 function applyBright() {
-  video.style.filter = Math.abs(bright - 1) < 0.02 ? '' : `brightness(${bright.toFixed(2)})`;
-  brightEl.style.setProperty('--lv', String(Math.round(((bright - 0.35) / 1.25) * 100)));
+  // el filtro se deja siempre puesto (quitarlo y ponerlo al pasar por 100 % da un tirón)
+  video.style.filter = `brightness(${bright.toFixed(3)})`;
+  brightEl.style.setProperty('--lv', ((bright - 0.35) / 1.25).toFixed(4));
   brightEl.setAttribute('aria-valuenow', String(Math.round(bright * 100)));
 }
 applyBright();
-function setBrightFrom(e) {
-  const r = brightEl.querySelector('.st-bright-track').getBoundingClientRect();
-  // girado, lo de abajo del video queda a la izquierda de la pantalla
-  const f = isRotated() ? (e.clientX - r.left) / r.width : (r.bottom - e.clientY) / r.height;
-  bright = 0.35 + Math.min(1, Math.max(0, f)) * 1.25;
-  applyBright();
-  wake();
-}
+/* Se arrastra desde donde está (como el Centro de control): tocar no salta el brillo a otro punto. */
 let brightDrag = null;
+let brightFrame = 0;
+function brightAxis(e) { return isRotated() ? e.clientX : -e.clientY; }
 brightEl.addEventListener('pointerdown', (e) => {
   e.stopPropagation();
-  brightDrag = e.pointerId;
+  const r = brightEl.querySelector('.st-bright-track').getBoundingClientRect();
+  brightDrag = { id: e.pointerId, from: brightAxis(e), start: bright, len: isRotated() ? r.width : r.height };
+  brightEl.classList.add('is-dragging');
   try { brightEl.setPointerCapture(e.pointerId); } catch { /* nada */ }
-  setBrightFrom(e);
+  wake();
 });
-brightEl.addEventListener('pointermove', (e) => { if (brightDrag === e.pointerId) setBrightFrom(e); });
+brightEl.addEventListener('pointermove', (e) => {
+  const d = brightDrag;
+  if (!d || d.id !== e.pointerId) return;
+  bright = Math.min(1.6, Math.max(0.35, d.start + ((brightAxis(e) - d.from) / d.len) * 1.25));
+  if (!brightFrame) brightFrame = requestAnimationFrame(() => { brightFrame = 0; applyBright(); wake(); });
+});
 ['pointerup', 'pointercancel'].forEach((ev) => brightEl.addEventListener(ev, (e) => {
-  if (brightDrag !== e.pointerId) return;
+  if (!brightDrag || brightDrag.id !== e.pointerId) return;
   brightDrag = null;
+  brightEl.classList.remove('is-dragging');
+  applyBright();
   LS.set('bright', Number(bright.toFixed(2)));
 }));
 brightEl.addEventListener('click', (e) => e.stopPropagation());
