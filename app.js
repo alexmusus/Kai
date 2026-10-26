@@ -1345,13 +1345,13 @@ function softRender() {
 
 function render() {
   closeDrawer();
-  if (!LS.get('session', null)) { stopPlayback(); renderLogin(); return; }
+  if (!LS.get('session', null)) { stopPlayback(); renderLogin(); paintCat('login'); return; }
   const { view, arg } = route();
   if (!state.profile || !visibleProfiles().some((p) => p.id === state.profile.id) && state.sharedLoaded) {
     if (state.profile && state.sharedLoaded) { state.profile = null; LS.del('profile'); }
-    if (!state.profile) { stopPlayback(); renderProfiles(); paintDock(); lastRouteKey = 'perfiles'; return; }
+    if (!state.profile) { stopPlayback(); renderProfiles(); paintCat('perfiles'); paintDock(); lastRouteKey = 'perfiles'; return; }
   }
-  if (view === 'perfiles') { stopPlayback(); renderProfiles(); paintDock(); lastRouteKey = 'perfiles'; return; }
+  if (view === 'perfiles') { stopPlayback(); renderProfiles(); paintCat('perfiles'); paintDock(); lastRouteKey = 'perfiles'; return; }
   if (picking && (view !== 'serie' || String(picking.si) !== String(arg))) endPicking(false);
   if (view === 'play') {
     const c = resolveContext(arg);
@@ -1369,6 +1369,7 @@ function render() {
     else if (view === 'ajustes') renderSettings();
     else renderHome();
   }
+  paintCat(view);
   paintSync();
   paintDock();
   hydrateThumbs(app);
@@ -1376,6 +1377,14 @@ function render() {
   if (key !== lastRouteKey && view !== 'play') window.scrollTo(0, 0);
   if (key !== lastRouteKey && view === 'play' && lastRouteKey.split('/')[0] !== 'play') window.scrollTo(0, 0);
   lastRouteKey = key;
+}
+
+/** El gatito vive solo en la portada (gato.js). */
+function paintCat(view) {
+  if (!window.KaiCat) return;
+  const home = view !== 'play' && app.querySelector('.tv.is-home');
+  if (home) window.KaiCat.mount(home, state.settings.cat !== false);
+  else window.KaiCat.unmount();
 }
 
 /* ── botón flotante (reemplaza el menú lateral) ── */
@@ -1449,7 +1458,7 @@ document.addEventListener('keydown', (e) => {
 let loginNote = ''; // aviso que se mantiene en la pantalla de entrar aunque se vuelva a dibujar
 function renderLogin(message = loginNote, needCode = false, email = '') {
   app.innerHTML = `<main class="login">
-    <div class="login-mark" aria-hidden="true"><span class="orb"></span></div>
+    <div class="login-mark" aria-hidden="true"><img class="login-icon" src="icon-192.png" alt=""></div>
     <h1 class="login-title">Kai</h1>
     <p class="login-lead">Tus series de MEGA, donde te quedaste, en cualquier pantalla.</p>
     <form id="login" class="form" autocomplete="on">
@@ -2673,6 +2682,7 @@ function renderSettings() {
       <label class="switch"><input type="checkbox" name="subs" ${s.subs !== 'off' ? 'checked' : ''}><span>Mostrar subtítulos cuando el capítulo los traiga</span></label>
       <label class="switch"><input type="checkbox" name="autoSkip" ${s.autoSkip ? 'checked' : ''}><span>Saltar intros solo cuando Kai sepa dónde están</span></label>
       <label class="switch"><input type="checkbox" name="ambient" ${s.ambient !== false ? 'checked' : ''}><span>Luz ambiental alrededor del video</span></label>
+      <label class="switch"><input type="checkbox" name="cat" ${s.cat !== false ? 'checked' : ''}><span>Kai, el gatito, en el inicio</span></label>
       <label class="switch"><input type="checkbox" name="prefetchNext" ${s.prefetchNext !== false ? 'checked' : ''}><span>Preparar el siguiente capítulo para que empiece sin espera (usa unos 3 MB de MEGA)</span></label>
     </form>
     <section class="settings-group" id="dl-where">${downloadsWhereHTML()}</section>
@@ -2707,6 +2717,7 @@ function renderSettings() {
     s.autoSkip = f.autoSkip.checked;
     s.ambient = f.ambient.checked;
     s.prefetchNext = f.prefetchNext.checked;
+    s.cat = f.cat.checked;
     saveSettings();
   });
   paintSpace();

@@ -17,6 +17,7 @@ Reproductor web para ver las series y películas de anime guardadas en una cuent
 - **Rápido:** lo ya visto queda en memoria (retroceder no gasta cuota de MEGA) y prepara el inicio del siguiente capítulo.
 - **Descargas sin conexión,** de uno en uno o varios a la vez. En Chrome y Edge de computadora se pueden guardar en una carpeta como MP4. Nada se borra solo: lo descargado se quita a mano desde Descargados.
 - **Novedades** en Ajustes con lo que se agrega a MEGA (un puntito en el menú avisa que hay algo nuevo). Aviso del uso de la cuota de MEGA y de cuando hay una versión nueva de Kai (también se puede buscar en Ajustes).
+- **Kai, el gatito:** vive abajo a la derecha del inicio, junto al botón flotante. Duerme, a ratos se despierta, se estira, se acicala y a veces juega solo con el estambre; si lo tocas, juega contigo. No aparece fuera del inicio ni mientras suena un video, y se apaga en Ajustes.
 - **Visto por todos:** en Ajustes, lista lo que ya terminaron todos los perfiles, por si quieres liberar espacio en MEGA.
 
 ## Notas
