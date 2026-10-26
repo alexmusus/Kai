@@ -56,7 +56,9 @@ function cleanText(s) {
 export function toMeta(m) {
   return {
     id: m.id,
+    v: 2,
     title: (m.title && (m.title.english || m.title.romaji || m.title.userPreferred)) || '',
+    romaji: (m.title && m.title.romaji) || '',
     native: (m.title && m.title.native) || '',
     synopsis: cleanText(m.description),
     banner: m.bannerImage || '',
@@ -65,7 +67,7 @@ export function toMeta(m) {
     year: m.seasonYear || null,
     episodes: m.episodes || null,
     format: FORMATS[m.format] || '',
-    genres: (m.genres || []).slice(0, 3).map((g) => GENRES[g] || g),
+    genres: (m.genres || []).map((g) => GENRES[g] || g), // todos: sirven para filtrar en el catálogo
     at: Date.now(),
   };
 }

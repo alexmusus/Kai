@@ -6,7 +6,7 @@
  */
 importScripts('core.js');
 
-const VERSION = 'kai-v7';
+const VERSION = 'kai-v8';
 const SHELL = [
   './', 'index.html', 'styles.css', 'app.js', 'subs.js', 'meta.js', 'core.js',
   'vendor/mega.js', 'manifest.webmanifest', 'icon.svg', 'icon-180.png', 'icon-512.png',
@@ -33,7 +33,13 @@ async function reportQuota(timeLeft) {
 }
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
+  // 'reload' evita que el navegador entregue archivos viejos de su propia caché
+  e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL.map((u) => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));
+});
+
+// la app pregunta qué versión está instalada (Ajustes)
+self.addEventListener('message', (e) => {
+  if ((e.data || {}).type === 'version' && e.source) e.source.postMessage({ type: 'version', version: VERSION });
 });
 
 self.addEventListener('activate', (e) => {

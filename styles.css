@@ -632,7 +632,7 @@ html.kai-fs-on .dock, html.kai-fs-on .ambi { display: none; }
 .tv-alt { margin: 10px 0 0; font-size: 16px; color: var(--dim); font-weight: 500; }
 .tv-alt span { margin-left: 6px; opacity: 0.8; }
 .tv-facts { margin: 14px 0 0; display: flex; flex-wrap: wrap; gap: 6px; }
-.tv-facts span { font-size: 13px; font-weight: 600; padding: 5px 11px; border-radius: 999px; background: var(--glass); border: 1px solid var(--glass-edge); -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur); }
+.tv-facts span, .tv-facts .fact { font-size: 13px; font-weight: 600; padding: 5px 11px; border-radius: 999px; background: var(--glass); border: 1px solid var(--glass-edge); -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur); }
 .tv-facts .tv-new { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
 .tv-synopsis { margin: 16px 0 0; max-width: 62ch; font-size: 16px; line-height: 1.55; color: color-mix(in srgb, var(--text) 86%, transparent); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; text-shadow: 0 1px 12px color-mix(in srgb, var(--bg) 70%, transparent); }
 .tv-synopsis.is-long { -webkit-line-clamp: 8; white-space: pre-line; }
@@ -779,7 +779,7 @@ body.quota-hit .dock-quota { color: var(--dim); }
 body.quota-hit .dock-quota::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #e6a23c; margin-right: 6px; vertical-align: 1px; }
 body.quota-hit .dock-btn::after { content: ''; position: absolute; top: 2px; right: 2px; width: 9px; height: 9px; border-radius: 50%; background: #e6a23c; border: 2px solid var(--bg); }
 
-.tv-top .sync { margin-top: 10px; }
+.tv-top .sync { margin-top: 0; }
 
 /* portada: el anime solo vive en su póster y en los mosaicos */
 .tv-hero { display: grid; grid-template-columns: 1fr; gap: 34px; align-items: end; max-width: 1180px; padding: clamp(24px, 7vh, 80px) 0 26px; }
@@ -1058,3 +1058,80 @@ html.has-mini .pick-bar, html.has-mini .toast { bottom: calc(18px + var(--mini-s
   html.has-mini { --mini-space: 76px; }
 }
 html.has-mini body { padding-bottom: var(--mini-space); }
+.profiles-why { margin: -4px auto 12px; max-width: 46ch; color: var(--dim); font-size: 14px; text-align: center; }
+
+/* aviso de versión nueva */
+.update-notice {
+  position: fixed; z-index: 45; left: 50%; top: calc(env(safe-area-inset-top) + 14px); transform: translateX(-50%);
+  display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 16px; max-width: calc(100vw - 24px);
+  border-radius: 999px; font-size: 14px; font-weight: 600;
+  background: var(--glass-solid); box-shadow: inset 0 0 0 1px var(--glass-edge), 0 14px 40px var(--shadow);
+  -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur); animation: pick-in 0.25s ease-out;
+}
+.update-btn { height: 34px; padding: 0 14px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font-weight: 650; }
+.update-x { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; color: var(--dim); }
+.update-x svg { width: 16px; height: 16px; }
+
+
+/* etiquetas que filtran el catálogo */
+.tv-facts .fact { color: var(--text); transition: background-color 0.15s, transform 0.15s; }
+@media (hover: hover) { .tv-facts .fact:hover { background: var(--glass-strong); transform: translateY(-1px); } }
+.tv-facts .fact:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* cuadrícula de mosaicos (inicio y catálogo): hacia abajo, sin deslizar de lado */
+.tiles.is-grid {
+  grid-auto-flow: row; grid-auto-columns: auto; grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr));
+  overflow: visible; padding: 10px 0 8px; margin: 0; scroll-snap-type: none; gap: clamp(12px, 2vw, 20px);
+}
+@media (max-width: 520px) {
+  .tiles.is-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .tiles.is-grid .tile { border-radius: 16px; }
+  .tiles.is-grid .tile-text { left: 10px; right: 10px; bottom: 8px; }
+  .tiles.is-grid .tile-title { font-size: 14px; }
+  .tiles.is-grid .tile-sub { font-size: 11px; }
+  .tiles.is-grid .tile-badge { top: 7px; left: 7px; padding: 3px 8px; font-size: 10px; }
+}
+.tv-row-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.tv-more { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px; border-radius: 999px; font-size: 14px; font-weight: 600; color: var(--text); background: var(--glass); box-shadow: inset 0 0 0 1px var(--glass-edge); }
+.tv-more svg { width: 16px; height: 16px; }
+@media (hover: hover) { .tv-more:hover { background: var(--glass-strong); } }
+
+/* lupa del inicio */
+.tv-top-tools { display: flex; align-items: center; gap: 10px; }
+.tv-icon { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; color: var(--text); background: var(--glass); box-shadow: inset 0 0 0 1px var(--glass-edge), inset 0 1px 0 var(--glass-hi); -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur); }
+.tv-icon svg { width: 20px; height: 20px; }
+.tv-icon.is-small { width: 36px; height: 36px; background: transparent; box-shadow: none; }
+.home-search, .cat-search {
+  position: relative; z-index: 4; display: flex; align-items: center; gap: 8px;
+  height: 56px; padding: 0 8px 0 18px; border-radius: 999px;
+  background: var(--glass-strong); box-shadow: inset 0 0 0 1px var(--glass-edge), inset 0 1px 0 var(--glass-hi), 0 14px 40px var(--shadow);
+  -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur);
+}
+.home-search { margin: 4px clamp(16px, 4vw, 56px) 10px; animation: pick-in 0.22s ease-out; }
+.home-search[hidden] { display: none; }
+.home-search input, .cat-search input { flex: 1; min-width: 0; height: 100%; border: 0; background: transparent; color: var(--text); font: inherit; font-size: 17px; outline: none; }
+.home-search input::-webkit-search-cancel-button, .cat-search input::-webkit-search-cancel-button { -webkit-appearance: none; }
+.search-icon { display: grid; color: var(--dim); }
+.search-icon svg { width: 20px; height: 20px; }
+.tv.is-searching .tv-hero, .tv.is-searching .tv-row:not(#home-results) { display: none; }
+
+/* catálogo */
+.catalog { max-width: 1440px; display: grid; gap: 14px; padding-top: 8px; }
+.cat-filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.cat-select { display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 6px 0 14px; border-radius: 999px; background: var(--glass); box-shadow: inset 0 0 0 1px var(--glass-edge); font-size: 13px; color: var(--dim); }
+.cat-select select { -webkit-appearance: none; appearance: none; border: 0; background: transparent; color: var(--text); font: inherit; font-size: 14px; font-weight: 600; padding: 0 22px 0 2px; height: 100%; max-width: 46vw; text-overflow: ellipsis;
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: calc(100% - 11px) 52%, calc(100% - 6px) 52%; background-size: 5px 5px; background-repeat: no-repeat; cursor: pointer; }
+.cat-select select option { color: #111; }
+.cat-clear { margin: 0 4px; }
+.cat-count { margin: 0; }
+@media (max-width: 520px) {
+  .cat-filters { display: grid; grid-template-columns: 1fr 1fr; }
+  .cat-select { justify-content: space-between; }
+  .cat-select select { max-width: 100%; }
+  .cat-clear { grid-column: 1 / -1; justify-self: start; }
+}
+
+/* película resaltada al llegar desde el catálogo */
+.ep.is-flash { animation: ep-flash 1.6s ease-out; }
+@keyframes ep-flash { 0%, 30% { box-shadow: inset 0 0 0 2px var(--accent), 0 0 0 6px color-mix(in srgb, var(--accent) 30%, transparent); } }

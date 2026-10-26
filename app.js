@@ -68,11 +68,14 @@ const ICON = {
   image: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="14" rx="2.5"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-4.5 3.5 3 3-2.5 4.5 4"/></svg>',
   sun: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4L6 18M18 6l1.4-1.4"/></svg>',
   moon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 14.5A8 8 0 0 1 9.5 4.5a8 8 0 1 0 10 10z"/></svg>',
+  search: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L20 20"/></svg>',
+  close: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  grid: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5"/></svg>',
 };
 
 /* ───────────────────────── estado ───────────────────────── */
 
-const DEFAULTS = { root: 'Anime', autoRemoveLocal: true, trashOnFinish: false, autoplay: true, subs: 'on', subLabel: '', subSize: 'm', autoSkip: true, theme: 'auto' };
+const DEFAULTS = { root: 'Anime', autoRemoveLocal: true, autoplay: true, subs: 'on', subLabel: '', subSize: 'm', autoSkip: true, theme: 'auto' };
 const SHARED_FILE = '.kai-compartido.json';            // perfiles, intros aprendidas e imágenes elegidas
 const profileFile = (id) => `.kai-progreso-${id}.json`;  // progreso de cada perfil
 const LEGACY_PROGRESS = ['.kai-progreso.json', '.yoru-progreso.json'];
@@ -189,6 +192,7 @@ function makeEpisode(f, folderPath, siblings = []) {
     key: C.bytesToB64u(new Uint8Array(f.key)),
     fa: f.fa || null,
     mime: MIME[ext] || 'video/mp4',
+    ts: f.timestamp || 0, // cuándo llegó a MEGA, para "agregados recientemente"
     subs,
   };
 }
@@ -228,7 +232,8 @@ function buildLibrary(storage) {
     }
     if (!seasons.length) continue;
     seasons.sort((a, b) => (a.num ?? 9999) - (b.num ?? 9999) || a.name.localeCompare(b.name, 'es', { numeric: true }));
-    series.push({ name: sf.name, folderId: sf.nodeId, seasons });
+    const added = Math.max(0, ...seasons.flatMap((se) => se.episodes.map((e) => e.ts || 0)));
+    series.push({ name: sf.name, folderId: sf.nodeId, seasons, added });
   }
   series.sort((a, b) => a.name.localeCompare(b.name, 'es', { numeric: true }));
   return { root: state.settings.root, rootId: root.nodeId, v: 2, series, updated: Date.now() };
@@ -260,7 +265,7 @@ function setLibrary(lib) {
 
 function librarySignature(lib) {
   if (!lib) return '';
-  return lib.root + '|' + lib.series.map((s) => s.name + ':' + s.seasons.map((se) => se.name + '=' + se.episodes.map((e) => e.id + (e.fa ? '+' : '') + e.subs.length).join(',')).join(';')).join('|');
+  return lib.root + '|' + lib.series.map((s) => s.name + '@' + (s.added || 0) + ':' + s.seasons.map((se) => se.name + '=' + se.episodes.map((e) => e.id + (e.fa ? '+' : '') + e.subs.length).join(',')).join(';')).join('|');
 }
 
 /** La versión 1 guardaba rutas relativas a la carpeta de series; ahora son desde la raíz de MEGA. */
@@ -769,6 +774,7 @@ async function doSync() {
     state.syncState = 'error';
     if (!state.sharedLoaded) {
       state.sharedError = true;
+      state.sharedErrorMsg = megaMessage((err && err.cause) || err); // el motivo real: cuota, sesión, red…
       if (!state.profile || route().view === 'perfiles') render();
     }
     console.warn('sync', err);
@@ -1138,8 +1144,9 @@ function nextUnseen(ep, list, n) {
 
 function route() {
   const h = location.hash.replace(/^#\/?/, '');
-  const [view, ...rest] = h.split('/');
-  return { view: view || 'home', arg: decodeURIComponent(rest.join('/')) };
+  const [path, query = ''] = h.split('?');
+  const [view, ...rest] = path.split('/');
+  return { view: view || 'home', arg: decodeURIComponent(rest.join('/')), q: new URLSearchParams(query) };
 }
 let inAppNav = 0;
 function go(hash) { if (location.hash !== hash) location.hash = hash; else render(); }
@@ -1185,6 +1192,7 @@ function render() {
     setTint(null);
     if (view === 'serie') renderSeries(arg);
     else if (view === 'explorar') renderExplorer(arg);
+    else if (view === 'catalogo') renderCatalog();
     else if (view === 'descargas') renderDownloads();
     else if (view === 'ajustes') renderSettings();
     else renderHome();
@@ -1322,6 +1330,7 @@ function renderProfiles(editing = false, adding = false) {
       ${first && !blocked ? '<p class="profiles-lead">Cada perfil guarda su propio progreso y aparece en todos tus dispositivos.</p>' : ''}
       ${waiting && first ? '<p class="profiles-lead">Buscando perfiles en tu MEGA…</p>' : ''}
       ${failed ? `<p class="profiles-lead">${navigator.onLine ? 'No pude leer tus perfiles en MEGA.' : 'Conéctate a internet para cargar tus perfiles.'}</p>
+        ${navigator.onLine && state.sharedErrorMsg && state.sharedErrorMsg !== 'MFA' ? `<p class="profiles-why">${esc(state.sharedErrorMsg)}${/límite de transferencia/i.test(state.sharedErrorMsg) ? ' MEGA cuenta ese límite por conexión: con datos móviles u otra red suele funcionar de inmediato.' : ''}</p>` : ''}
         ${navigator.onLine ? '<button class="btn btn-lamp" data-act="profiles-retry">Reintentar</button>' : ''}` : ''}
       <ul class="profile-grid">
         ${list.map((p) => `<li><button class="profile-tile ${editing ? 'is-editing' : ''}" data-act="${editing ? 'profile-delete' : 'profile-pick'}" data-id="${esc(p.id)}">
@@ -1446,13 +1455,13 @@ async function ensureMeta() {
   try {
     for (const s of state.library.series) {
       const pick = state.shared.picks[s.name];
-      if (isCollection(s) && !pick) {
+      if (isCollection(s)) {
         // cada película por separado; la carpeta no se busca
         let failed = false;
         for (const it of collectionItems(s)) {
           const k = itemMetaKey(s, it.key);
           const c = state.meta[k];
-          if (c && Date.now() - (c.at || 0) < 30 * 86400000) continue;
+          if (c && Date.now() - (c.at || 0) < 30 * 86400000 && (c.none || c.v === 2)) continue;
           let m = null;
           if (it.query) {
             let list;
@@ -1468,7 +1477,7 @@ async function ensureMeta() {
         continue;
       }
       const cur = state.meta[s.name];
-      const stale = !cur || Date.now() - (cur.at || 0) > 30 * 86400000 || (pick && pick.id !== (cur.id || 0));
+      const stale = !cur || Date.now() - (cur.at || 0) > 30 * 86400000 || (pick && pick.id !== (cur.id || 0)) || (!cur.none && cur.v !== 2);
       if (!stale) continue;
       try {
         let m = null;
@@ -1499,8 +1508,9 @@ function synopsisOf(m) { return m ? (m.synopsisEs || m.synopsis || '') : ''; }
 /* ── colecciones: una carpeta "Películas" no es una serie ──
  * Cada película (subcarpeta, o archivo si están sueltos) se busca por separado en AniList,
  * y la carpeta se muestra con un mosaico de sus pósters y un texto propio. */
-const COLLECTION_RE = /^(pel[ií]culas?|movies?|films?|filmes)$/i;
-const isCollection = (s) => !!s && COLLECTION_RE.test(String(s.name || '').trim());
+// "Películas" puede venir con la tilde en cualquier codificación (macOS la guarda separada), o sin tilde
+const COLLECTION_RE = /^(peliculas?|movies?|films?|filmes)\b/i;
+const isCollection = (s) => !!s && COLLECTION_RE.test(String(s.name || '').trim().normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
 function cleanFileTitle(name) {
   const t = String(name).replace(/\.[^.]+$/, '').replace(/[[(][^\])]*[\])]/g, ' ').replace(/[_.]+/g, ' ')
     .replace(/\b(1080p|720p|480p|2160p|4k|x26[45]|hevc|aac|sub|subs|dub|latino|esp|spa|bd|bdrip|web|webrip)\b/gi, ' ')
@@ -1529,8 +1539,8 @@ function itemMeta(s, key) {
 }
 /** Lo que se muestra de una serie: lo de AniList, o para una colección, lo armado con sus películas. */
 function displayMeta(s) {
-  const m = metaFor(s);
-  if (m || !isCollection(s)) return m;
+  // una colección nunca usa la ficha de la carpeta (aunque haya quedado guardada de antes): se arma con sus películas
+  if (!isCollection(s)) return metaFor(s);
   const items = collectionItems(s).map((it) => ({ ...it, m: itemMeta(s, it.key) }));
   const named = items.map((it) => {
     const t = it.title || (it.m && it.m.title) || '';
@@ -1554,7 +1564,7 @@ function episodeArt(ep) {
   const e = index.byId.get(ep.id);
   const s = e && state.library && state.library.series[e.si];
   if (!s) return '';
-  const m = isCollection(s) && !metaFor(s) ? itemMeta(s, itemFor(s, ep).key) : metaFor(s);
+  const m = isCollection(s) ? itemMeta(s, itemFor(s, ep).key) : metaFor(s);
   return m ? m.banner || m.cover || '' : '';
 }
 
@@ -1667,8 +1677,16 @@ function tvTop() {
       <p class="tv-greet" id="tv-greet">${esc(greeting())}</p>
       <p class="tv-clock" id="tv-clock">${clockHTML()}</p>
     </div>
-    <span id="sync" class="sync" data-state="ok"></span>
-  </header>`;
+    <div class="tv-top-tools">
+      <span id="sync" class="sync" data-state="ok"></span>
+      <button class="tv-icon" data-act="home-search" aria-label="Buscar" aria-expanded="false">${ICON.search}</button>
+    </div>
+  </header>
+  <div class="home-search" id="home-search" hidden>
+    <span class="search-icon">${ICON.search}</span>
+    <input id="home-q" type="search" placeholder="Buscar un anime o película" autocomplete="off" enterkeyhint="search" aria-label="Buscar">
+    <button class="tv-icon is-small" data-act="home-search-close" aria-label="Cerrar la búsqueda">${ICON.close}</button>
+  </div>`;
 }
 
 let heroSi = null;
@@ -1681,6 +1699,16 @@ function heroPlan(s) {
   return { next, label: next ? `${resume ? 'Continuar' : 'Ver'} ${episodeLabel(next)}` : 'Serie terminada', left: resume ? fmtLeft(np) : '' };
 }
 
+/** Año, tipo y géneros: cada uno lleva al catálogo filtrado por esa etiqueta. */
+function factsHTML(s, m, extra = '') {
+  const chip = (label, params) => `<a class="fact" href="#/catalogo?${new URLSearchParams(params)}">${esc(label)}</a>`;
+  return [
+    m && m.year ? chip(m.year, { y: m.year }) : '',
+    m && m.format ? (m.collection ? `<span>${esc(m.format)}</span>` : chip(m.format, { f: m.format })) : '',
+    `<span>${esc(countLabel(s, m))}</span>`,
+    ...((m && m.genres) || []).slice(0, 3).map((g) => chip(g, { g })),
+  ].join('') + extra;
+}
 function countLabel(s, m) {
   return m && m.collection ? plural(m.count, 'película', 'películas') : plural(s.all.length, 'capítulo', 'capítulos');
 }
@@ -1688,7 +1716,7 @@ function heroInnerHTML(s, si) {
   const m = displayMeta(s);
   const plan = heroPlan(s);
   const fresh = newEpisodes(s).length;
-  const facts = [m && m.year, m && m.format, countLabel(s, m), ...((m && m.genres) || [])].filter(Boolean);
+  const facts = [m && m.year, m && m.format, countLabel(s, m), ...((m && m.genres) || []).slice(0, 3)].filter(Boolean);
   const syn = synopsisOf(m);
   const coverEp = s.all.find((e) => e.fa);
   const poster = m && m.collage && m.collage.length
@@ -1698,7 +1726,7 @@ function heroInnerHTML(s, si) {
     : (coverEp ? `<a class="hero-poster is-thumb" href="#/serie/${si}" aria-hidden="true" tabindex="-1"><span data-thumb="${esc(coverEp.id)}"></span></a>` : '');
   return `${poster}<div class="tvh-text"><h2 class="tv-title">${esc(s.name)}</h2>
     ${m && m.title && m.title.toLowerCase() !== s.name.toLowerCase() ? `<p class="tv-alt">${esc(m.title)}</p>` : ''}
-    <p class="tv-facts">${facts.map((f) => `<span>${esc(f)}</span>`).join('')}${fresh ? `<span class="tv-new">${fresh === 1 ? '1 nuevo' : `${fresh} nuevos`}</span>` : ''}</p>
+    <p class="tv-facts">${factsHTML(s, m, fresh ? `<span class="tv-new">${fresh === 1 ? '1 nuevo' : `${fresh} nuevos`}</span>` : '')}</p>
     ${syn ? `<p class="tv-synopsis">${esc(syn.replace(/\s*\n+\s*/g, ' '))}</p>` : ''}
     <div class="tv-actions">
       ${plan.next ? `<a class="tv-btn is-primary" href="#/play/${encodeURIComponent(plan.next.id)}">${ICON.play}<span>${esc(plan.label)}</span></a>` : ''}
@@ -1753,26 +1781,182 @@ function renderHome() {
     ${tvTop()}
     <main class="tv-main">
       <section class="tv-hero" id="tv-hero">${heroInnerHTML(hs, heroSi)}</section>
-      ${cont.length ? `<section class="tv-row"><h3 class="tv-row-title">Continuar viendo</h3><div class="tiles" role="list">
-        ${cont.map((c) => tileHTML(c.series, siOf(c.series), {
+      <section class="tv-row" id="home-results" hidden></section>
+      ${cont.length ? `<section class="tv-row"><h3 class="tv-row-title">Continuar viendo</h3><div class="tiles is-grid" role="list">
+        ${cont.slice(0, 8).map((c) => tileHTML(c.series, siOf(c.series), {
           href: '#/serie/' + siOf(c.series), // primero la página de la serie, con "Continuar" listo
           sub: `${episodeLabel(c.ep)}${c.p && c.p.t > 5 ? `, ${fmtLeft(c.p)}` : ''}`,
           pct: c.p && c.p.d ? Math.min(100, (c.p.t / c.p.d) * 100) : 0,
         })).join('')}
       </div></section>` : ''}
-      <section class="tv-row"><h3 class="tv-row-title">Series</h3><div class="tiles" role="list">
-        ${lib.series.map((s, si) => {
+      <section class="tv-row">
+        <div class="tv-row-head"><h3 class="tv-row-title">Agregados recientemente</h3>
+          <a class="tv-more" href="#/catalogo">${ICON.grid}<span>Ver catálogo${lib.series.length > HOME_RECENT ? ` (${catalogEntries().length})` : ''}</span></a></div>
+        <div class="tiles is-grid" role="list">
+        ${recentSeries(lib).map(({ s, si }) => {
           const fresh = newEpisodes(s).length;
           const seen = s.all.filter((e) => (prog(e) || {}).w).length;
           return tileHTML(s, si, {
             href: '#/serie/' + si,
-            sub: seen ? `${seen} de ${s.all.length} vistos` : plural(s.all.length, 'capítulo', 'capítulos'),
+            sub: isCollection(s) ? plural(collectionItems(s).length, 'película', 'películas') : seen ? `${seen} de ${s.all.length} vistos` : plural(s.all.length, 'capítulo', 'capítulos'),
             badge: fresh ? (fresh === 1 ? 'Nuevo' : `${fresh} nuevos`) : '',
           });
         }).join('')}
       </div></section>
     </main>
   </div>`;
+}
+
+/* ── catálogo: todo lo que hay, con buscador y filtros ── */
+
+const HOME_RECENT = 20;
+const norm = (t) => String(t ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+function recentSeries(lib) {
+  return lib.series.map((s, si) => ({ s, si }))
+    .sort((a, b) => (b.s.added || 0) - (a.s.added || 0) || a.s.name.localeCompare(b.s.name, 'es', { numeric: true }))
+    .slice(0, HOME_RECENT);
+}
+
+/** Series y, de las colecciones, cada película por separado (cada una con sus etiquetas de AniList). */
+function catalogEntries() {
+  const lib = state.library;
+  if (!lib || lib.v !== 2) return [];
+  const out = [];
+  lib.series.forEach((s, si) => {
+    if (isCollection(s)) {
+      for (const it of collectionItems(s)) {
+        const m = itemMeta(s, it.key);
+        const title = it.title || (m && m.title) || it.eps[0].name.replace(/\.[^.]+$/, '');
+        out.push({
+          si, title, m, img: m && (m.banner || m.cover), year: m && m.year, genres: (m && m.genres) || [], format: 'Película',
+          added: Math.max(0, ...it.eps.map((e) => e.ts || 0)), focus: it.eps[0].id,
+          words: norm([title, m && m.title, m && m.romaji, m && m.native, s.name].join(' ')),
+        });
+      }
+    } else {
+      const m = metaFor(s);
+      out.push({
+        si, title: s.name, m, img: m && (m.banner || m.cover), year: m && m.year, genres: (m && m.genres) || [],
+        format: (m && m.format) || 'Serie', added: s.added || 0, count: s.all.length,
+        words: norm([s.name, m && m.title, m && m.romaji, m && m.native, ...s.seasons.map((se) => se.title)].join(' ')),
+      });
+    }
+  });
+  return out;
+}
+function filterEntries(list, { q = '', g = '', y = '', f = '' }) {
+  const terms = norm(q).split(/\s+/).filter(Boolean);
+  return list.filter((e) => terms.every((t) => e.words.includes(t))
+    && (!g || e.genres.includes(g)) && (!y || String(e.year) === String(y)) && (!f || e.format === f));
+}
+function sortEntries(list, o) {
+  const az = (a, b) => a.title.localeCompare(b.title, 'es', { numeric: true });
+  if (o === 'az') return list.sort(az);
+  if (o === 'year') return list.sort((a, b) => (b.year || 0) - (a.year || 0) || az(a, b));
+  return list.sort((a, b) => (b.added || 0) - (a.added || 0) || az(a, b));
+}
+function entryTile(e) {
+  const sub = [e.year, e.format, e.count ? plural(e.count, 'capítulo', 'capítulos') : ''].filter(Boolean).join(' · ');
+  return `<a class="tile" href="#/serie/${e.si}" ${e.focus ? `data-focus="${esc(e.focus)}"` : ''} style="--h:${hue(e.title)}">
+    ${e.img ? `<img class="tile-img" src="${esc(e.img)}" alt="" loading="lazy" decoding="async">` : `<span class="tile-img is-fallback"><span class="cover-glyph">${esc([...e.title.trim()][0] || '·')}</span></span>`}
+    <span class="tile-text"><span class="tile-title">${esc(e.title)}</span>${sub ? `<span class="tile-sub">${esc(sub)}</span>` : ''}</span>
+  </a>`;
+}
+
+function renderCatalog() {
+  const q = route().q;
+  const all = catalogEntries();
+  const count = (key) => {
+    const m = new Map();
+    for (const e of all) for (const v of [].concat(e[key] || [])) if (v) m.set(String(v), (m.get(String(v)) || 0) + 1);
+    return m;
+  };
+  const genres = [...count('genres').entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'es')).map(([v, n]) => [v, `${v} (${n})`]);
+  const years = [...count('year').keys()].sort((a, b) => b - a).map((v) => [v, v]);
+  const formats = [...count('format').keys()].sort().map((v) => [v, v]);
+  const select = (name, label, opts, all = true) => {
+    const cur = q.get(name) || '';
+    const known = !cur || opts.some(([v]) => v === cur);
+    return `<label class="cat-select"><span>${label}</span><select name="${name}">
+      ${all ? `<option value="">Todos</option>` : ''}${opts.map(([v, l]) => `<option value="${esc(v)}" ${v === cur ? 'selected' : ''}>${esc(l)}</option>`).join('')}
+      ${known ? '' : `<option value="${esc(cur)}" selected>${esc(cur)}</option>`}</select></label>`;
+  };
+  app.innerHTML = header('Catálogo') + `<main class="catalog">
+    <form class="cat-search" id="cat-form" role="search">
+      <span class="search-icon">${ICON.search}</span>
+      <input id="cat-q" name="q" type="search" placeholder="Buscar por nombre" value="${esc(q.get('q') || '')}" autocomplete="off" enterkeyhint="search" aria-label="Buscar">
+    </form>
+    <div class="cat-filters" id="cat-filters">
+      ${select('g', 'Género', genres)}${select('y', 'Año', years)}${select('f', 'Tipo', formats)}
+      ${select('o', 'Orden', [['recent', 'Recientes'], ['az', 'A–Z'], ['year', 'Año']], false)}
+      <button class="link-btn cat-clear" type="button" data-act="cat-clear" hidden>Quitar filtros</button>
+    </div>
+    <p class="dim cat-count" id="cat-count" aria-live="polite"></p>
+    <div class="tiles is-grid" id="cat-results" role="list"></div>
+  </main>`;
+  const form = $('#cat-form');
+  form.addEventListener('submit', (e) => { e.preventDefault(); $('#cat-q').blur(); });
+  $('#cat-q').addEventListener('input', paintCatalog);
+  $('#cat-filters').addEventListener('change', paintCatalog);
+  paintCatalog();
+  if (q.get('buscar') === '1') $('#cat-q').focus();
+}
+function catalogState() {
+  const val = (n) => { const el = app.querySelector(`#cat-filters [name="${n}"]`); return el ? el.value : ''; };
+  return { q: ($('#cat-q') || {}).value || '', g: val('g'), y: val('y'), f: val('f'), o: val('o') || 'recent' };
+}
+function paintCatalog() {
+  const box = $('#cat-results');
+  if (!box) return;
+  const st = catalogState();
+  const list = sortEntries(filterEntries(catalogEntries(), st), st.o);
+  box.innerHTML = list.map(entryTile).join('') || '';
+  $('#cat-count').textContent = list.length ? plural(list.length, 'título', 'títulos') : (state.library ? 'Nada coincide con la búsqueda o los filtros.' : 'Cargando la biblioteca…');
+  app.querySelector('[data-act="cat-clear"]').hidden = !(st.g || st.y || st.f || st.q);
+  // la dirección refleja la búsqueda (para volver atrás o compartirla), sin redibujar la página
+  const params = new URLSearchParams();
+  for (const k of ['q', 'g', 'y', 'f']) if (st[k]) params.set(k, st[k]);
+  if (st.o !== 'recent') params.set('o', st.o);
+  const h = '#/catalogo' + (params.toString() ? '?' + params : '');
+  if (location.hash !== h) history.replaceState(null, '', h);
+}
+
+/* búsqueda rápida desde el inicio */
+function openHomeSearch() {
+  const bar = $('#home-search');
+  if (!bar) return;
+  bar.hidden = false;
+  app.querySelector('[data-act="home-search"]').setAttribute('aria-expanded', 'true');
+  const input = $('#home-q');
+  input.focus();
+  input.oninput = paintHomeSearch;
+  input.onkeydown = (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); go('#/catalogo?' + new URLSearchParams({ q: input.value })); }
+    else if (e.key === 'Escape') closeHomeSearch();
+  };
+}
+function closeHomeSearch() {
+  const bar = $('#home-search');
+  if (!bar) return;
+  bar.hidden = true;
+  $('#home-q').value = '';
+  app.querySelector('[data-act="home-search"]').setAttribute('aria-expanded', 'false');
+  paintHomeSearch();
+}
+function paintHomeSearch() {
+  const box = $('#home-results');
+  const tv = app.querySelector('.tv.is-home');
+  if (!box || !tv) return;
+  const qv = ($('#home-q') || {}).value || '';
+  const on = !!qv.trim();
+  tv.classList.toggle('is-searching', on);
+  box.hidden = !on;
+  if (!on) { box.innerHTML = ''; return; }
+  const list = sortEntries(filterEntries(catalogEntries(), { q: qv }), 'az');
+  box.innerHTML = `<div class="tv-row-head"><h3 class="tv-row-title">${list.length ? plural(list.length, 'resultado', 'resultados') : 'Sin resultados'}</h3>
+      <a class="tv-more" href="#/catalogo?${new URLSearchParams({ q: qv })}">${ICON.grid}<span>Buscar en el catálogo</span></a></div>
+    <div class="tiles is-grid" role="list">${list.slice(0, 24).map(entryTile).join('')}</div>`;
 }
 
 /* ── serie ── */
@@ -1793,7 +1977,7 @@ function renderSeries(arg) {
   const season = flat ? { title: '', episodes: s.all } : s.seasons[ki];
   const fresh = new Set(newEpisodes(s).map((e) => e.id));
   const upcoming = next ? [next, ...nextUnseen(next, s.all, 2)].filter((x) => !state.saved.has(x.id)) : [];
-  const facts = [m && m.year, m && m.format, countLabel(s, m), ...((m && m.genres) || [])].filter(Boolean);
+  const facts = [m && m.year, m && m.format, countLabel(s, m), ...((m && m.genres) || []).slice(0, 3)].filter(Boolean);
   const syn = synopsisOf(m);
   const coverEp = s.all.find((e) => e.fa);
   const seen = s.all.filter((e) => (prog(e) || {}).w).length;
@@ -1810,7 +1994,7 @@ function renderSeries(arg) {
           <div class="series-info">
             <h2 class="tv-title">${esc(s.name)}</h2>
             ${m && m.title && m.title.toLowerCase() !== s.name.toLowerCase() ? `<p class="tv-alt">${esc(m.title)}${m.native ? ` <span lang="ja">${esc(m.native)}</span>` : ''}</p>` : ''}
-            <p class="tv-facts">${facts.map((f) => `<span>${esc(f)}</span>`).join('')}${seen ? `<span>${seen} de ${s.all.length} vistos</span>` : ''}</p>
+            <p class="tv-facts">${factsHTML(s, m, seen ? `<span>${seen} de ${s.all.length} vistos</span>` : '')}</p>
           </div>
         </div>
         ${syn ? `<p class="tv-synopsis is-long" id="synopsis">${esc(syn)}</p>` : ''}
@@ -1818,7 +2002,6 @@ function renderSeries(arg) {
         <div class="tv-actions">
           ${next ? `<a class="tv-btn is-primary" href="#/play/${encodeURIComponent(next.id)}">${ICON.play}<span>${esc(plan.label)}</span></a>` : '<span class="tv-done">Serie terminada</span>'}
           ${upcoming.length ? `<button class="tv-btn" data-act="series-dl" data-si="${si}">${ICON.down}<span>Descargar ${upcoming.length === 1 ? 'el siguiente' : `los ${upcoming.length} siguientes`}</span></button>` : ''}
-          <button class="tv-btn is-quiet" data-act="pick-image" data-si="${si}">${ICON.image}<span>${m ? 'Cambiar imagen' : 'Buscar imagen'}</span></button>
         </div>
       </section>
       <section class="ep-section">
@@ -1846,6 +2029,10 @@ function renderSeries(arg) {
   }));
   if (picking && (picking.si !== si || picking.ki !== ki)) picking = { si, ki, ids: new Set() };
   paintPick();
+  let focusId = null;
+  try { focusId = sessionStorage.getItem('kai.focus'); sessionStorage.removeItem('kai.focus'); } catch { /* nada */ }
+  const fli = focusId && app.querySelector(`.ep[data-id="${CSS.escape(focusId)}"]`);
+  if (fli) requestAnimationFrame(() => { fli.scrollIntoView({ block: 'center' }); fli.classList.add('is-flash'); });
   // los "nuevos" se muestran esta vez y quedan vistos
   if (fresh.size) { markSeriesSeen(s); lastNew = null; announceNew(); }
 }
@@ -2114,7 +2301,6 @@ function renderSettings() {
       <label class="switch"><input type="checkbox" name="ambient" ${s.ambient !== false ? 'checked' : ''}><span>Luz ambiental alrededor del video</span></label>
       <label class="switch"><input type="checkbox" name="prefetchNext" ${s.prefetchNext !== false ? 'checked' : ''}><span>Preparar el siguiente capítulo para que empiece sin espera (usa unos 3 MB de MEGA)</span></label>
       <label class="switch"><input type="checkbox" name="autoRemoveLocal" ${s.autoRemoveLocal ? 'checked' : ''}><span>Quitar del dispositivo los capítulos que termine</span></label>
-      <label class="switch"><input type="checkbox" name="trashOnFinish" ${s.trashOnFinish ? 'checked' : ''}><span>Mandar a la papelera de MEGA los capítulos que termine</span></label>
     </form>
     <section class="settings-group" id="dl-where">${downloadsWhereHTML()}</section>
     <section class="settings-group">
@@ -2124,6 +2310,11 @@ function renderSettings() {
         <button class="btn" data-act="sync-now">Sincronizar ahora</button>
         <a class="btn" href="#/descargas">Ver descargados</a>
       </div>
+    </section>
+    <section class="settings-group">
+      <p class="settings-label">Versión</p>
+      <p class="settings-value" id="app-version">…</p>
+      <button class="btn" data-act="check-update" id="check-update">${ICON.refresh}<span>${updateReady ? 'Actualizar ahora' : 'Buscar actualización'}</span></button>
     </section>
     <section class="settings-group">
       <p class="dim">Sesión de MEGA: ${esc((LS.get('session', {}).options || {}).email || '')}</p>
@@ -2138,11 +2329,11 @@ function renderSettings() {
     s.ambient = f.ambient.checked;
     s.prefetchNext = f.prefetchNext.checked;
     s.autoRemoveLocal = f.autoRemoveLocal.checked;
-    s.trashOnFinish = f.trashOnFinish.checked;
     saveSettings();
   });
   paintSpace();
   paintDownloadsWhere();
+  swVersion().then((v) => { const el = $('#app-version'); if (el) el.textContent = v ? v.replace('kai-v', 'Kai ') : 'Sin instalar'; });
 }
 
 function downloadsWhereHTML(perm = '') {
@@ -2503,7 +2694,6 @@ function finishCurrent() {
   const p = prog(ep);
   if (p && p.w) {
     if (state.settings.autoRemoveLocal && state.saved.has(ep.id)) removeDownload(ep.id, true);
-    if (state.settings.trashOnFinish && navigator.onLine) trashEpisode(ep, false);
   }
   if (playing.objectUrl) {
     const u = playing.objectUrl;
@@ -3457,6 +3647,8 @@ document.addEventListener('click', async (e) => {
     if (ep && (!playing || playing.ep.id !== id)) switchTo(ep);
     return;
   }
+  const focusLink = e.target.closest('a[data-focus]');
+  if (focusLink) { try { sessionStorage.setItem('kai.focus', focusLink.dataset.focus); } catch { /* nada */ } }
   const el = e.target.closest('[data-act]');
   if (!el || stage.contains(el)) return;
   const act = el.dataset.act;
@@ -3475,6 +3667,12 @@ document.addEventListener('click', async (e) => {
     renderProfiles(visibleProfiles().length > 0);
     sync();
   }
+  else if (act === 'check-update') checkUpdate();
+  else if (act === 'home-search') { if ($('#home-search') && !$('#home-search').hidden) closeHomeSearch(); else openHomeSearch(); }
+  else if (act === 'home-search-close') closeHomeSearch();
+  else if (act === 'cat-clear') { go('#/catalogo'); }
+  else if (act === 'apply-update') applyUpdate();
+  else if (act === 'dismiss-update') { const n = $('#update-notice'); if (n) n.remove(); }
   else if (act === 'mini-open' && playing) go('#/play/' + encodeURIComponent(playing.ep.id));
   else if (act === 'mini-toggle') togglePlay();
   else if (act === 'mini-close') stopPlayback();
@@ -3508,7 +3706,7 @@ document.addEventListener('click', async (e) => {
   else if (act === 'profiles-retry') {
     state.sharedError = false;
     renderProfiles();
-    try { await connect(); if (syncing) await syncing.catch(() => {}); await sync(); } catch { /* se muestra abajo */ }
+    try { await connect(); if (syncing) await syncing.catch(() => {}); await sync(); } catch (err) { state.sharedErrorMsg = megaMessage(err); }
     if (!state.sharedLoaded) state.sharedError = true;
     render();
   }
@@ -3594,22 +3792,25 @@ app.addEventListener('focusin', (e) => {
   const t = e.target.closest('.tile');
   if (t && route().view === 'home') { clearTimeout(heroTimer); setHero(Number(t.dataset.si)); }
 });
+// flechas como control remoto: va al mosaico o botón más cercano en esa dirección
 app.addEventListener('keydown', (e) => {
   const t = e.target.closest('.tile');
-  if (!t || !['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return;
-  const row = t.parentElement;
-  const tiles = [...row.children];
-  const i = tiles.indexOf(t);
-  let target = null;
-  if (e.key === 'ArrowRight') target = tiles[i + 1];
-  else if (e.key === 'ArrowLeft') target = tiles[i - 1];
-  else {
-    const rows = [...app.querySelectorAll('.tiles')];
-    const r = rows.indexOf(row) + (e.key === 'ArrowDown' ? 1 : -1);
-    if (rows[r]) target = rows[r].children[Math.min(i, rows[r].children.length - 1)];
-    else if (e.key === 'ArrowUp') target = app.querySelector('.tv-hero .tv-btn');
+  const dir = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+  if (!t || !dir) return;
+  const a = t.getBoundingClientRect();
+  const ax = a.left + a.width / 2, ay = a.top + a.height / 2;
+  let best = null, bestScore = Infinity;
+  for (const el of app.querySelectorAll('.tile, .tv-hero .tv-btn')) {
+    if (el === t || !el.offsetParent) continue;
+    const b = el.getBoundingClientRect();
+    const dx = b.left + b.width / 2 - ax, dy = b.top + b.height / 2 - ay;
+    const along = dx * dir[0] + dy * dir[1];
+    if (along <= 4) continue;
+    const across = Math.abs(dx * dir[1]) + Math.abs(dy * dir[0]);
+    const score = along + across * 2.5;
+    if (score < bestScore) { bestScore = score; best = el; }
   }
-  if (target) { e.preventDefault(); target.focus(); target.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' }); }
+  if (best) { e.preventDefault(); best.focus(); best.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' }); }
 });
 
 window.addEventListener('hashchange', () => { inAppNav++; render(); });
@@ -3633,11 +3834,67 @@ window.addEventListener('pagehide', () => savePosition(true));
 
 /* ───────────────────────── arranque ───────────────────────── */
 
+/* ── actualizaciones ──
+ * El service worker se instala solo cuando cambia; al activarse toma el control de la página
+ * (controllerchange). Ahí Kai avisa que hay versión nueva y basta con recargar. */
+let swReg = null;
+let updateReady = false;
+let hadController = 'serviceWorker' in navigator && !!navigator.serviceWorker.controller;
+function swVersion() {
+  const sw = navigator.serviceWorker && navigator.serviceWorker.controller;
+  if (!sw) return Promise.resolve('');
+  return new Promise((res) => {
+    const done = (e) => { if (e.data && e.data.type === 'version') { navigator.serviceWorker.removeEventListener('message', done); res(e.data.version); } };
+    navigator.serviceWorker.addEventListener('message', done);
+    sw.postMessage({ type: 'version' });
+    setTimeout(() => res(''), 2000);
+  });
+}
+function showUpdateNotice() {
+  updateReady = true;
+  const btn = $('#check-update');
+  if (btn) btn.querySelector('span').textContent = 'Actualizar ahora';
+  if ($('#update-notice')) return;
+  const el = document.createElement('div');
+  el.id = 'update-notice';
+  el.className = 'update-notice';
+  el.setAttribute('role', 'status');
+  el.innerHTML = `<span>Hay una versión nueva de Kai.</span><button class="update-btn" data-act="apply-update">Actualizar</button><button class="update-x" data-act="dismiss-update" aria-label="Más tarde">${'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>'}</button>`;
+  document.body.appendChild(el);
+}
+function applyUpdate() {
+  savePosition(true);
+  location.reload();
+}
+async function checkUpdate() {
+  if (updateReady) { applyUpdate(); return; }
+  const btn = $('#check-update');
+  if (btn) { btn.disabled = true; btn.querySelector('span').textContent = 'Buscando…'; }
+  let found = false;
+  try {
+    if (!swReg && navigator.serviceWorker) swReg = await navigator.serviceWorker.getRegistration();
+    if (swReg) {
+      await swReg.update();
+      found = !!(swReg.installing || swReg.waiting);
+      // si hay una nueva, se instala y toma el control en unos segundos
+      for (let i = 0; i < 40 && found && !updateReady; i++) await sleep(250);
+    }
+  } catch { /* sin conexión */ }
+  if (btn) { btn.disabled = false; btn.querySelector('span').textContent = updateReady ? 'Actualizar ahora' : 'Buscar actualización'; }
+  if (!updateReady) toast(navigator.onLine ? (found ? 'Descargando la versión nueva…' : 'Ya tienes la última versión.') : 'Necesitas conexión para buscar actualizaciones.');
+}
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController) { hadController = true; return; } // primera instalación: no hay nada que avisar
+    showUpdateNotice();
+  });
+}
+
 async function boot() {
   applyTheme();
   paintQuota();
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js').catch((e) => console.warn('sw', e));
+    navigator.serviceWorker.register('sw.js').then((r) => { swReg = r; }).catch((e) => console.warn('sw', e));
   }
   await refreshSaved().catch(() => {});
   render();
