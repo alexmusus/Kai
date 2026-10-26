@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0d0e12">
+  <meta name="color-scheme" content="dark light">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Kai">
+  <meta name="referrer" content="no-referrer">
+  <title>Kai</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon-180.png">
+  <link rel="stylesheet" href="styles.css">
+  <script src="core.js"></script>
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <div class="ambient" aria-hidden="true"></div>
+  <div id="app"></div>
+  <button id="lights" class="lights" data-act="lights" aria-label="Encender la luz" hidden></button>
+
+  <!-- El reproductor vive aquí guardado y se mueve a la página cuando se usa, para no reiniciar el video. -->
+  <div id="stage-parking" hidden>
+    <div id="stage" class="stage is-paused" hidden>
+      <video id="video" class="cue-m" playsinline preload="auto"></video>
+      <div id="st-tap" class="st-tap" aria-hidden="true"></div>
+      <div class="st-spinner" aria-hidden="true"></div>
+      <div id="st-flash" class="st-flash" aria-hidden="true"></div>
+      <button id="st-big" class="st-big" data-act="toggle" aria-label="Reproducir">
+        <svg viewBox="0 0 24 24" aria-hidden="true" class="solid"><path d="M8 5.5v13l10.5-6.5z"/></svg>
+      </button>
+      <button id="st-skip" class="st-skip" data-act="skip" hidden>Saltar 85 s</button>
+
+      <div class="st-bar">
+        <div class="st-seek-wrap">
+          <div id="st-marks" class="st-marks" aria-hidden="true"></div>
+          <input id="st-seek" class="st-seek" type="range" min="0" max="0" step="0.1" value="0" aria-label="Línea de tiempo">
+        </div>
+        <div class="st-row">
+          <button id="st-play" class="st-btn" data-act="toggle" aria-label="Reproducir"></button>
+          <button class="st-btn" data-act="back10" aria-label="Retroceder 10 segundos">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3M4.5 4v4.5H9"/><text x="12" y="15.2" text-anchor="middle" class="st-num">10</text></svg>
+          </button>
+          <button class="st-btn" data-act="fwd10" aria-label="Adelantar 10 segundos">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 4v4.5H15"/><text x="12" y="15.2" text-anchor="middle" class="st-num">10</text></svg>
+          </button>
+          <button id="st-next" class="st-btn" data-act="next" aria-label="Siguiente capítulo">
+            <svg viewBox="0 0 24 24" aria-hidden="true" class="solid"><path d="M6 5.5v13l9-6.5zM16.5 5.5H19v13h-2.5z"/></svg>
+          </button>
+          <button id="st-mute" class="st-btn st-desktop" data-act="mute" aria-label="Silenciar"></button>
+          <span id="st-time" class="st-time">0:00 / 0:00</span>
+          <span id="st-chapter" class="st-chapter"></span>
+          <span class="st-gap"></span>
+          <button id="st-cc" class="st-btn st-cc" data-act="cc" aria-label="Subtítulos">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="M10.5 10.2a2.2 2.2 0 1 0 0 3.6M16.5 10.2a2.2 2.2 0 1 0 0 3.6"/></svg>
+          </button>
+          <button id="st-speed" class="st-btn st-speed" data-act="speed" aria-label="Velocidad">1×</button>
+          <button id="st-lights" class="st-btn st-desktop-ish" data-act="lights" aria-label="Apagar la luz">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg>
+          </button>
+          <button id="st-pip" class="st-btn" data-act="pip" aria-label="Ventana flotante">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><rect x="12" y="11.5" width="7" height="5.5" rx="1" class="solid"/></svg>
+          </button>
+          <button id="st-fs" class="st-btn" data-act="fs" aria-label="Pantalla completa">
+            <svg viewBox="0 0 24 24" aria-hidden="true" class="ic-enter"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+            <svg viewBox="0 0 24 24" aria-hidden="true" class="ic-exit"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div id="st-menu" class="st-menu" hidden></div>
+      <div id="p-next" class="p-card" hidden></div>
+      <div id="p-msg" class="p-card" hidden></div>
+    </div>
+  </div>
+
+  <nav id="dock" class="dock" aria-label="Menú" hidden>
+    <div class="dock-panel" role="menu" hidden></div>
+    <button class="dock-btn" data-act="dock" aria-expanded="false" aria-haspopup="menu" aria-label="Menú"></button>
+  </nav>
+  <div id="sheet" class="sheet" hidden></div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
