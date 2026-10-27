@@ -781,6 +781,14 @@ html.kai-fs-on .dock { display: none; }
   opacity: 0.62; transition: opacity 0.2s, transform 0.2s;
 }
 .dock-btn .dock-avatar { width: 40px; height: 40px; font-size: 17px; }
+/* ir arriba: el avatar se cambia por una flecha mientras dura */
+.dock-btn .dock-avatar { transition: opacity 0.18s, transform 0.18s; }
+.dock-top { position: absolute; inset: 0; display: grid; place-items: center; opacity: 0; transform: translateY(6px); transition: opacity 0.18s, transform 0.18s; pointer-events: none; }
+.dock-top svg { width: 24px; height: 24px; fill: none; stroke: var(--text); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.dock.is-up .dock-top { opacity: 1; transform: none; }
+.dock.is-up .dock-avatar { opacity: 0; transform: scale(0.7); }
+.dock.is-up .dock-state, .dock.is-up .dock-btn::after { display: none; }
+.dock.is-up .dock-btn { opacity: 0.9; }
 /* sincronización: ruedita azul alrededor mientras sincroniza; puntito abajo a la derecha (verde al día, azul por sincronizar, gris sin conexión) */
 .dock-ring { position: absolute; inset: -4px; border-radius: 50%; border: 2.5px solid transparent; border-top-color: var(--accent); border-right-color: color-mix(in srgb, var(--accent) 45%, transparent); display: none; animation: dock-spin 0.9s linear infinite; pointer-events: none; }
 .dock[data-sync='syncing'] .dock-ring { display: block; }

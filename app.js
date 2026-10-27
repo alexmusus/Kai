@@ -52,6 +52,7 @@ const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 const ICON = {
   menu: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>',
   back: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>',
+  top: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V6M6 11.5l6-6 6 6"/></svg>',
   down: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10.5l5 5 5-5M5 20h14"/></svg>',
   saved: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20h14"/><path d="M7.5 11l3 3 6-6.5"/></svg>',
   queued: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 8v4.5l3 1.5"/></svg>',
@@ -1408,7 +1409,7 @@ function paintDock() {
   if (!show) { closeDock(); return; }
   const p = visibleProfiles().find((x) => x.id === state.profile.id) || state.profile;
   const btn = dock.querySelector('.dock-btn');
-  btn.innerHTML = `${avatarHTML(p, 'dock-avatar')}<span class="dock-ring" aria-hidden="true"></span><span class="dock-state" aria-hidden="true"></span>`;
+  btn.innerHTML = `${avatarHTML(p, 'dock-avatar')}<span class="dock-top" aria-hidden="true">${ICON.top}</span><span class="dock-ring" aria-hidden="true"></span><span class="dock-state" aria-hidden="true"></span>`;
   btn.dataset.name = p.name;
   paintSync();
   paintNewsDot();
@@ -1451,6 +1452,37 @@ function closeDock() {
   dock.querySelector('.dock-btn').setAttribute('aria-expanded', 'false');
   setTimeout(() => { if (!panel.classList.contains('is-in')) panel.hidden = true; }, 180);
 }
+/* Ir arriba: en pantallas táctiles, el botón flotante se vuelve una flecha cuando bajaste más de dos pantallas
+ * y empiezas a subir. Vuelve a ser el de siempre al llegar arriba, al seguir bajando o tras unos segundos quieto.
+ * (UP_ON_IOS: en iPhone/iPad ya se sube tocando la hora; se deja encendido mientras Alex lo prueba.) */
+const UP_ON_IOS = true;
+const IS_IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const UP_ENABLED = matchMedia('(pointer: coarse)').matches && (UP_ON_IOS || !IS_IOS);
+let upLastY = 0, upIdle = 0, upFrame = 0, upHoldUntil = 0; // upHoldUntil: mientras sube solo, no volver a mostrar la flecha
+function setDockUp(on) {
+  if (dock.classList.contains('is-up') === on) return;
+  dock.classList.toggle('is-up', on);
+  const btn = dock.querySelector('.dock-btn');
+  if (btn) btn.setAttribute('aria-label', on ? 'Ir arriba' : 'Menú');
+}
+function checkDockUp() {
+  upFrame = 0;
+  const y = window.scrollY;
+  const dy = y - upLastY;
+  if (Math.abs(dy) < 6) return; // movimientos mínimos no cuentan
+  upLastY = y;
+  clearTimeout(upIdle);
+  const ok = !dock.hidden && !dock.classList.contains('is-open') && route().view !== 'play';
+  if (!ok || y < 80 || dy > 0 || Date.now() < upHoldUntil) { setDockUp(false); return; }
+  if (y > window.innerHeight * 2) {
+    setDockUp(true);
+    upIdle = setTimeout(() => setDockUp(false), 3000);
+  }
+}
+if (UP_ENABLED) {
+  addEventListener('scroll', () => { if (!upFrame) upFrame = requestAnimationFrame(checkDockUp); }, { passive: true });
+}
+
 // nombres antiguos que aún usan otras partes
 const closeDrawer = closeDock;
 function paintDrawerCount() {
@@ -4340,7 +4372,15 @@ document.addEventListener('click', async (e) => {
       translateMissing(); // ya con el traductor listo, sigue con las demás
     } else el.textContent = 'Este navegador no puede traducir ahora.';
   }
-  else if (act === 'dock') { if (dock.classList.contains('is-open')) closeDock(); else openDock(); }
+  else if (act === 'dock') {
+    if (dock.classList.contains('is-up')) {
+      setDockUp(false);
+      upHoldUntil = Date.now() + 1500;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    if (dock.classList.contains('is-open')) closeDock(); else openDock();
+  }
   else if (act === 'profiles-retry') {
     state.sharedError = false;
     renderProfiles();
