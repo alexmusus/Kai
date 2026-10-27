@@ -772,7 +772,8 @@ html.kai-fs-on .dock { display: none; }
 /* ───────────────────────── v5: botón flotante, portadas, serie y episodios ───────────────────────── */
 
 /* botón flotante: visible pero discreto */
-.dock { position: fixed; z-index: 26; right: max(18px, env(safe-area-inset-right)); bottom: calc(18px + env(safe-area-inset-bottom)); display: grid; justify-items: end; gap: 10px; }
+/* abajo: más pegado al borde que antes; en iPhone queda justo encima de la barrita de inicio (no la tapa) */
+.dock { position: fixed; z-index: 26; right: max(18px, env(safe-area-inset-right)); bottom: max(14px, calc(env(safe-area-inset-bottom) - 8px)); display: grid; justify-items: end; gap: 10px; }
 .dock-btn {
   position: relative; display: grid; place-items: center; width: 54px; height: 54px; border-radius: 50%;
   background: var(--glass-strong); border: 1px solid var(--glass-edge);
