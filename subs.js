@@ -373,6 +373,26 @@ export async function mp4Chapters(info, read, duration) {
   return list.map((c, i) => ({ start: c.t, end: i + 1 < list.length ? list[i + 1].t : (duration || Infinity), title: c.title }));
 }
 
+/* ───────── cuál capítulo es el opening ───────── */
+
+export const INTRO_RE = /^\s*(intro|opening|op\b|apertura|avance inicial)/i;
+export const OUTRO_RE = /^\s*(ending|ed\b|outro|cr[eé]ditos|credits|cierre)/i;
+const OPENING_RE = /^\s*(opening|op\b|apertura)/i;
+
+/** El capítulo que es el opening, o null. Algunos MP4 llaman "Intro" o "Avance inicial" al pedacito de
+ * anime que va antes del opening, así que no basta el nombre: un opening dura más o menos 1 a 2½ minutos.
+ * Se prefiere el que se llama Opening/OP/Apertura; si hay varios, el de duración más cercana a 1:30. */
+export function pickIntro(chapters) {
+  const fits = (c) => { const len = c.end - c.start; return isFinite(len) && len >= 45 && len <= 150; };
+  const named = (chapters || []).filter((c) => INTRO_RE.test(c.title || ''));
+  if (!named.length) return null;
+  const rank = (c) => (OPENING_RE.test(c.title) ? 0 : 1) * 1000 + Math.abs(c.end - c.start - 90);
+  const ok = named.filter(fits).sort((a, b) => rank(a) - rank(b));
+  if (ok.length) return ok[0];
+  // ninguno dura lo que un opening: solo se confía si se llama Opening/OP/Apertura (puede venir pegado a otra parte)
+  return named.find((c) => OPENING_RE.test(c.title) && isFinite(c.end - c.start)) || null;
+}
+
 /** Texto de una muestra de subtítulo. */
 export function decodeSample(codec, bytes) {
   if (codec === 'wvtt') {

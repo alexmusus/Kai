@@ -1,5 +1,5 @@
 import { Storage } from './vendor/mega.js';
-import { isSubtitleName, mp4Info, mp4Chapters, mp4Formats, mp4QuickFormats } from './subs.js';
+import { isSubtitleName, mp4Info, mp4Chapters, mp4Formats, mp4QuickFormats, pickIntro, OUTRO_RE as OUTRO } from './subs.js';
 import { searchAnime, animeById, toMeta, findForSeries, findMovie, translateToSpanish, canTranslate, recommendationsFor, airingTop, toDiscover } from './meta.js';
 
 const C = window.MegaCore;
@@ -3697,13 +3697,12 @@ async function cacheChapters(ep) {
 
 /* ── capítulos e intros ── */
 
-const INTRO = /^\s*(intro|opening|op\b|apertura|avance inicial)/i;
-const OUTRO = /^\s*(ending|ed\b|outro|cr[eé]ditos|credits|cierre)/i;
 const median = (a) => { const b = [...a].sort((x, y) => x - y); return b.length ? b[Math.floor(b.length / 2)] : 0; };
 
 function setChapters(token, chapters) {
   if (playing !== token) return;
   token.chapters = (chapters || []).map((c) => ({ ...c, end: c.end == null || !isFinite(c.end) ? (video.duration || Infinity) : c.end }));
+  token.intro = pickIntro(token.chapters); // el opening de verdad (no el pedacito de anime que a veces va antes)
   token.chaptersDone = true;
   paintMarks();
   paintControls();
@@ -3754,10 +3753,10 @@ function skipOffer(t, d) {
   if (!playing || !d) return null;
   if (playing.undo && Date.now() < playing.undo.until) return { label: 'Volver a la intro', act: 'undo' };
   const ch = chapterAt(t);
-  if (ch && INTRO.test(ch.title) && t < ch.end - 2) return { label: 'Saltar intro', to: ch.end, sure: true };
+  if (ch && ch === playing.intro && t < ch.end - 2) return { label: 'Saltar intro', to: ch.end, sure: true };
   if (ch && OUTRO.test(ch.title) && neighbor(1)) return { label: 'Siguiente capítulo', act: 'next' };
   if (!playing.chaptersDone) return null;
-  if (playing.chapters && playing.chapters.some((c) => INTRO.test(c.title))) return null;
+  if (playing.intro) return null; // con el opening marcado en el MP4 no hace falta adivinar
   if (d < 400 || t > 360) return null;
   const li = learnedIntro();
   if (li && li.sure) {
