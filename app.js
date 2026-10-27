@@ -2106,17 +2106,8 @@ function renderHome() {
       <section class="tv-row">
         <div class="tv-row-head"><h3 class="tv-row-title">Series</h3>
           <a class="tv-more" href="#/catalogo?t=series">${ICON.grid}<span>Ver catálogo${lib.series.filter((x) => !isCollection(x)).length > HOME_RECENT ? ` (${lib.series.filter((x) => !isCollection(x)).length})` : ''}</span></a></div>
-        <div class="tiles is-grid" role="list">
-        ${recentSeries(lib).map(({ s, si }) => {
-          const fresh = newEpisodes(s).length;
-          const seen = s.all.filter((e) => (prog(e) || {}).w).length;
-          return tileHTML(s, si, {
-            href: '#/serie/' + si,
-            sub: isCollection(s) ? plural(collectionItems(s).length, 'película', 'películas') : seen ? `${seen} de ${s.all.length} vistos` : plural(s.all.length, 'capítulo', 'capítulos'),
-            badge: fresh ? (fresh === 1 ? 'Nuevo' : `${fresh} nuevos`) : '',
-          });
-        }).join('')}
-      </div></section>
+        <ul class="shelf is-row" role="list">${recentSeries(lib).map(({ s, si }) => seriesPosterHTML(s, si)).join('')}</ul>
+</section>
       ${homeMoviesHTML(lib)}
     </main>
   </div>`;
@@ -2243,6 +2234,27 @@ function sortEntries(list, o) {
   if (o === 'year') return list.sort((a, b) => (b.year || 0) - (a.year || 0) || az(a, b));
   return list.sort((a, b) => (b.added || 0) - (a.added || 0) || az(a, b));
 }
+/** Una serie como póster vertical (mismo diseño que las películas). */
+function seriesPosterHTML(s, si) {
+  const m = displayMeta(s);
+  const fresh = newEpisodes(s).length;
+  const seen = s.all.filter((e) => (prog(e) || {}).w).length;
+  const sub = seen ? `${seen} de ${s.all.length} vistos` : plural(s.all.length, 'capítulo', 'capítulos');
+  const coverEp = s.all.find((e) => e.fa) || s.all[0];
+  const pct = s.all.length && seen ? Math.round((seen / s.all.length) * 100) : 0;
+  return `<li><a class="shelf-item" href="#/serie/${si}" style="--h:${hue(s.name)}">
+    <span class="shelf-poster">
+      ${m && m.cover ? `<img src="${esc(m.cover)}" alt="" loading="lazy" decoding="async">` : `<span class="is-fallback" ${coverEp ? `data-thumb="${esc(coverEp.id)}"` : ''}><span class="cover-glyph">${esc([...s.name.trim()][0] || '·')}</span></span>`}
+      ${fresh ? `<span class="tile-badge">${fresh === 1 ? 'Nuevo' : `${fresh} nuevos`}</span>` : ''}
+      ${pct && pct < 100 ? `<span class="tile-bar"><span style="width:${pct}%"></span></span>` : ''}
+    </span>
+    <span class="shelf-title">${esc(s.name)}</span>
+    <span class="shelf-sub">${esc(sub)}</span>
+  </a></li>`;
+}
+/** Cualquier título del catálogo como póster: serie o película. */
+function posterAny(e) { return e.movie ? posterEntry(e) : seriesPosterHTML(state.library.series[e.si], e.si); }
+
 /** Una película del catálogo como póster (mismo diseño que la fila del inicio). */
 let posterCache = null; // se arma una vez por dibujo: { s, items: Map(clave → película), fresh }
 function posterEntry(e) {
@@ -2317,13 +2329,13 @@ function paintCatalog() {
   const st = catalogState();
   const t = (app.querySelector('.catalog') || {}).dataset?.t || '';
   const list = sortEntries(filterEntries(catalogBase(t, st), st), st.o);
-  // solo películas: como pósters, igual que en el inicio; si hay series (o se está buscando), como mosaicos
-  const posters = t === 'peliculas' && !isFiltering(st);
+  // series y películas, como pósters
+  const posters = true;
   // si al teclear sigue saliendo lo mismo, no se vuelven a dibujar todos los mosaicos
   const sig = (posters ? 'p' : 't') + list.map((e) => e.href || e.si).join('|') + '#' + list.map((e) => e.img || '').join('').length;
   if (box.dataset.sig !== sig) {
     posterCache = null;
-    box.innerHTML = posters ? `<ul class="shelf" role="list">${list.map(posterEntry).join('')}</ul>` : `<div class="tiles is-grid" role="list">${list.map(entryTile).join('')}</div>`;
+    box.innerHTML = posters ? `<ul class="shelf" role="list">${list.map(posterAny).join('')}</ul>` : `<div class="tiles is-grid" role="list">${list.map(entryTile).join('')}</div>`;
     box.dataset.sig = sig;
     if (posters) hydrateThumbs(box);
   }
@@ -2379,7 +2391,8 @@ function paintHomeSearch() {
   const list = sortEntries(filterEntries(catalogEntries(), { q: qv }), 'az');
   box.innerHTML = `<div class="tv-row-head"><h3 class="tv-row-title">${list.length ? plural(list.length, 'resultado', 'resultados') : 'Sin resultados'}</h3>
       <a class="tv-more" href="#/catalogo?${new URLSearchParams({ q: qv })}">${ICON.grid}<span>Buscar en el catálogo</span></a></div>
-    <div class="tiles is-grid" role="list">${list.slice(0, 24).map(entryTile).join('')}</div>`;
+    <ul class="shelf is-row" role="list">${list.slice(0, 24).map(posterAny).join('')}</ul>`;
+  posterCache = null;
 }
 
 /* ── serie ── */

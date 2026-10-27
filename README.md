@@ -10,7 +10,7 @@ Reproductor web para ver las series y películas de anime guardadas en una cuent
 - **Códec de cada video** en pequeño sobre su miniatura, con un puntito rojo si el dispositivo donde estás no lo puede reproducir (por ejemplo AV1 en un iPad M2).
 - **Inicio** con las 10 series agregadas más recientemente, una fila de **Películas**, lo marcado para **Más tarde** y búsqueda rápida (la lupa). El botón de inicio está en todas las páginas.
 - **Seguir en otro dispositivo:** si dejaste algo a medias en otro dispositivo, el inicio ofrece seguir en ese mismo segundo.
-- **Inicio:** Continuar viendo (los 3 más recientes), Más tarde, y las filas **Series** y **Películas**, cada una con su botón **Ver catálogo**.
+- **Inicio:** Continuar viendo (los 3 más recientes) y Más tarde en horizontal, y las filas **Series** y **Películas** en pósters, cada una con su botón **Ver catálogo**. Si empezaste algo en otro dispositivo, una tarjeta ofrece seguir ahí mismo (en la PC, arriba a la derecha).
 - **Catálogos de Series y de Películas** con buscador y filtros por género, año y tipo. Al buscar o usar una etiqueta se busca en todo, series y películas juntas. El año, el tipo y los géneros de cada ficha son botones que llevan al catálogo filtrado.
 - **Reproductor propio:** marcas de capítulos, ±10 s, velocidad, ventana flotante, pantalla completa, salta la intro sola y pasa al siguiente capítulo.
 - **Gestos en el teléfono:** doble toque a los lados para ±10 s, mantener presionado para 2×, deslizar arriba para pantalla completa y abajo para salir de ella o pasar al mini reproductor. En iPhone el video se gira solo, aunque tengas el bloqueo de rotación.

@@ -675,12 +675,14 @@ html.kai-fs-on .dock { display: none; }
 .resume-kicker { margin: 0; font-size: 13px; color: var(--dim); }
 .resume-title { margin: 2px 0 0; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .resume-card .tv-btn { flex: none; }
-@media (max-width: 600px) {
-  .resume-card { flex-wrap: wrap; padding: 12px 12px 12px 16px; }
-  .resume-text { flex-basis: calc(100% - 56px); }
-  .resume-x { order: 2; }
-  .resume-card .tv-btn { order: 3; flex: 1; justify-content: center; }
-}
+/* en el teléfono ocupa el ancho; en pantallas grandes es la misma tarjeta, compacta y a la derecha */
+.resume-card { flex-wrap: wrap; padding: 12px 12px 12px 16px; }
+.resume-text { flex-basis: calc(100% - 56px); }
+.resume-x { order: 2; }
+.resume-card .tv-btn { order: 3; flex: 1; justify-content: center; }
+@media (min-width: 601px) { .resume-card { width: min(420px, 100%); margin-left: auto; } }
+/* en la PC flota arriba a la derecha, en el espacio libre sobre la portada, sin empujarla */
+@media (min-width: 900px) { .resume-card { position: absolute; top: 0; right: clamp(16px, 4vw, 56px); z-index: 4; margin: 0; } }
 @media (hover: hover) { .tv-btn:hover { transform: scale(1.03); } }
 .tv-btn:focus-visible { outline: none; transform: scale(1.05); box-shadow: 0 0 0 3px var(--text), 0 14px 40px var(--shadow); }
 .tv-done { color: var(--dim); font-weight: 600; }
