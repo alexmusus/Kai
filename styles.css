@@ -61,6 +61,15 @@
   --thumb-bg: #dfe2e9;
 }
 
+/* Tono del modo oscuro "Gris Culero": gris medio como los paneles de Lightroom, con botones y barras más oscuros que el fondo. */
+[data-theme='dark'][data-dark='gris'] {
+  --bg: #4d4d4d; --text: #e4e4e4; --dim: #b0b0b0; --faint: #8a8a8a; --line: rgba(0, 0, 0, 0.38);
+  --glass: rgba(40, 40, 40, 0.42); --glass-strong: rgba(52, 52, 52, 0.86); --glass-solid: rgba(50, 50, 50, 0.97);
+  --glass-edge: rgba(0, 0, 0, 0.45); --glass-hi: rgba(255, 255, 255, 0.06); --shadow: rgba(0, 0, 0, 0.32);
+  --accent: #8fb6ec; --primary: #e0e0e0; --primary-ink: #1d1d1d;
+  --blob-1: rgba(90, 90, 90, 0.25); --blob-2: rgba(70, 70, 70, 0.2); --blob-3: rgba(85, 85, 85, 0.2); --thumb-bg: #3d3d3d;
+}
+
 /* Tonos del modo claro: menos brillo que el blanco, para que no canse la vista. Se eligen en Ajustes. */
 [data-theme='light'][data-tone='gris'] {
   --bg: #c6c8cb; --text: #0f1012; --dim: #3f4247; --faint: #6c7076; --line: rgba(0, 0, 0, 0.12);
