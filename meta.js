@@ -171,3 +171,53 @@ async function doTranslate(text, allowDownload) {
   }
 }
 export const canTranslate = () => 'Translator' in self;
+
+/* ── Descubrir: recomendaciones y lo que está en emisión ── */
+
+const DFIELDS = `id isAdult
+  title { romaji english userPreferred }
+  description(asHtml: false)
+  coverImage { extraLarge large color }
+  genres averageScore popularity seasonYear format episodes status
+  nextAiringEpisode { episode airingAt }`;
+
+/** Lo que muestra Kai de un anime en Descubrir. */
+export function toDiscover(m) {
+  return {
+    id: m.id,
+    title: (m.title && (m.title.english || m.title.romaji || m.title.userPreferred)) || '',
+    romaji: (m.title && m.title.romaji) || '',
+    synopsis: cleanText(m.description),
+    cover: (m.coverImage && (m.coverImage.extraLarge || m.coverImage.large)) || '',
+    color: (m.coverImage && m.coverImage.color) || '',
+    genres: (m.genres || []).map((g) => GENRES[g] || g),
+    score: m.averageScore || null,
+    year: m.seasonYear || null,
+    format: FORMATS[m.format] || '',
+    episodes: m.episodes || null,
+    next: m.nextAiringEpisode ? { ep: m.nextAiringEpisode.episode, at: m.nextAiringEpisode.airingAt * 1000 } : null,
+  };
+}
+
+/** Recomendaciones de AniList para varias series a la vez (de a 8 por pedido, para no saturar AniList).
+ * Devuelve { idDeTuSerie: [{ rating, media }] }. */
+export async function recommendationsFor(ids, pause = () => new Promise((r) => setTimeout(r, 800))) {
+  const out = {};
+  for (let i = 0; i < ids.length; i += 8) {
+    const chunk = ids.slice(i, i + 8);
+    const q = `query { ${chunk.map((id, k) => `a${k}: Media(id: ${Number(id)}, type: ANIME) { id recommendations(sort: RATING_DESC, perPage: 8) { nodes { rating mediaRecommendation { ${DFIELDS} } } } }`).join('\n')} }`;
+    const data = await gql(q, {});
+    chunk.forEach((id, k) => {
+      const nodes = (data && data[`a${k}`] && data[`a${k}`].recommendations && data[`a${k}`].recommendations.nodes) || [];
+      out[id] = nodes.filter((n) => n && n.mediaRecommendation && !n.mediaRecommendation.isAdult).map((n) => ({ rating: n.rating || 0, media: n.mediaRecommendation }));
+    });
+    if (i + 8 < ids.length) await pause();
+  }
+  return out;
+}
+
+/** Lo que está saliendo ahora y tiene buena puntuación (y suficiente gente que lo sigue, para que la nota sea confiable). */
+export async function airingTop() {
+  const data = await gql(`query { Page(perPage: 36) { media(type: ANIME, status: RELEASING, isAdult: false, sort: SCORE_DESC, averageScore_greater: 74, popularity_greater: 6000, format_in: [TV, TV_SHORT, ONA]) { ${DFIELDS} } } }`, {});
+  return (data && data.Page && data.Page.media) || [];
+}

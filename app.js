@@ -1,6 +1,6 @@
 import { Storage } from './vendor/mega.js';
 import { isSubtitleName, mp4Info, mp4Chapters, mp4Formats, mp4QuickFormats } from './subs.js';
-import { searchAnime, animeById, toMeta, findForSeries, findMovie, translateToSpanish, canTranslate } from './meta.js';
+import { searchAnime, animeById, toMeta, findForSeries, findMovie, translateToSpanish, canTranslate, recommendationsFor, airingTop, toDiscover } from './meta.js';
 
 const C = window.MegaCore;
 const $ = (s, el = document) => el.querySelector(s);
@@ -1385,6 +1385,7 @@ function render() {
     else if (view === 'catalogo') renderCatalog();
     else if (view === 'descargas') renderDownloads();
     else if (view === 'ajustes') renderSettings();
+    else if (view === 'descubrir') renderDiscover(arg);
     else renderHome();
   }
   paintSync();
@@ -1772,7 +1773,9 @@ async function translateMissing() {
   synRunning = true;
   let added = 0;
   try {
-    for (const m of Object.values(state.meta)) {
+    const disc = LS.get('discover', {}) || {};
+    const extra = Object.values(disc).flatMap((d) => (d && d.items) || []);
+    for (const m of [...Object.values(state.meta), ...extra]) {
       if (!m || m.none || !m.id) continue;
       if (state.syn[m.id]) continue;
       // lo que este navegador ya había traducido antes también se comparte
@@ -2109,6 +2112,10 @@ function renderHome() {
         <ul class="shelf is-row" role="list">${recentSeries(lib).map(({ s, si }) => seriesPosterHTML(s, si)).join('')}</ul>
 </section>
       ${homeMoviesHTML(lib)}
+      <nav class="discover-links" aria-label="Descubrir">
+        <a class="tv-more" href="#/descubrir/porque">${ICON.grid}<span>Porque viste…</span></a>
+        <a class="tv-more" href="#/descubrir/emision">${ICON.grid}<span>En emisión</span></a>
+      </nav>
     </main>
   </div>`;
 }
@@ -2987,6 +2994,142 @@ function openSheet(ep) {
     else if (act === 'later-movie') setLater(series, movie.key, !isLater(series, movie.key));
   };
 }
+/* ── Descubrir: "Porque viste…" y "En emisión" ──
+ * Con AniList: recomendaciones de las series que tienes en MEGA (las que ya viste pesan más) y lo que está
+ * saliendo ahora con buena nota. Lo que ya tienes sale a color y lleva a su página; lo que no, en blanco y negro. */
+const ANIMEAV1_SEARCH = (t) => 'https://animeav1.com/catalogo?search=' + encodeURIComponent(t);
+const DISCOVER = {
+  porque: { title: 'Porque viste…', ttl: 24 * 3600000 },
+  emision: { title: 'En emisión', ttl: 6 * 3600000 },
+};
+/** Lo que tienes en MEGA, por id de AniList → a dónde lleva en Kai. */
+function ownedIds() {
+  const out = new Map();
+  const lib = state.library;
+  if (!lib || lib.v !== 2) return out;
+  lib.series.forEach((s, si) => {
+    if (isCollection(s)) { for (const it of collectionItems(s)) { const m = itemMeta(s, it.key); if (m && m.id) out.set(m.id, movieHref(si, it.key)); } }
+    else { const m = metaFor(s); if (m && m.id) out.set(m.id, '#/serie/' + si); }
+  });
+  return out;
+}
+let discoverJob = null;
+async function loadDiscover(kind, force = false) {
+  const all = LS.get('discover', {}) || {};
+  const cur = all[kind];
+  if (!force && cur && Date.now() - cur.at < DISCOVER[kind].ttl && cur.items && cur.items.length) return cur;
+  if (discoverJob) return discoverJob;
+  discoverJob = (async () => {
+    let items = [];
+    if (kind === 'emision') {
+      items = (await airingTop()).map(toDiscover);
+    } else {
+      // tus series de MEGA (sin repetir la misma ficha); las que ya empezaste a ver cuentan doble
+      const lib = state.library;
+      const src = new Map();
+      if (lib && lib.v === 2) for (const s of lib.series) {
+        if (isCollection(s)) continue;
+        const m = metaFor(s);
+        if (!m || !m.id) continue;
+        const watched = s.all.some((e) => { const p = prog(e); return p && (p.w || p.t > 60); });
+        src.set(m.id, { name: s.name, w: watched ? 2 : 1 });
+      }
+      const recs = await recommendationsFor([...src.keys()].slice(0, 40));
+      const score = new Map();
+      for (const [id, list] of Object.entries(recs)) {
+        const from = src.get(Number(id));
+        list.forEach(({ rating, media }, rank) => {
+          if (src.has(media.id)) return; // no recomendar una serie que es la misma fuente
+          const r = score.get(media.id) || { m: media, pts: 0, from: [] };
+          r.pts += from.w * (1 + Math.log10(1 + Math.max(0, rating))) * (1 - rank * 0.05);
+          r.from.push({ name: from.name, pts: from.w * (1 + Math.log10(1 + Math.max(0, rating))) });
+          score.set(media.id, r);
+        });
+      }
+      items = [...score.values()].sort((a, b) => b.pts - a.pts).slice(0, 30).map((r) => ({
+        ...toDiscover(r.m), because: r.from.sort((a, b) => b.pts - a.pts).slice(0, 2).map((x) => x.name),
+      }));
+    }
+    const fresh = { at: Date.now(), items };
+    const store = LS.get('discover', {}) || {};
+    store[kind] = fresh;
+    LS.set('discover', store);
+    setTimeout(translateMissing, 1000);
+    return fresh;
+  })().finally(() => { discoverJob = null; });
+  return discoverJob;
+}
+function airingIn(at) {
+  const h = Math.round((at - Date.now()) / 3600000);
+  if (h <= 0) return 'sale hoy';
+  if (h < 24) return `en ${h} h`;
+  const d = Math.round(h / 24);
+  return d === 1 ? 'mañana' : `en ${d} días`;
+}
+function discoverPosterHTML(x, owned, kind) {
+  const href = owned.get(x.id);
+  const sub = kind === 'emision'
+    ? [x.next ? `Ep. ${x.next.ep} ${airingIn(x.next.at)}` : '', x.score ? `★ ${x.score}` : ''].filter(Boolean).join(' · ')
+    : (x.because && x.because.length ? `Porque viste ${x.because.join(' y ')}` : (x.score ? `★ ${x.score}` : ''));
+  const inner = `<span class="shelf-poster">
+      ${x.cover ? `<img src="${esc(x.cover)}" alt="" loading="lazy" decoding="async">` : `<span class="is-fallback"><span class="cover-glyph">${esc([...(x.title || '·').trim()][0])}</span></span>`}
+      ${href ? '<span class="tile-badge">En Kai</span>' : ''}
+    </span>
+    <span class="shelf-title">${esc(x.title)}</span>
+    ${sub ? `<span class="shelf-sub">${esc(sub)}</span>` : ''}`;
+  return href
+    ? `<li><a class="shelf-item" href="${href}" style="--h:${hue(x.title)}">${inner}</a></li>`
+    : `<li><button class="shelf-item is-gray" data-act="discover-open" data-id="${x.id}" style="--h:${hue(x.title)}">${inner}</button></li>`;
+}
+async function renderDiscover(kind) {
+  if (!DISCOVER[kind]) kind = 'porque';
+  const other = kind === 'porque' ? 'emision' : 'porque';
+  app.innerHTML = header(DISCOVER[kind].title) + `<main class="shelf-main discover" data-kind="${kind}">
+    <p class="dim shelf-count" id="disc-note">${kind === 'porque' ? 'Recomendaciones de AniList según lo que tienes en MEGA.' : 'Lo que está saliendo ahora y tiene buena nota en AniList.'}</p>
+    <div id="disc-list"><p class="dim">Buscando en AniList…</p></div>
+    <p class="discover-foot"><a class="tv-more" href="#/descubrir/${other}">${ICON.grid}<span>${DISCOVER[other].title}</span></a></p>
+  </main>`;
+  const paint = (d) => {
+    const box = $('#disc-list');
+    if (!box || route().view !== 'descubrir') return;
+    const owned = ownedIds();
+    if (!d.items.length) { box.innerHTML = `<p class="dim">${kind === 'porque' ? 'Todavía no hay recomendaciones: agrega series a MEGA y espera a que Kai encuentre sus fichas.' : 'AniList no devolvió nada ahora.'}</p>`; return; }
+    box.innerHTML = `<ul class="shelf" role="list">${d.items.map((x) => discoverPosterHTML(x, owned, kind)).join('')}</ul>`;
+  };
+  const cached = (LS.get('discover', {}) || {})[kind];
+  if (cached && cached.items && cached.items.length) paint(cached);
+  try { paint(await loadDiscover(kind)); } catch (err) {
+    const box = $('#disc-list');
+    if (box && !(cached && cached.items && cached.items.length)) box.innerHTML = `<p class="dim">No se pudo consultar AniList (${esc(err.message || 'sin conexión')}). Intenta en un momento.</p>`;
+  }
+}
+function openDiscoverSheet(id) {
+  const all = LS.get('discover', {}) || {};
+  const x = Object.values(all).flatMap((d) => (d && d.items) || []).find((y) => y.id === id);
+  if (!x) return;
+  const syn = (state.syn[x.id] && state.syn[x.id].es) || x.synopsis || '';
+  const short = syn.length > 420 ? syn.slice(0, 400).replace(/\s+\S*$/, '') + '…' : syn;
+  const facts = [x.year, x.format, x.episodes ? plural(x.episodes, 'capítulo', 'capítulos') : '', x.score ? `★ ${x.score}` : ''].filter(Boolean).join(' · ');
+  const sheet = $('#sheet');
+  sheet.innerHTML = `<div class="sheet-back" data-act="close"></div>
+    <div class="sheet-panel discover-sheet" role="dialog" aria-modal="true" aria-label="${esc(x.title)}">
+      <div class="discover-head">
+        ${x.cover ? `<img class="discover-cover" src="${esc(x.cover)}" alt="">` : ''}
+        <div><p class="sheet-title">${esc(x.title)}</p>
+          <p class="sheet-sub">${esc(facts)}</p>
+          ${x.genres.length ? `<p class="sheet-sub">${esc(x.genres.slice(0, 4).join(', '))}</p>` : ''}
+          ${x.next ? `<p class="sheet-sub">Capítulo ${x.next.ep} ${airingIn(x.next.at)}</p>` : ''}</div>
+      </div>
+      ${short ? `<p class="discover-syn">${esc(short)}</p>` : ''}
+      <a class="sheet-btn" href="${ANIMEAV1_SEARCH(x.romaji || x.title)}" target="_blank" rel="noopener">Buscar en animeav1</a>
+      <a class="sheet-btn" href="https://anilist.co/anime/${x.id}" target="_blank" rel="noopener">Ver en AniList</a>
+      <button class="sheet-btn is-quiet" data-act="close">Cerrar</button>
+    </div>`;
+  sheet.hidden = false;
+  requestAnimationFrame(() => sheet.classList.add('is-open'));
+  sheet.onclick = (e) => { if (e.target.closest('[data-act="close"]') || e.target.closest('a.sheet-btn')) closeSheet(); };
+}
+
 function closeSheet() {
   const sheet = $('#sheet');
   if (sheet.hidden) return;
@@ -4215,6 +4358,7 @@ document.addEventListener('click', async (e) => {
     else if (state.saved.has(ep.id)) { if (confirm(`¿Quitar ${episodeLabel(ep)} del dispositivo?`)) removeDownload(ep.id); }
     else queueDownload(ep);
   } else if (act === 'more' && ep) openSheet(ep);
+  else if (act === 'discover-open') openDiscoverSheet(Number(el.dataset.id));
   else if (act === 'w-more' && playing) openSheet(playing.ep);
   else if (act === 'w-dl' && playing) {
     const cur = playing.ep;

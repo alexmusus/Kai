@@ -1238,3 +1238,13 @@ html.has-mini body { padding-bottom: var(--mini-space); }
   .tv-date { position: relative; }
   .kcat-sit.is-top { display: block; left: 50%; bottom: calc(100% - 6px); width: 105%; min-width: 130px; height: auto; aspect-ratio: 520 / 224; transform: translateX(-50%); }
 }
+
+/* ───────── Descubrir ───────── */
+.discover-links { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin: 34px 0 8px; opacity: 0.85; }
+.shelf-item.is-gray { border: 0; background: none; padding: 0; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+.shelf-item.is-gray .shelf-poster img { filter: grayscale(1) contrast(0.95); opacity: 0.8; transition: filter 0.3s, opacity 0.3s; }
+@media (hover: hover) { .shelf-item.is-gray:hover .shelf-poster img { filter: grayscale(0.2); opacity: 1; } }
+.discover-foot { margin: 28px 0 0; display: flex; justify-content: center; }
+.discover-head { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 10px; }
+.discover-cover { width: 84px; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 12px; flex: none; }
+.discover-syn { margin: 0 0 12px; font-size: 14px; line-height: 1.5; color: var(--dim); max-height: 40vh; overflow: auto; }
