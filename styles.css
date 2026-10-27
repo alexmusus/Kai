@@ -472,7 +472,7 @@ html.kai-fs-on, html.kai-fs-on body { overflow: hidden; overscroll-behavior: non
 html.kai-fs-on, html.kai-fs-on body, html:has(.stage:fullscreen), html:has(.stage:fullscreen) body { background: #000 !important; }
 .stage:fullscreen::backdrop { background: #000; }
 html.kai-fs-on .stage-slot { z-index: 1000; }
-html.kai-fs-on .dock, html.kai-fs-on .ambi { display: none; }
+html.kai-fs-on .dock { display: none; }
 .stage.kai-fs .st-bar, .stage.kai-fs:not(:fullscreen) .st-bar {
   left: max(12px, env(safe-area-inset-left)); right: max(12px, env(safe-area-inset-right));
   bottom: calc(10px + env(safe-area-inset-bottom, 0px));
@@ -1018,21 +1018,8 @@ html.is-picking .series-main { padding-bottom: calc(110px + env(safe-area-inset-
   .watch-list { padding: 14px 8px 8px; }
 }
 
-/* luz ambiental alrededor del video */
 .stage-slot { isolation: isolate; }
-.ambi {
-  position: absolute; inset: -6% -4%; z-index: -1; pointer-events: none; opacity: 0; border-radius: 40px;
-  background:
-    radial-gradient(60% 80% at 10% 50%, var(--a1, transparent), transparent 70%),
-    radial-gradient(60% 80% at 50% 50%, var(--a2, transparent), transparent 70%),
-    radial-gradient(60% 80% at 90% 50%, var(--a3, transparent), transparent 70%);
-  filter: blur(50px) saturate(150%); transition: opacity 1s, background 1s;
-}
-.ambi.is-on { opacity: 0.75; }
-[data-theme='light'] .ambi.is-on { opacity: 0.4; }
-body.lights-off .ambi.is-on { opacity: 0.8; }
-@media (max-width: 719px) { .ambi { inset: 0 0 -14%; } }
-/* la luz ambiental (y cualquier otra cosa) nunca debe crear desplazamiento lateral */
+/* nada dentro de la página de reproducción debe crear desplazamiento lateral */
 .watch { overflow-x: clip; }
 
 @media (prefers-reduced-motion: reduce) {

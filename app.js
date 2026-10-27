@@ -2725,7 +2725,6 @@ function renderSettings() {
       <label class="switch"><input type="checkbox" name="autoplay" ${s.autoplay ? 'checked' : ''}><span>Reproducir el siguiente capítulo solo</span></label>
       <label class="switch"><input type="checkbox" name="subs" ${s.subs !== 'off' ? 'checked' : ''}><span>Mostrar subtítulos cuando el capítulo los traiga</span></label>
       <label class="switch"><input type="checkbox" name="autoSkip" ${s.autoSkip ? 'checked' : ''}><span>Saltar intros solo cuando Kai sepa dónde están</span></label>
-      <label class="switch"><input type="checkbox" name="ambient" ${s.ambient !== false ? 'checked' : ''}><span>Luz ambiental alrededor del video</span></label>
       <label class="switch"><input type="checkbox" name="cat" ${s.cat !== false ? 'checked' : ''}><span>Kai, el gatito, en el inicio</span></label>
       <label class="switch"><input type="checkbox" name="prefetchNext" ${s.prefetchNext !== false ? 'checked' : ''}><span>Preparar el siguiente capítulo para que empiece sin espera (usa unos 3 MB de MEGA)</span></label>
     </form>
@@ -2759,7 +2758,6 @@ function renderSettings() {
     s.autoplay = f.autoplay.checked;
     s.subs = f.subs.checked ? 'on' : 'off';
     s.autoSkip = f.autoSkip.checked;
-    s.ambient = f.ambient.checked;
     s.prefetchNext = f.prefetchNext.checked;
     s.cat = f.cat.checked;
     saveSettings();
@@ -2905,7 +2903,7 @@ function renderWatch(id) {
     app.innerHTML = header('') + `<main class="watch">
       <div class="watch-grid">
         <div class="watch-main">
-          <div class="stage-slot" id="stage-slot"><div class="ambi" id="ambi" aria-hidden="true"></div></div>
+          <div class="stage-slot" id="stage-slot"></div>
           <div class="watch-info" id="watch-info"></div>
         </div>
         <aside class="watch-list" id="watch-list"></aside>
@@ -3663,40 +3661,6 @@ function doSkip() {
   paintControls();
 }
 
-/* ── luz ambiental: los colores del video se reflejan alrededor del reproductor ── */
-
-const ambiCanvas = document.createElement('canvas');
-ambiCanvas.width = 12; ambiCanvas.height = 6;
-const ambiCtx = ambiCanvas.getContext('2d', { willReadFrequently: true });
-let ambiOk = true;
-function sampleAmbient() {
-  const el = $('#ambi');
-  if (!el || !ambiOk || state.settings.ambient === false || video.readyState < 2 || document.hidden) return;
-  try {
-    ambiCtx.drawImage(video, 0, 0, 12, 6);
-    const d = ambiCtx.getImageData(0, 0, 12, 6).data;
-    const zone = (x0, x1) => {
-      let r = 0, g = 0, b = 0, n = 0;
-      for (let y = 0; y < 6; y++) for (let x = x0; x < x1; x++) { const i = (y * 12 + x) * 4; r += d[i]; g += d[i + 1]; b += d[i + 2]; n++; }
-      return [r / n, g / n, b / n];
-    };
-    const zones = [zone(0, 4), zone(4, 8), zone(8, 12)];
-    // el desenfoque grande es caro de redibujar: solo si el color cambió de forma visible
-    const prev = el._zones;
-    const diff = prev ? Math.max(...zones.map((z, k) => Math.abs(z[0] - prev[k][0]) + Math.abs(z[1] - prev[k][1]) + Math.abs(z[2] - prev[k][2]))) : 999;
-    if (diff >= 18) {
-      el._zones = zones;
-      zones.forEach((z, k) => el.style.setProperty(`--a${k + 1}`, `rgb(${Math.round(z[0])} ${Math.round(z[1])} ${Math.round(z[2])})`));
-    }
-    el.classList.add('is-on');
-  } catch {
-    ambiOk = false; // el navegador no deja leer los colores de este video
-  }
-}
-setInterval(() => { if (playing && !video.paused && !stage.classList.contains('is-mini')) sampleAmbient(); }, 1200);
-video.addEventListener('seeked', () => setTimeout(sampleAmbient, 120));
-video.addEventListener('loadeddata', () => setTimeout(sampleAmbient, 120));
-
 /* ── tema y luz ── */
 
 const darkMQ = matchMedia('(prefers-color-scheme: dark)');
@@ -3957,7 +3921,7 @@ ui.seek.addEventListener('pointerup', () => { if (seeking) { video.currentTime =
  * Táctil: un toque muestra u oculta los controles; doble toque a la izquierda o derecha salta 10 s
  * (cada toque rápido extra suma otros 10 s); mantener presionado reproduce a 2× mientras no se suelte.
  * Deslizar: en la página, arriba = pantalla completa y abajo = mini reproductor; en pantalla completa,
- * abajo = salir. El brillo se cambia con la barra de la izquierda (solo en pantalla completa). */
+ * abajo = salir. */
 let lastTap = 0;
 let lastTapSide = '';
 let tapTimer;
