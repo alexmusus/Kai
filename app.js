@@ -2017,7 +2017,7 @@ function renderHome() {
       <section class="tv-hero" id="tv-hero">${heroInnerHTML(hs, heroSi)}</section>
       <section class="tv-row" id="home-results" hidden></section>
       ${cont.length ? `<section class="tv-row"><h3 class="tv-row-title">Continuar viendo</h3><div class="tiles is-grid" role="list">
-        ${cont.slice(0, 8).map((c) => tileHTML(c.series, siOf(c.series), {
+        ${cont.slice(0, HOME_CONTINUE).map((c) => tileHTML(c.series, siOf(c.series), {
           // primero la página de la serie (o de la película), con "Continuar" listo
           href: isCollection(c.series) ? movieHref(siOf(c.series), itemFor(c.series, c.ep).key) : '#/serie/' + siOf(c.series),
           label: isCollection(c.series) ? movieTitle(c.series, itemFor(c.series, c.ep)) : '',
@@ -2035,8 +2035,8 @@ function renderHome() {
         })).join('')}
       </div></section>` : ''}
       <section class="tv-row">
-        <div class="tv-row-head"><h3 class="tv-row-title">Agregados recientemente</h3>
-          <a class="tv-more" href="#/catalogo">${ICON.grid}<span>Ver catálogo${lib.series.filter((x) => !isCollection(x)).length > HOME_RECENT ? ` (${catalogEntries().length})` : ''}</span></a></div>
+        <div class="tv-row-head"><h3 class="tv-row-title">Series</h3>
+          <a class="tv-more" href="#/catalogo?t=series">${ICON.grid}<span>Ver catálogo${lib.series.filter((x) => !isCollection(x)).length > HOME_RECENT ? ` (${lib.series.filter((x) => !isCollection(x)).length})` : ''}</span></a></div>
         <div class="tiles is-grid" role="list">
         ${recentSeries(lib).map(({ s, si }) => {
           const fresh = newEpisodes(s).length;
@@ -2062,7 +2062,7 @@ function homeMoviesHTML(lib) {
   const fresh = new Set(newEpisodes(s).map((e) => e.id));
   return `<section class="tv-row">
     <div class="tv-row-head"><h3 class="tv-row-title">Películas</h3>
-      <a class="tv-more" href="#/serie/${si}">${ICON.grid}<span>Ver todas${items.length > HOME_MOVIES ? ` (${items.length})` : ''}</span></a></div>
+      <a class="tv-more" href="#/catalogo?t=peliculas">${ICON.grid}<span>Ver catálogo${items.length > HOME_MOVIES ? ` (${items.length})` : ''}</span></a></div>
     <ul class="shelf is-row" role="list">${items.slice(0, HOME_MOVIES).map((x) => moviePosterHTML(s, si, x, fresh)).join('')}</ul>
   </section>`;
 }
@@ -2127,6 +2127,7 @@ async function paintSeenByAll(btn) {
 
 const HOME_RECENT = 10;
 const HOME_MOVIES = 10;
+const HOME_CONTINUE = 3;
 const norm = (t) => String(t ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
 function recentSeries(lib) {
@@ -2147,7 +2148,7 @@ function catalogEntries() {
         const title = it.title || (m && m.title) || it.eps[0].name.replace(/\.[^.]+$/, '');
         out.push({
           si, title: movieTitle(s, it), m, img: m && (m.banner || m.cover), year: m && m.year, genres: (m && m.genres) || [], format: 'Película',
-          added: Math.max(0, ...it.eps.map((e) => e.ts || 0)), href: movieHref(si, it.key),
+          added: Math.max(0, ...it.eps.map((e) => e.ts || 0)), href: movieHref(si, it.key), movie: it.key,
           words: norm([title, m && m.title, m && m.romaji, m && m.native, s.name].join(' ')),
         });
       }
@@ -2173,6 +2174,14 @@ function sortEntries(list, o) {
   if (o === 'year') return list.sort((a, b) => (b.year || 0) - (a.year || 0) || az(a, b));
   return list.sort((a, b) => (b.added || 0) - (a.added || 0) || az(a, b));
 }
+/** Una película del catálogo como póster (mismo diseño que la fila del inicio). */
+let posterCache = null; // se arma una vez por dibujo: { s, items: Map(clave → película), fresh }
+function posterEntry(e) {
+  const s = state.library.series[e.si];
+  if (!posterCache || posterCache.s !== s) posterCache = { s, items: new Map(shelfItems(s).map((y) => [y.it.key, y])), fresh: new Set(newEpisodes(s).map((ep) => ep.id)) };
+  const x = posterCache.items.get(e.movie);
+  return x ? moviePosterHTML(s, e.si, x, posterCache.fresh) : '';
+}
 function entryTile(e) {
   const sub = [e.year, e.format, e.count ? plural(e.count, 'capítulo', 'capítulos') : ''].filter(Boolean).join(' · ');
   return `<a class="tile" href="${e.href || '#/serie/' + e.si}" style="--h:${hue(e.title)}">
@@ -2181,8 +2190,18 @@ function entryTile(e) {
   </a>`;
 }
 
+/* Dos catálogos, Series y Películas (?t=series | ?t=peliculas). Al buscar o filtrar por una etiqueta,
+ * se busca en todo: series y películas juntas. */
+const CAT_TITLES = { series: 'Series', peliculas: 'Películas' };
+const isFiltering = (st) => !!(st.q || st.g || st.y || st.f);
+function catalogBase(t, st) {
+  const all = catalogEntries();
+  if (!CAT_TITLES[t] || isFiltering(st)) return all;
+  return all.filter((e) => (t === 'peliculas') === !!e.movie);
+}
 function renderCatalog() {
   const q = route().q;
+  const t = CAT_TITLES[q.get('t')] ? q.get('t') : '';
   const all = catalogEntries();
   const count = (key) => {
     const m = new Map();
@@ -2199,10 +2218,10 @@ function renderCatalog() {
       ${all ? `<option value="">Todos</option>` : ''}${opts.map(([v, l]) => `<option value="${esc(v)}" ${v === cur ? 'selected' : ''}>${esc(l)}</option>`).join('')}
       ${known ? '' : `<option value="${esc(cur)}" selected>${esc(cur)}</option>`}</select></label>`;
   };
-  app.innerHTML = header('Catálogo') + `<main class="catalog">
+  app.innerHTML = header(CAT_TITLES[t] || 'Catálogo') + `<main class="catalog" data-t="${t}">
     <form class="cat-search" id="cat-form" role="search">
       <span class="search-icon">${ICON.search}</span>
-      <input id="cat-q" name="q" type="search" placeholder="Buscar por nombre" value="${esc(q.get('q') || '')}" autocomplete="off" enterkeyhint="search" aria-label="Buscar">
+      <input id="cat-q" name="q" type="search" placeholder="Buscar series y películas" value="${esc(q.get('q') || '')}" autocomplete="off" enterkeyhint="search" aria-label="Buscar">
     </form>
     <div class="cat-filters" id="cat-filters">
       ${select('g', 'Género', genres)}${select('y', 'Año', years)}${select('f', 'Tipo', formats)}
@@ -2210,7 +2229,7 @@ function renderCatalog() {
       <button class="link-btn cat-clear" type="button" data-act="cat-clear" hidden>Quitar filtros</button>
     </div>
     <p class="dim cat-count" id="cat-count" aria-live="polite"></p>
-    <div class="tiles is-grid" id="cat-results" role="list"></div>
+    <div id="cat-results"></div>
   </main>`;
   const form = $('#cat-form');
   form.addEventListener('submit', (e) => { e.preventDefault(); $('#cat-q').blur(); });
@@ -2227,14 +2246,23 @@ function paintCatalog() {
   const box = $('#cat-results');
   if (!box) return;
   const st = catalogState();
-  const list = sortEntries(filterEntries(catalogEntries(), st), st.o);
+  const t = (app.querySelector('.catalog') || {}).dataset?.t || '';
+  const list = sortEntries(filterEntries(catalogBase(t, st), st), st.o);
+  // solo películas: como pósters, igual que en el inicio; si hay series (o se está buscando), como mosaicos
+  const posters = t === 'peliculas' && !isFiltering(st);
   // si al teclear sigue saliendo lo mismo, no se vuelven a dibujar todos los mosaicos
-  const sig = list.map((e) => e.href || e.si).join('|') + '#' + list.map((e) => e.img || '').join('').length;
-  if (box.dataset.sig !== sig) { box.innerHTML = list.map(entryTile).join('') || ''; box.dataset.sig = sig; }
+  const sig = (posters ? 'p' : 't') + list.map((e) => e.href || e.si).join('|') + '#' + list.map((e) => e.img || '').join('').length;
+  if (box.dataset.sig !== sig) {
+    posterCache = null;
+    box.innerHTML = posters ? `<ul class="shelf" role="list">${list.map(posterEntry).join('')}</ul>` : `<div class="tiles is-grid" role="list">${list.map(entryTile).join('')}</div>`;
+    box.dataset.sig = sig;
+    if (posters) hydrateThumbs(box);
+  }
   $('#cat-count').textContent = list.length ? plural(list.length, 'título', 'títulos') : (state.library ? 'Nada coincide con la búsqueda o los filtros.' : 'Cargando la biblioteca…');
   app.querySelector('[data-act="cat-clear"]').hidden = !(st.g || st.y || st.f || st.q);
   // la dirección refleja la búsqueda (para volver atrás o compartirla), sin redibujar la página
   const params = new URLSearchParams();
+  if (t) params.set('t', t);
   for (const k of ['q', 'g', 'y', 'f']) if (st[k]) params.set(k, st[k]);
   if (st.o !== 'recent') params.set('o', st.o);
   const h = '#/catalogo' + (params.toString() ? '?' + params : '');
@@ -4028,7 +4056,7 @@ document.addEventListener('click', async (e) => {
   else if (act === 'check-update') checkUpdate();
   else if (act === 'home-search') { if ($('#home-search') && !$('#home-search').hidden) closeHomeSearch(); else openHomeSearch(); }
   else if (act === 'home-search-close') closeHomeSearch();
-  else if (act === 'cat-clear') { go('#/catalogo'); }
+  else if (act === 'cat-clear') { const t = (app.querySelector('.catalog') || {}).dataset?.t; go('#/catalogo' + (t ? '?t=' + t : '')); }
   else if (act === 'apply-update') applyUpdate();
   else if (act === 'dismiss-update') { const n = $('#update-notice'); if (n) n.remove(); }
   else if (act === 'mini-open' && playing) go('#/play/' + encodeURIComponent(playing.ep.id));
