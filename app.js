@@ -3962,8 +3962,6 @@ let lastTap = 0;
 let lastTapSide = '';
 let tapTimer;
 let lastTouchEnd = 0;
-let bright = Math.min(1.6, Math.max(0.35, Number(LS.get('bright', 1)) || 1));
-const brightEl = $('#st-bright');
 const holdEl = $('#st-hold');
 
 /** ¿El reproductor está girado 90° con CSS (iPhone vertical en pantalla completa)? */
@@ -3975,48 +3973,7 @@ function videoPoint(e) {
   return { x: e.clientX - r.left, y: e.clientY - r.top, w: r.width, h: r.height };
 }
 
-function applyBright() {
-  // el filtro se deja siempre puesto (quitarlo y ponerlo al pasar por 100 % da un tirón)
-  video.style.filter = `brightness(${bright.toFixed(3)})`;
-  brightEl.style.setProperty('--lv', ((bright - 0.35) / 1.25).toFixed(4));
-  brightEl.setAttribute('aria-valuenow', String(Math.round(bright * 100)));
-}
-applyBright();
-/* Se arrastra desde donde está (como el Centro de control): tocar no salta el brillo a otro punto. */
-let brightDrag = null;
-let brightFrame = 0;
-function brightAxis(e) { return isRotated() ? e.clientX : -e.clientY; }
-brightEl.addEventListener('pointerdown', (e) => {
-  e.stopPropagation();
-  const r = brightEl.querySelector('.st-bright-track').getBoundingClientRect();
-  brightDrag = { id: e.pointerId, from: brightAxis(e), start: bright, len: isRotated() ? r.width : r.height };
-  brightEl.classList.add('is-dragging');
-  try { brightEl.setPointerCapture(e.pointerId); } catch { /* nada */ }
-  wake();
-});
-brightEl.addEventListener('pointermove', (e) => {
-  const d = brightDrag;
-  if (!d || d.id !== e.pointerId) return;
-  bright = Math.min(1.6, Math.max(0.35, d.start + ((brightAxis(e) - d.from) / d.len) * 1.25));
-  if (!brightFrame) brightFrame = requestAnimationFrame(() => { brightFrame = 0; applyBright(); wake(); });
-});
-['pointerup', 'pointercancel'].forEach((ev) => brightEl.addEventListener(ev, (e) => {
-  if (!brightDrag || brightDrag.id !== e.pointerId) return;
-  brightDrag = null;
-  brightEl.classList.remove('is-dragging');
-  applyBright();
-  LS.set('bright', Number(bright.toFixed(2)));
-}));
-brightEl.addEventListener('click', (e) => e.stopPropagation());
-brightEl.addEventListener('keydown', (e) => {
-  const d = { ArrowUp: 0.05, ArrowRight: 0.05, ArrowDown: -0.05, ArrowLeft: -0.05 }[e.key];
-  if (!d) return;
-  e.preventDefault(); e.stopPropagation();
-  bright = Math.min(1.6, Math.max(0.35, bright + d));
-  applyBright();
-  LS.set('bright', Number(bright.toFixed(2)));
-  wake();
-});
+LS.del('bright'); // la barra de brillo se quitó en v16
 
 function tapSide(fx) {
   return fx < 0.4 ? 'left' : fx > 0.6 ? 'right' : 'center';

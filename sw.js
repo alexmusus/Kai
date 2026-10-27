@@ -6,7 +6,7 @@
  */
 importScripts('core.js');
 
-const VERSION = 'kai-v15';
+const VERSION = 'kai-v16';
 const SHELL = [
   './', 'index.html', 'styles.css', 'app.js', 'subs.js', 'meta.js', 'core.js',
   'vendor/mega.js', 'manifest.webmanifest', 'icon-32.png', 'icon-180.png', 'icon-192.png', 'icon-512.png',

@@ -448,25 +448,6 @@ body.lights-off .bar { z-index: 1; }
 .st-flash.is-on { animation: flash 0.6s ease-out; }
 @keyframes flash { 0% { opacity: 0; } 20% { opacity: 1; } 100% { opacity: 0; } }
 
-/* brillo: una píldora a la derecha (como la del Centro de control), solo en pantalla completa; se oculta con los controles */
-.st-bright {
-  position: absolute; right: max(16px, env(safe-area-inset-right)); top: 50%; transform: translateY(-50%);
-  display: none; padding: 0; touch-action: none; cursor: ns-resize; transition: opacity 0.25s; --lv: 0.5;
-}
-.st-bright::before { content: ''; position: absolute; inset: -16px -18px; } /* zona de toque más grande que la píldora */
-.stage.is-fs .st-bright { display: block; }
-.stage.is-idle .st-bright:not(.is-dragging) { opacity: 0; pointer-events: none; visibility: hidden; transition: opacity 0.25s, visibility 0s 0.25s; }
-.st-bright-track {
-  position: relative; display: block; width: 34px; height: min(160px, 36vh); border-radius: 17px; overflow: hidden;
-  background: rgba(30, 32, 38, 0.42); border: 1px solid rgba(255, 255, 255, 0.14);
-  -webkit-backdrop-filter: blur(18px) saturate(160%); backdrop-filter: blur(18px) saturate(160%);
-  transition: transform 0.2s ease; transform: translateZ(0);
-}
-.st-bright.is-dragging .st-bright-track { transform: scale(1.06); }
-.st-bright-track i { position: absolute; inset: 0; background: rgba(255, 255, 255, 0.9); transform-origin: 50% 100%; transform: scaleY(var(--lv)); will-change: transform; }
-.st-bright-track b { display: none; }
-.st-bright svg { position: absolute; left: 50%; bottom: 9px; width: 16px; height: 16px; margin-left: -8px; z-index: 1; fill: none; stroke: #6b6f78; stroke-width: 1.9; stroke-linecap: round; pointer-events: none; }
-.st-bright:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* mantener presionado: 2× mientras no se suelte */
 .st-hold {
@@ -510,7 +491,6 @@ html.kai-fs-on .dock, html.kai-fs-on .ambi { display: none; }
     left: max(12px, env(safe-area-inset-top)); right: max(12px, env(safe-area-inset-bottom)); bottom: 10px;
   }
   .stage.kai-fs.kai-rot .st-skip { right: max(16px, env(safe-area-inset-bottom)); }
-  .stage.kai-fs.kai-rot .st-bright { right: max(16px, env(safe-area-inset-bottom)); }
 }
 
 .st-skip {
