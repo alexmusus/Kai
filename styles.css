@@ -1241,7 +1241,7 @@ html.has-mini body { padding-bottom: var(--mini-space); }
 
 /* ───────── Descubrir ───────── */
 .discover-links { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin: 34px 0 8px; opacity: 0.85; }
-.shelf-item.is-gray { border: 0; background: none; padding: 0; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+.shelf-item.is-gray { width: 100%; border: 0; background: none; padding: 0; text-align: left; font: inherit; color: inherit; cursor: pointer; }
 .shelf-item.is-gray .shelf-poster img { filter: grayscale(1) contrast(0.95); opacity: 0.8; transition: filter 0.3s, opacity 0.3s; }
 @media (hover: hover) { .shelf-item.is-gray:hover .shelf-poster img { filter: grayscale(0.2); opacity: 1; } }
 .discover-foot { margin: 28px 0 0; display: flex; justify-content: center; }
