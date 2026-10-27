@@ -6,9 +6,9 @@
  */
 importScripts('core.js');
 
-const VERSION = 'kai-v24';
+const VERSION = 'kai-v25';
 const SHELL = [
-  './', 'index.html', 'styles.css', 'app.js', 'subs.js', 'meta.js', 'core.js',
+  './', 'styles.css', 'app.js', 'subs.js', 'meta.js', 'core.js',
   'vendor/mega.js', 'manifest.webmanifest', 'icon-32.png', 'icon-180.png', 'icon-192.png', 'icon-512.png',
   'gato/sentado.webp', 'gato/sentado-cierra.webp', 'gato/echado.webp',
 ];
@@ -35,7 +35,15 @@ async function reportQuota(timeLeft) {
 
 self.addEventListener('install', (e) => {
   // 'reload' evita que el navegador entregue archivos viejos de su propia caché
-  e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL.map((u) => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));
+  e.waitUntil((async () => {
+    const c = await caches.open(VERSION);
+    await Promise.all(SHELL.map(async (u) => {
+      const res = await fetch(new Request(u, { cache: 'reload' }));
+      if (!res.ok) throw new Error('No se pudo guardar ' + u);
+      await c.put(u, await clean(res));
+    }));
+    await self.skipWaiting();
+  })());
 });
 
 // la app pregunta qué versión está instalada (Ajustes)
@@ -90,17 +98,28 @@ async function cacheFirst(req, name) {
   }
 }
 
+/* Una respuesta que llegó tras una redirección no se puede entregar como página: Safari la rechaza
+ * ("Response served by service worker has redirections"). Cloudflare Pages redirige /index.html → /,
+ * así que se guarda y se entrega siempre una copia limpia. */
+async function clean(res) {
+  if (!res.redirected) return res;
+  return new Response(await res.blob(), { status: res.status, statusText: res.statusText, headers: res.headers });
+}
+
 async function staleWhileRevalidate(req, e) {
   const cache = await caches.open(VERSION);
-  const key = req.mode === 'navigate' ? 'index.html' : req;
+  const key = req.mode === 'navigate' ? './' : req;
   const hit = await cache.match(key, { ignoreSearch: req.mode === 'navigate' });
-  const update = fetch(req).then((res) => {
-    if (res.ok && res.type === 'basic') cache.put(key, res.clone());
+  const update = fetch(req).then(async (res) => {
+    if (res.ok && res.type === 'basic') {
+      res = await clean(res);
+      cache.put(key, res.clone());
+    }
     return res;
   }).catch(() => null);
   if (hit) {
     e.waitUntil(update);
-    return hit;
+    return clean(hit);
   }
   const res = await update;
   return res || new Response('Sin conexión', { status: 503 });
