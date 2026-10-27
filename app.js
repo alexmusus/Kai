@@ -150,6 +150,16 @@ export function seasonInfo(name) {
   return { num: t ? Number(t[1]) : null, title: name.trim() };
 }
 
+/** Nombre de la pestaña de una temporada. Si dos carpetas tienen el mismo número (una temporada en dos partes:
+ * "2. Temporada 2 - Parte 1" y "2. Temporada 2 - Parte 2"), se agrega la parte para distinguirlas. */
+function seasonTab(s, se) {
+  if (se.num == null) return se.name;
+  const twin = s.seasons.filter((x) => x.num === se.num).length > 1;
+  if (!twin) return `Temporada ${se.num}`;
+  const part = /\b(?:parte|part|cour)\s*(\d{1,2})\b/i.exec(se.name);
+  return part ? `Temporada ${se.num} · Parte ${part[1]}` : (se.title || `Temporada ${se.num}`);
+}
+
 function episodeLabel(ep) {
   const e = index.byId.get(ep.id);
   const s = e && state.library && state.library.series && state.library.series[e.si];
@@ -2323,7 +2333,7 @@ function renderSeries(arg) {
         <div class="ep-head">
           <h3 class="ep-heading">${flat ? 'Películas' : 'Episodios'}</h3>
           <button class="pick-toggle" data-act="pick-mode" id="pick-toggle" aria-pressed="false">${ICON.check}<span>Seleccionar</span></button>
-          ${!flat && s.seasons.length > 1 ? `<nav class="seasons" aria-label="Temporadas">${s.seasons.map((se, i) => `<button class="season ${i === ki ? 'is-on' : ''}" data-act="season" data-i="${i}" aria-pressed="${i === ki}">${esc(se.num != null ? `Temporada ${se.num}` : se.name)}</button>`).join('')}</nav>` : ''}
+          ${!flat && s.seasons.length > 1 ? `<nav class="seasons" aria-label="Temporadas">${s.seasons.map((se, i) => `<button class="season ${i === ki ? 'is-on' : ''}" data-act="season" data-i="${i}" aria-pressed="${i === ki}">${esc(seasonTab(s, se))}</button>`).join('')}</nav>` : ''}
         </div>
         ${season.title && season.title !== s.name ? `<p class="season-title">${esc(season.title)}</p>` : ''}
         <ol class="episodes is-grid" id="season-eps">${season.episodes.map((ep) => episodeRow(ep, { fresh: fresh.has(ep.id), next: next && ep.id === next.id })).join('')}</ol>
