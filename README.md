@@ -6,7 +6,7 @@ Reproductor web para ver las series y películas de anime guardadas en una cuent
 
 - **Perfiles** tipo Netflix, cada uno con su propio progreso, sincronizado entre dispositivos.
 - **Biblioteca** armada desde la carpeta `Anime` de MEGA: cada carpeta es una serie y sus subcarpetas son temporadas. Una carpeta `Peliculas` se muestra como un estante de pósters, y cada película (una subcarpeta o un archivo suelto) tiene su propia página con imagen y sinopsis; en el catálogo y la búsqueda salen sueltas.
-- **Sinopsis e imágenes** de AniList para cada serie y película, automáticas.
+- **Sinopsis e imágenes** de AniList para cada serie y película, automáticas. Las sinopsis se traducen al español en Chrome de computadora (en segundo plano, con el traductor de Chrome) y se guardan en `.kai-sinopsis.json` en tu MEGA, así los demás dispositivos (iPhone, Mac, Android) las ven ya traducidas. La primera vez hay que tocar "Traducir sinopsis al español" en Chrome para que descargue el traductor.
 - **Códec de cada video** en pequeño sobre su miniatura, con un puntito rojo si el dispositivo donde estás no lo puede reproducir (por ejemplo AV1 en un iPad M2).
 - **Inicio** con las 10 series agregadas más recientemente, una fila de **Películas**, lo marcado para **Más tarde** y búsqueda rápida (la lupa). El botón de inicio está en todas las páginas.
 - **Seguir en otro dispositivo:** si dejaste algo a medias en otro dispositivo, el inicio ofrece seguir en ese mismo segundo.

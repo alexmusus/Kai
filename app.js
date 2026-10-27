@@ -82,11 +82,14 @@ const ICON = {
 const DARK_TONES = { negro: { label: 'Negro', bg: '#0d0e12' }, gris: { label: 'Gris Culero', bg: '#4d4d4d' } };
 const TONES = { blanco: { label: 'Blanco', bg: '#eef0f4' }, gris: { label: 'Gris', bg: '#c6c8cb' }, celeste: { label: 'Celeste', bg: '#d9e5f0' }, arena: { label: 'Arena', bg: '#e6e0d5' } };
 const DEFAULTS = { root: 'Anime', autoplay: true, autoSkip: true, theme: 'auto' };
+const SYN_FILE = '.kai-sinopsis.json';                 // sinopsis traducidas al español (se comparten entre dispositivos)
 const SHARED_FILE = '.kai-compartido.json';            // perfiles, intros aprendidas e imágenes elegidas
 const profileFile = (id) => `.kai-progreso-${id}.json`;  // progreso de cada perfil
 const LEGACY_PROGRESS = ['.kai-progreso.json', '.yoru-progreso.json'];
 
 const state = {
+  syn: LS.get('syn', {}) || {}, // sinopsis en español por id de AniList: { es, u }
+  synDirty: false,
   storage: null,
   connecting: false,
   library: LS.get('library', null),
@@ -856,6 +859,7 @@ async function writeJson(folder, name, obj, replaced) {
     goneNodes.add(n.nodeId);
     await n.delete(true).catch(() => {});
   }
+  return fresh;
 }
 
 async function doSync() {
@@ -894,6 +898,8 @@ async function doSync() {
     if (!state.sharedLoaded) { state.sharedLoaded = true; LS.set('sharedLoaded', true); }
     state.sharedError = false;
     await backupProfiles();
+    // 1b) sinopsis traducidas (un fallo aquí no frena el progreso)
+    try { await syncSynopses(home); } catch (err) { console.warn('sinopsis', err); }
 
     // 2) progreso del perfil activo
     let changedHere = false;
@@ -1750,9 +1756,72 @@ async function ensureMeta() {
     metaRunning = false;
   }
   if (changed && ['home', 'serie', 'pelicula'].includes(route().view)) softRender();
+  setTimeout(translateMissing, 1500);
 }
 
-function synopsisOf(m) { return m ? (m.synopsisEs || m.synopsis || '') : ''; }
+function synopsisOf(m) { return m ? (m.synopsisEs || (m.id && state.syn[m.id] && state.syn[m.id].es) || m.synopsis || '') : ''; }
+const hasSpanish = (m) => !!(m && (m.synopsisEs || (m.id && state.syn[m.id])));
+
+/* ── sinopsis en español compartidas ──
+ * Solo Chrome de computadora trae traductor. Donde lo hay, Kai traduce en segundo plano, de una en una, las sinopsis
+ * que falten y las guarda en MEGA (.kai-sinopsis.json); los demás dispositivos las leen de ahí ya traducidas. */
+function saveSyn() { LS.set('syn', state.syn); }
+let synRunning = false;
+async function translateMissing() {
+  if (synRunning || !canTranslate()) return;
+  synRunning = true;
+  let added = 0;
+  try {
+    for (const m of Object.values(state.meta)) {
+      if (!m || m.none || !m.id) continue;
+      if (state.syn[m.id]) continue;
+      // lo que este navegador ya había traducido antes también se comparte
+      let es = m.synopsisEs || null;
+      if (!es && m.synopsis) {
+        if (document.hidden) break;
+        es = await translateToSpanish(m.synopsis);
+        if (!es) break; // el traductor no está listo (se activa la primera vez con el botón "Traducir")
+        await sleep(250);
+      }
+      if (!es) continue;
+      state.syn[m.id] = { es, u: Date.now() };
+      added++;
+      if (added % 10 === 0) { saveSyn(); state.synDirty = true; }
+    }
+  } finally {
+    synRunning = false;
+    if (added) { saveSyn(); state.synDirty = true; sync(); if (['home', 'serie', 'pelicula'].includes(route().view)) softRender(); }
+  }
+}
+/** Junta las traducciones de MEGA con las de aquí. Si el archivo no se puede leer, no se toca (nunca se pisa). */
+async function syncSynopses(home) {
+  const nodes = filesNamed(home, SYN_FILE);
+  const sig = nodes.map((n) => `${n.nodeId}:${n.size}:${n.timestamp || 0}`).join('|');
+  let remote = {};
+  const known = LS.get('synSig', '');
+  if (sig && sig !== known) {
+    for (const n of nodes) { const d = await readJson(n); if (d && d.items) remote = mergeSyn(remote, d.items); }
+    const before = Object.keys(state.syn).length;
+    state.syn = mergeSyn(state.syn, remote);
+    saveSyn();
+    LS.set('synSig', sig);
+    if (Object.keys(state.syn).length !== before && ['home', 'serie', 'pelicula'].includes(route().view)) softRender();
+  } else if (sig) {
+    remote = null; // sin cambios en MEGA desde la última vez
+  }
+  const needWrite = Object.keys(state.syn).length && (state.synDirty || nodes.length > 1 || (!nodes.length) || (remote && Object.keys(state.syn).some((k) => !remote[k] || state.syn[k].u > remote[k].u)));
+  if (needWrite) {
+    const fresh = await writeJson(home, SYN_FILE, { v: 1, app: 'kai', items: state.syn }, nodes);
+    state.synDirty = false;
+    // la firma del archivo recién subido: así este dispositivo no lo vuelve a descargar
+    if (fresh && fresh.nodeId) LS.set('synSig', `${fresh.nodeId}:${fresh.size}:${fresh.timestamp || 0}`); else LS.del('synSig');
+  }
+}
+function mergeSyn(a, b) {
+  const out = { ...a };
+  for (const [k, v] of Object.entries(b || {})) if (v && v.es && (!out[k] || (v.u || 0) > (out[k].u || 0))) out[k] = v;
+  return out;
+}
 
 /* ── colecciones: una carpeta "Películas" no es una serie ──
  * Cada película (subcarpeta, o archivo si están sueltos) se busca por separado en AniList,
@@ -2353,7 +2422,7 @@ function renderSeries(arg) {
           </div>
         </div>
         ${syn ? `<p class="tv-synopsis is-long" id="synopsis">${esc(syn)}</p>` : ''}
-        ${m && !m.synopsisEs && m.synopsis && canTranslate() ? '<button class="link-btn" data-act="translate">Traducir sinopsis al español</button>' : ''}
+        ${m && !hasSpanish(m) && m.synopsis && canTranslate() ? '<button class="link-btn" data-act="translate">Traducir sinopsis al español</button>' : ''}
         <div class="tv-actions">
           ${next ? `<a class="tv-btn is-primary" href="#/play/${encodeURIComponent(next.id)}">${ICON.play}<span>${esc(plan.label)}</span></a>` : '<span class="tv-done">Serie terminada</span>'}
           ${upcoming.length ? `<button class="tv-btn" data-act="series-dl" data-si="${si}">${ICON.down}<span>Descargar ${upcoming.length === 1 ? 'el siguiente' : `los ${upcoming.length} siguientes`}</span></button>` : ''}
@@ -2478,7 +2547,7 @@ function renderMovie(arg) {
           </div>
         </div>
         ${syn ? `<p class="tv-synopsis is-long" id="synopsis">${esc(syn)}</p>` : ''}
-        ${m && !m.synopsisEs && m.synopsis && canTranslate() ? `<button class="link-btn" data-act="translate" data-key="${esc(it.key)}">Traducir sinopsis al español</button>` : ''}
+        ${m && !hasSpanish(m) && m.synopsis && canTranslate() ? `<button class="link-btn" data-act="translate" data-key="${esc(it.key)}">Traducir sinopsis al español</button>` : ''}
         <div class="tv-actions">
           <a class="tv-btn is-primary" href="#/play/${encodeURIComponent(plan.ep.id)}">${ICON.play}<span>${esc(plan.label)}</span></a>
           ${busy ? `<span class="tv-btn is-quiet">${ICON.queued}<span>Descargando…</span></span>`
@@ -4105,7 +4174,12 @@ document.addEventListener('click', async (e) => {
     if (!m) return;
     el.textContent = 'Traduciendo…';
     const es = await translateToSpanish(m.synopsis, true);
-    if (es) { m.synopsisEs = es; saveMeta(); softRender(); } else el.textContent = 'Este navegador no puede traducir ahora.';
+    if (es) {
+      m.synopsisEs = es; saveMeta();
+      if (m.id) { state.syn[m.id] = { es, u: Date.now() }; saveSyn(); state.synDirty = true; sync(); }
+      softRender();
+      translateMissing(); // ya con el traductor listo, sigue con las demás
+    } else el.textContent = 'Este navegador no puede traducir ahora.';
   }
   else if (act === 'dock') { if (dock.classList.contains('is-open')) closeDock(); else openDock(); }
   else if (act === 'profiles-retry') {
