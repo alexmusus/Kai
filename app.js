@@ -3257,8 +3257,31 @@ const isFullscreen = () => !!(document.fullscreenElement || document.webkitFulls
 /* iPhone no deja poner en pantalla completa un elemento de la página, solo el reproductor
  * nativo de iOS, que tapa los controles y gestos de Kai. Ahí se usa una pantalla completa
  * propia: el reproductor ocupa toda la pantalla (sin barras si Kai está en la pantalla de inicio). */
+/* Mientras el video está en pantalla completa, la página de atrás (lista de capítulos, etc.) se oculta:
+ * así, al girar la pantalla, el navegador no la vuelve a acomodar entera (en teléfonos de gama media eso daba un tirón).
+ * Al salir vuelve tal cual, en el mismo lugar del desplazamiento. */
+let fsScroll = null;
+function hideBehindFullscreen(on) {
+  const hidden = document.querySelectorAll('.fs-behind');
+  if (!on) {
+    if (!hidden.length) return;
+    hidden.forEach((el) => el.classList.remove('fs-behind'));
+    if (fsScroll != null) { const y = fsScroll; requestAnimationFrame(() => window.scrollTo(0, y)); }
+    fsScroll = null;
+    return;
+  }
+  if (hidden.length) return;
+  fsScroll = window.scrollY;
+  for (let el = stage; el && el.parentElement && el !== document.body; el = el.parentElement) {
+    for (const sib of el.parentElement.children) {
+      if (sib !== el && !/^(SCRIPT|STYLE|LINK)$/.test(sib.tagName) && !sib.matches('#toast, #sheet')) sib.classList.add('fs-behind');
+    }
+  }
+}
+
 function setKaiFullscreen(on) {
   stage.classList.toggle('kai-fs', on);
+  hideBehindFullscreen(on);
   // en el teléfono (sin girar la pantalla) el video horizontal se muestra girado; ver styles.css
   const wide = !video.videoWidth || video.videoWidth >= video.videoHeight;
   stage.classList.toggle('kai-rot', on && wide && matchMedia('(pointer: coarse)').matches);
@@ -3939,6 +3962,7 @@ document.addEventListener('pointerdown', (e) => {
 });
 ['fullscreenchange', 'webkitfullscreenchange'].forEach((ev) => document.addEventListener(ev, () => {
   document.documentElement.classList.toggle('kai-fs-on', isFullscreen());
+  hideBehindFullscreen(isFullscreen());
   paintThemeColor();
   paintControls();
   wake();

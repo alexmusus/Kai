@@ -470,6 +470,7 @@ html.kai-fs-on, html.kai-fs-on body, html:has(.stage:fullscreen), html:has(.stag
 .stage:fullscreen::backdrop { background: #000; }
 html.kai-fs-on .stage-slot { z-index: 1000; }
 html.kai-fs-on .dock { display: none; }
+.fs-behind { display: none !important; }
 .stage.kai-fs .st-bar, .stage.kai-fs:not(:fullscreen) .st-bar {
   left: max(12px, env(safe-area-inset-left)); right: max(12px, env(safe-area-inset-right));
   bottom: calc(10px + env(safe-area-inset-bottom, 0px));
