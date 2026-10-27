@@ -178,7 +178,7 @@ const DFIELDS = `id isAdult
   title { romaji english userPreferred }
   description(asHtml: false)
   coverImage { extraLarge large color }
-  genres averageScore popularity seasonYear format episodes status
+  genres averageScore popularity seasonYear format episodes duration status
   nextAiringEpisode { episode airingAt }`;
 
 /** Lo que muestra Kai de un anime en Descubrir. */
@@ -219,5 +219,8 @@ export async function recommendationsFor(ids, pause = () => new Promise((r) => s
 /** Lo que está saliendo ahora y tiene buena puntuación (y suficiente gente que lo sigue, para que la nota sea confiable). */
 export async function airingTop() {
   const data = await gql(`query { Page(perPage: 36) { media(type: ANIME, status: RELEASING, isAdult: false, sort: SCORE_DESC, averageScore_greater: 74, popularity_greater: 6000, format_in: [TV, TV_SHORT, ONA]) { ${DFIELDS} } } }`, {});
-  return (data && data.Page && data.Page.media) || [];
+  // fuera los cortos de un par de minutos por capítulo (como Chiikawa): animeav1 casi nunca los tiene.
+  // Si AniList no sabe la duración, la serie se queda.
+  return ((data && data.Page && data.Page.media) || []).filter((m) => !(m.duration && m.duration < SHORT_MIN));
 }
+const SHORT_MIN = 8; // minutos por capítulo

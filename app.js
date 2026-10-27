@@ -2998,6 +2998,9 @@ function openSheet(ep) {
  * Con AniList: recomendaciones de las series que tienes en MEGA (las que ya viste pesan más) y lo que está
  * saliendo ahora con buena nota. Lo que ya tienes sale a color y lleva a su página; lo que no, en blanco y negro. */
 const ANIMEAV1_SEARCH = (t) => 'https://animeav1.com/catalogo?search=' + encodeURIComponent(t);
+// sube cuando cambia qué se muestra en Descubrir, para no enseñar una lista guardada con lo de antes
+const DISCOVER_V = 2;
+const discoverFresh = (d) => !!(d && d.v === DISCOVER_V && d.items && d.items.length);
 const DISCOVER = {
   porque: { title: 'Porque viste…', ttl: 24 * 3600000 },
   emision: { title: 'En emisión', ttl: 6 * 3600000 },
@@ -3017,7 +3020,7 @@ let discoverJob = null;
 async function loadDiscover(kind, force = false) {
   const all = LS.get('discover', {}) || {};
   const cur = all[kind];
-  if (!force && cur && Date.now() - cur.at < DISCOVER[kind].ttl && cur.items && cur.items.length) return cur;
+  if (!force && discoverFresh(cur) && Date.now() - cur.at < DISCOVER[kind].ttl) return cur;
   if (discoverJob) return discoverJob;
   discoverJob = (async () => {
     let items = [];
@@ -3050,12 +3053,12 @@ async function loadDiscover(kind, force = false) {
         ...toDiscover(r.m), because: r.from.sort((a, b) => b.pts - a.pts).slice(0, 2).map((x) => x.name),
       }));
     }
-    const fresh = { at: Date.now(), items };
+    const out = { v: DISCOVER_V, at: Date.now(), items };
     const store = LS.get('discover', {}) || {};
-    store[kind] = fresh;
+    store[kind] = out;
     LS.set('discover', store);
     setTimeout(translateMissing, 1000);
-    return fresh;
+    return out;
   })().finally(() => { discoverJob = null; });
   return discoverJob;
 }
@@ -3097,10 +3100,10 @@ async function renderDiscover(kind) {
     box.innerHTML = `<ul class="shelf" role="list">${d.items.map((x) => discoverPosterHTML(x, owned, kind)).join('')}</ul>`;
   };
   const cached = (LS.get('discover', {}) || {})[kind];
-  if (cached && cached.items && cached.items.length) paint(cached);
+  if (discoverFresh(cached)) paint(cached);
   try { paint(await loadDiscover(kind)); } catch (err) {
     const box = $('#disc-list');
-    if (box && !(cached && cached.items && cached.items.length)) box.innerHTML = `<p class="dim">No se pudo consultar AniList (${esc(err.message || 'sin conexión')}). Intenta en un momento.</p>`;
+    if (box && !discoverFresh(cached)) box.innerHTML = `<p class="dim">No se pudo consultar AniList (${esc(err.message || 'sin conexión')}). Intenta en un momento.</p>`;
   }
 }
 function openDiscoverSheet(id) {
