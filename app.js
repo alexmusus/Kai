@@ -78,6 +78,8 @@ const ICON = {
 
 /* ───────────────────────── estado ───────────────────────── */
 
+/** Tonos del modo claro (el color de fondo sirve para la barra del sistema). */
+const TONES = { blanco: { label: 'Blanco', bg: '#eef0f4' }, gris: { label: 'Gris', bg: '#c6c8cb' }, celeste: { label: 'Celeste', bg: '#d9e5f0' }, arena: { label: 'Arena', bg: '#e6e0d5' } };
 const DEFAULTS = { root: 'Anime', autoplay: true, autoSkip: true, theme: 'auto' };
 const SHARED_FILE = '.kai-compartido.json';            // perfiles, intros aprendidas e imágenes elegidas
 const profileFile = (id) => `.kai-progreso-${id}.json`;  // progreso de cada perfil
@@ -2720,6 +2722,9 @@ function renderSettings() {
     <section class="settings-group">
       <p class="settings-label">Apariencia</p>
       <div class="segmented" role="group" aria-label="Tema">${[['auto', 'Automático'], ['light', 'Claro'], ['dark', 'Oscuro']].map(([v, l]) => `<button class="seg ${s.theme === v ? 'is-on' : ''}" data-act="set-theme" data-v="${v}" aria-pressed="${s.theme === v}">${l}</button>`).join('')}</div>
+      <p class="settings-label">Tono del modo claro</p>
+      <div class="segmented" role="group" aria-label="Tono del modo claro">${Object.entries(TONES).map(([v, o]) => `<button class="seg ${(s.tone || 'blanco') === v ? 'is-on' : ''}" data-act="set-tone" data-v="${v}" aria-pressed="${(s.tone || 'blanco') === v}">${o.label}</button>`).join('')}</div>
+      <p class="dim settings-hint">Se usa cuando el tema está en Claro, y en Automático durante el día.</p>
     </section>
     <section class="settings-group">
       <p class="settings-label">Carpeta de series</p>
@@ -3519,11 +3524,14 @@ function resolvedTheme() {
 function paintThemeColor() {
   const meta = document.querySelector('meta[name="theme-color"]');
   if (!meta) return;
-  meta.content = isFullscreen() ? '#000000' : resolvedTheme() === 'dark' ? '#0d0e12' : '#eef0f4';
+  meta.content = isFullscreen() ? '#000000' : resolvedTheme() === 'dark' ? '#0d0e12' : (TONES[state.settings.tone] || TONES.blanco).bg;
 }
 function applyTheme() {
   const t = resolvedTheme();
   document.documentElement.dataset.theme = t;
+  const tone = state.settings.tone;
+  if (t === 'light' && tone && tone !== 'blanco' && TONES[tone]) document.documentElement.dataset.tone = tone;
+  else delete document.documentElement.dataset.tone;
   paintThemeColor();
   if (dock.classList.contains('is-open')) fillDock();
   document.querySelectorAll('[data-act="theme"]:not(.dock-chip)').forEach((b) => {
@@ -4076,6 +4084,7 @@ document.addEventListener('click', async (e) => {
   }
   else if (act === 'theme') { state.settings.theme = resolvedTheme() === 'dark' ? 'light' : 'dark'; saveSettings(); applyTheme(); }
   else if (act === 'set-theme') { state.settings.theme = el.dataset.v; saveSettings(); applyTheme(); renderSettings(); }
+  else if (act === 'set-tone') { state.settings.tone = el.dataset.v; saveSettings(); applyTheme(); renderSettings(); }
   else if (act === 'lights') setLights(false);
 
   else if (act === 'back') goBack(playing ? playing.ctx.back : '#/');

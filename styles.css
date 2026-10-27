@@ -61,6 +61,26 @@
   --thumb-bg: #dfe2e9;
 }
 
+/* Tonos del modo claro: menos brillo que el blanco, para que no canse la vista. Se eligen en Ajustes. */
+[data-theme='light'][data-tone='gris'] {
+  --bg: #c6c8cb; --text: #0f1012; --dim: #3f4247; --faint: #6c7076; --line: rgba(0, 0, 0, 0.12);
+  --glass: rgba(222, 223, 225, 0.55); --glass-strong: rgba(214, 215, 218, 0.78); --glass-solid: rgba(210, 212, 215, 0.96);
+  --glass-edge: rgba(255, 255, 255, 0.42); --glass-hi: rgba(255, 255, 255, 0.5); --shadow: rgba(0, 0, 0, 0.2);
+  --accent: #2459c2; --blob-1: rgba(120, 124, 132, 0.3); --blob-2: rgba(140, 146, 146, 0.24); --blob-3: rgba(132, 128, 140, 0.24); --thumb-bg: #b6b9bd;
+}
+[data-theme='light'][data-tone='celeste'] {
+  --bg: #d9e5f0; --text: #14202c; --dim: #4f6072; --faint: #7f90a2; --line: rgba(16, 32, 52, 0.09);
+  --glass: rgba(236, 244, 251, 0.5); --glass-strong: rgba(229, 239, 248, 0.72); --glass-solid: rgba(226, 236, 245, 0.95);
+  --glass-edge: rgba(255, 255, 255, 0.55); --glass-hi: rgba(255, 255, 255, 0.65); --shadow: rgba(20, 40, 70, 0.14);
+  --accent: #2a63c9; --blob-1: rgba(120, 160, 220, 0.4); --blob-2: rgba(120, 200, 210, 0.32); --blob-3: rgba(160, 170, 230, 0.3); --thumb-bg: #c8d7e5;
+}
+[data-theme='light'][data-tone='arena'] {
+  --bg: #e6e0d5; --text: #231f18; --dim: #675f51; --faint: #958c7c; --line: rgba(40, 30, 15, 0.09);
+  --glass: rgba(246, 242, 234, 0.5); --glass-strong: rgba(240, 235, 226, 0.74); --glass-solid: rgba(236, 231, 221, 0.95);
+  --glass-edge: rgba(255, 252, 245, 0.55); --glass-hi: rgba(255, 252, 245, 0.65); --shadow: rgba(50, 36, 15, 0.14);
+  --accent: #b5652a; --blob-1: rgba(215, 175, 130, 0.38); --blob-2: rgba(190, 200, 160, 0.3); --blob-3: rgba(220, 170, 160, 0.28); --thumb-bg: #d9d1c2;
+}
+
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; background: var(--bg); transition: background-color 0.3s; }
 body {
