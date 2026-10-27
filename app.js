@@ -1489,9 +1489,21 @@ function paintDrawerCount() {
   const el = $('#dock-count');
   if (el) el.textContent = state.saved.size || '';
 }
+// Con el menú abierto, tocar fuera solo lo cierra: ese toque no abre un capítulo, ni reproduce, ni sigue un enlace.
+let dockSwallow = 0; // hasta cuándo se ignora el clic de ese toque
 document.addEventListener('pointerdown', (e) => {
-  if (!dock.contains(e.target)) closeDock();
-});
+  if (!dock.classList.contains('is-open')) { dockSwallow = 0; return; } // un toque nuevo con el menú cerrado nunca se ignora
+  if (dock.contains(e.target)) return;
+  closeDock();
+  e.stopPropagation(); // que no llegue a los gestos del reproductor
+  dockSwallow = Date.now() + 800;
+}, true);
+document.addEventListener('click', (e) => {
+  if (Date.now() > dockSwallow || dock.contains(e.target)) return;
+  dockSwallow = 0;
+  e.preventDefault();
+  e.stopPropagation();
+}, true);
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && dock.classList.contains('is-open')) { closeDock(); dock.querySelector('.dock-btn').focus(); }
 });
