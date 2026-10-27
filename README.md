@@ -11,7 +11,7 @@ Reproductor web para ver las series y películas de anime guardadas en una cuent
 - **Inicio** con las 10 series agregadas más recientemente, una fila de **Películas**, lo marcado para **Más tarde** y búsqueda rápida (la lupa). El botón de inicio está en todas las páginas.
 - **Seguir en otro dispositivo:** si dejaste algo a medias en otro dispositivo, el inicio ofrece seguir en ese mismo segundo.
 - **Catálogo** con buscador y filtros por género, año y tipo. El año, el tipo y los géneros de cada ficha son botones que llevan al catálogo filtrado.
-- **Reproductor propio:** marcas de capítulos, ±10 s, velocidad, subtítulos, ventana flotante, pantalla completa, salta la intro sola y pasa al siguiente capítulo.
+- **Reproductor propio:** marcas de capítulos, ±10 s, velocidad, ventana flotante, pantalla completa, salta la intro sola y pasa al siguiente capítulo.
 - **Gestos en el teléfono:** doble toque a los lados para ±10 s, mantener presionado para 2×, deslizar arriba para pantalla completa y abajo para salir de ella o pasar al mini reproductor. En iPhone el video se gira solo, aunque tengas el bloqueo de rotación.
 - **Mini reproductor:** el video sigue sonando mientras navegas por Kai.
 - **Rápido:** lo ya visto queda en memoria (retroceder no gasta cuota de MEGA) y prepara el inicio del siguiente capítulo.

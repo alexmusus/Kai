@@ -1,5 +1,5 @@
 import { Storage } from './vendor/mega.js';
-import { isSubtitleName, parseSubtitleFile, mp4Info, mp4Chapters, mp4Formats, mp4QuickFormats, loadTrackCues, langName } from './subs.js';
+import { isSubtitleName, mp4Info, mp4Chapters, mp4Formats, mp4QuickFormats } from './subs.js';
 import { searchAnime, animeById, toMeta, findForSeries, findMovie, translateToSpanish, canTranslate } from './meta.js';
 
 const C = window.MegaCore;
@@ -78,7 +78,7 @@ const ICON = {
 
 /* ───────────────────────── estado ───────────────────────── */
 
-const DEFAULTS = { root: 'Anime', autoplay: true, subs: 'on', subLabel: '', subSize: 'm', autoSkip: true, theme: 'auto' };
+const DEFAULTS = { root: 'Anime', autoplay: true, autoSkip: true, theme: 'auto' };
 const SHARED_FILE = '.kai-compartido.json';            // perfiles, intros aprendidas e imágenes elegidas
 const profileFile = (id) => `.kai-progreso-${id}.json`;  // progreso de cada perfil
 const LEGACY_PROGRESS = ['.kai-progreso.json', '.yoru-progreso.json'];
@@ -1047,16 +1047,11 @@ async function runDownload(ep, title) {
     await Promise.all(Array.from({ length: PARALLEL }, worker));
     if (task.ctrl.signal.aborted) return;
 
-    // subtítulos en archivo aparte: se guardan con el capítulo
-    meta.subs = [];
-    for (const s of ep.subs || []) {
-      try { meta.subs.push({ name: s.name, text: await readNodeText(s) }); } catch { /* sin subtítulo */ }
-    }
     meta.done = true;
     await idb.put('dl', meta);
     state.saved.add(ep.id);
     state.dlMeta.set(ep.id, meta);
-    cacheEmbeddedSubs(ep).catch(() => {});
+    cacheChapters(ep).catch(() => {});
     let where = '';
     if (await getDir()) {
       try {
@@ -2723,7 +2718,6 @@ function renderSettings() {
     </section>
     <form id="settings" class="form settings-group">
       <label class="switch"><input type="checkbox" name="autoplay" ${s.autoplay ? 'checked' : ''}><span>Reproducir el siguiente capítulo solo</span></label>
-      <label class="switch"><input type="checkbox" name="subs" ${s.subs !== 'off' ? 'checked' : ''}><span>Mostrar subtítulos cuando el capítulo los traiga</span></label>
       <label class="switch"><input type="checkbox" name="autoSkip" ${s.autoSkip ? 'checked' : ''}><span>Saltar intros solo cuando Kai sepa dónde están</span></label>
       <label class="switch"><input type="checkbox" name="cat" ${s.cat !== false ? 'checked' : ''}><span>Kai, el gatito, en el inicio</span></label>
       <label class="switch"><input type="checkbox" name="prefetchNext" ${s.prefetchNext !== false ? 'checked' : ''}><span>Preparar el siguiente capítulo para que empiece sin espera (usa unos 3 MB de MEGA)</span></label>
@@ -2756,7 +2750,6 @@ function renderSettings() {
   $('#settings').addEventListener('change', (e) => {
     const f = e.currentTarget;
     s.autoplay = f.autoplay.checked;
-    s.subs = f.subs.checked ? 'on' : 'off';
     s.autoSkip = f.autoSkip.checked;
     s.prefetchNext = f.prefetchNext.checked;
     s.cat = f.cat.checked;
@@ -2835,7 +2828,7 @@ function openSheet(ep) {
   sheet.innerHTML = `<div class="sheet-back" data-act="close"></div>
     <div class="sheet-panel" role="dialog" aria-modal="true" aria-label="${esc(episodeLabel(ep))}">
       <p class="sheet-title">${esc(episodeLabel(ep))}</p>
-      <p class="sheet-sub">${esc(ep.name)}, ${fmtSize(ep.size)}${ep.subs && ep.subs.length ? ', con subtítulos aparte' : ''}</p>
+      <p class="sheet-sub">${esc(ep.name)}, ${fmtSize(ep.size)}</p>
       <button class="sheet-btn" data-act="toggle-seen">${p && p.w ? 'Marcar como no visto' : 'Marcar como visto'}</button>
       ${p && p.t > 5 && !p.w ? '<button class="sheet-btn" data-act="restart">Ver desde el principio</button>' : ''}
       ${saved || busy ? `<button class="sheet-btn" data-act="unsave">${busy ? 'Cancelar descarga' : 'Quitar del dispositivo'}</button>` : '<button class="sheet-btn" data-act="save">Descargar para ver sin conexión</button>'}
@@ -2957,7 +2950,7 @@ function parkStage() {
 /* ───────────────────────── motor del reproductor ───────────────────────── */
 
 const ui = {
-  big: $('#st-big'), play: $('#st-play'), chapter: $('#st-chapter'), lights: $('#st-lights'), seek: $('#st-seek'), time: $('#st-time'), cc: $('#st-cc'),
+  big: $('#st-big'), play: $('#st-play'), chapter: $('#st-chapter'), lights: $('#st-lights'), seek: $('#st-seek'), time: $('#st-time'),
   speed: $('#st-speed'), pip: $('#st-pip'), fs: $('#st-fs'), mute: $('#st-mute'), next: $('#st-next'),
   skip: $('#st-skip'), menu: $('#st-menu'), flash: $('#st-flash'), nextCard: $('#p-next'), msg: $('#p-msg'), tap: $('#st-tap'),
 };
@@ -2975,7 +2968,7 @@ async function startPlayback(ctx) {
   ui.msg.hidden = true;
   ui.nextCard.hidden = true;
   closeMenu();
-  resetSubs();
+  resetChapters();
   $('#st-marks').innerHTML = '';
   stage.classList.add('is-loading');
   stage.classList.remove('is-ended');
@@ -3020,7 +3013,7 @@ async function startPlayback(ctx) {
   }, { once: true });
   setMediaSession(ep, ctx);
   video.play().catch(() => { stage.classList.remove('is-loading'); paintControls(); });
-  initSubtitles(ep, token);
+  initChapters(ep, token);
 }
 
 async function streamUrl(ep) {
@@ -3130,7 +3123,7 @@ function stopPlayback() {
     finishCurrent();
     playing = null;
   }
-  resetSubs();
+  resetChapters();
   closeMenu();
   if (isFullscreen()) exitFullscreen();
   if (video.getAttribute('src')) { video.removeAttribute('src'); video.load(); }
@@ -3289,7 +3282,7 @@ async function togglePip() {
   } catch { toast('Este navegador no permite ventana flotante aquí.'); }
 }
 
-/* ── menú del reproductor: subtítulos y velocidad ── */
+/* ── menú del reproductor: velocidad ── */
 
 function openMenu(kind) {
   if (!ui.menu.hidden && ui.menu.dataset.kind === kind) { closeMenu(); return; }
@@ -3305,187 +3298,55 @@ function paintMenu() {
   const kind = ui.menu.dataset.kind;
   if (kind === 'speed') {
     ui.menu.innerHTML = `<p class="menu-title">Velocidad</p>${[0.75, 1, 1.25, 1.5, 2].map((v) => `<button class="menu-item ${v === speed ? 'is-on' : ''}" data-act="m-speed" data-v="${v}">${v === 1 ? 'Normal' : v + '×'}</button>`).join('')}`;
-    return;
   }
-  const cur = subs.current;
-  ui.menu.innerHTML = `<p class="menu-title">Subtítulos</p>
-    <button class="menu-item ${!cur ? 'is-on' : ''}" data-act="m-sub" data-id="off">Desactivados</button>
-    ${subs.tracks.map((t) => `<button class="menu-item ${cur === t ? 'is-on' : ''}" data-act="m-sub" data-id="${t.id}">${esc(t.label)}${t.note ? `<span class="menu-note">${esc(t.note)}</span>` : ''}</button>`).join('')}
-    ${subs.status ? `<p class="menu-status">${esc(subs.status)}</p>` : ''}
-    <label class="menu-item menu-file">Cargar archivo del dispositivo<input type="file" accept=".srt,.vtt,.ass,.ssa" data-act="m-file" hidden></label>
-    <p class="menu-title">Tamaño</p>
-    <div class="menu-sizes">${[['s', 'Pequeño'], ['m', 'Normal'], ['l', 'Grande']].map(([v, l]) => `<button class="menu-chip ${state.settings.subSize === v ? 'is-on' : ''}" data-act="m-size" data-v="${v}">${l}</button>`).join('')}</div>`;
 }
 
-/* ── subtítulos ── */
-
-const subs = { tracks: [], current: null, status: '', ctrl: null, pool: new Map(), mine: new Set() };
-let subSeq = 0;
-
-function pooledTrack(label, lang) {
-  let t = subs.pool.get(label);
-  if (!t) {
-    t = video.addTextTrack('subtitles', label, lang || '');
-    subs.pool.set(label, t);
-    subs.mine.add(t);
-  }
-  t.mode = 'hidden';
-  while (t.cues && t.cues.length) t.removeCue(t.cues[0]);
-  return t;
+/* ── capítulos del MP4 ("Intro", "Parte A"…) ──
+ * Los videos traen los subtítulos dentro de la imagen, así que Kai ya no busca pistas ni archivos de subtítulos:
+ * solo lee los capítulos, y desde MEGA lo hace cuando el video ya empezó, para no quitarle velocidad al arranque. */
+let chapCtrl = null;
+function resetChapters() {
+  if (chapCtrl) chapCtrl.abort();
+  chapCtrl = null;
 }
 
-function resetSubs() {
-  if (subs.ctrl) subs.ctrl.abort();
-  subs.ctrl = null;
-  subs.tracks = [];
-  subs.current = null;
-  subs.status = '';
-  for (const t of video.textTracks) t.mode = 'disabled';
-  paintCC();
-}
-
-function addSubTrack(label, lang, cues, note = '') {
-  let finalLabel = label;
-  for (let n = 2; subs.tracks.some((t) => t.label === finalLabel); n++) finalLabel = `${label} ${n}`;
-  const track = pooledTrack(finalLabel, lang);
-  const entry = { id: 's' + (++subSeq), label: finalLabel, lang, track, note, cues: [] };
-  for (const c of cues || []) addCue(entry, c[0], c[1], c[2]);
-  subs.tracks.push(entry);
-  autoSelectSub();
-  paintCC();
-  return entry;
-}
-
-function addCue(entry, start, end, text) {
-  entry.cues.push([start, end, text]);
-  try { entry.track.addCue(new VTTCue(start, end, text)); } catch { /* cue inválido */ }
-}
-
-function selectSub(entry, remember = true) {
-  subs.current = entry || null;
-  for (const t of video.textTracks) t.mode = entry && t === entry.track ? 'showing' : 'disabled';
-  if (remember) {
-    state.settings.subs = entry ? 'on' : 'off';
-    if (entry) state.settings.subLabel = entry.label;
-    saveSettings();
-  }
-  paintCC();
-}
-
-function autoSelectSub() {
-  if (subs.current || state.settings.subs === 'off' || !subs.tracks.length) return;
-  const pref = subs.tracks.find((t) => t.label === state.settings.subLabel)
-    || subs.tracks.find((t) => /^(spa|es)/i.test(t.lang || '') || /español/i.test(t.label))
-    || subs.tracks[0];
-  selectSub(pref, false);
-}
-
-function paintCC() {
-  ui.cc.classList.toggle('is-on', !!subs.current);
-  ui.cc.classList.toggle('has-subs', subs.tracks.length > 0);
-  ui.cc.setAttribute('aria-label', subs.current ? `Subtítulos: ${subs.current.label}` : 'Subtítulos');
-  video.className = 'cue-' + (state.settings.subSize || 'm');
-  if (!ui.menu.hidden && ui.menu.dataset.kind === 'subs') paintMenu();
-}
-
-const whenMetadata = () => new Promise((res) => {
-  if (video.readyState >= 1) res();
-  else video.addEventListener('loadedmetadata', res, { once: true });
+/** Espera a que el video esté sonando (o a que pase `ms`, por si no arranca solo). */
+const whenPlaying = (ms) => new Promise((res) => {
+  if (!video.paused && video.readyState >= 3) { res(); return; }
+  let timer = 0;
+  const done = () => { clearTimeout(timer); video.removeEventListener('playing', done); res(); };
+  timer = setTimeout(done, ms);
+  video.addEventListener('playing', done);
 });
 
-function nativeTextTracks() {
-  return [...video.textTracks].filter((t) => !subs.mine.has(t) && (t.kind === 'subtitles' || t.kind === 'captions'));
-}
-
-/** Busca subtítulos: caché, archivos junto al video, pistas que el navegador ya entiende o pistas dentro del MP4. */
-async function initSubtitles(ep, token) {
+async function initChapters(ep, token) {
   // mientras no se sepa si el video trae capítulos, Kai no adivina dónde está la intro (ni salta sola con lo aprendido)
   token.chaptersDone = false;
-  const giveUp = setTimeout(() => { token.chaptersDone = true; }, 10000);
-  try { await loadSubtitles(ep, token); } finally { clearTimeout(giveUp); token.chaptersDone = true; }
+  const giveUp = setTimeout(() => { token.chaptersDone = true; }, 12000);
+  try { await loadChapters(ep, token); } catch (err) { if (playing === token) console.warn('capítulos', err); } finally { clearTimeout(giveUp); token.chaptersDone = true; }
 }
-async function loadSubtitles(ep, token) {
+async function loadChapters(ep, token) {
   const ctrl = new AbortController();
-  subs.ctrl = ctrl;
+  chapCtrl = ctrl;
   const alive = () => playing === token && !ctrl.signal.aborted;
-
   const cached = await idb.get('subcache', ep.id).catch(() => null);
   if (!alive()) return;
-  if (cached && cached.v === 3) {
-    for (const t of cached.tracks || []) addSubTrack(t.label, t.lang, t.cues, t.note);
-    setChapters(token, cached.chapters || []);
-    if (!subs.tracks.length) { subs.status = 'Este capítulo no trae subtítulos.'; paintCC(); }
-    return;
-  }
-
-  const found = [];
-  // 1) archivos .srt/.vtt/.ass junto al video
-  const meta = state.dlMeta.get(ep.id);
-  const files = meta && meta.subs && meta.subs.length ? meta.subs.map((s) => ({ name: s.name, text: s.text })) : (ep.subs || []);
-  for (const f of files) {
-    try {
-      const text = f.text ?? (navigator.onLine ? await readNodeText(f) : null);
-      if (!alive()) return;
-      if (!text) continue;
-      const cues = parseSubtitleFile(f.name, text);
-      if (!cues.length) continue;
-      const ext = f.name.split('.').pop().toUpperCase();
-      const lang = /\.(spa|es|esp)\.\w+$/i.test(f.name) ? 'spa' : /\.(eng|en)\.\w+$/i.test(f.name) ? 'eng' : '';
-      const entry = addSubTrack(langName(lang) || 'Subtítulos', lang, cues, `Archivo ${ext}`);
-      found.push(entry);
-    } catch { /* se ignora ese archivo */ }
-  }
-
-  // 2) pistas que el navegador ya lee del video (Safari)
-  await whenMetadata();
+  if (cached && cached.v === 3) { setChapters(token, cached.chapters || []); return; }
+  if (!/mp4|quicktime/.test(ep.mime)) return;
+  // desde MEGA, primero que arranque el video; si está descargado, se lee al instante
+  if (!(token.source && token.source.blob)) await whenPlaying(4000);
   if (!alive()) return;
-  const natives = nativeTextTracks();
-  for (const t of natives) {
-    subs.tracks.push({ id: 's' + (++subSeq), label: t.label || langName(t.language) || 'Subtítulos', lang: t.language, track: t, note: 'Incrustados', cues: null });
-  }
-  if (natives.length) { autoSelectSub(); paintCC(); }
-
-  // 3) dentro del MP4: capítulos ("Intro", "Parte A"…) y pistas de subtítulos, leídos por partes
-  if (!/mp4|quicktime/.test(ep.mime)) { saveSubCache(ep, found, []); return; }
-  if (!natives.length) { subs.status = 'Buscando subtítulos dentro del video…'; paintCC(); }
-  try {
-    const read = await rangeReader(ep, token, ctrl.signal);
-    const info = await mp4Info(read, ep.size);
-    if (!alive()) return;
-    const chapters = await mp4Chapters(info, read, video.duration);
-    if (!alive()) return;
-    setChapters(token, chapters);
-    const tracks = natives.length ? [] : info.tracks;
-    if (!tracks.length) {
-      subs.status = found.length || natives.length ? '' : 'Este capítulo no trae subtítulos.';
-      paintCC();
-      saveSubCache(ep, found, chapters);
-      return;
-    }
-    subs.status = 'Cargando subtítulos…';
-    paintCC();
-    const entries = tracks.map((t) => addSubTrack(t.name || langName(t.lang) || 'Subtítulos', t.lang, [], 'Incrustados'));
-    await Promise.all(tracks.map((t, i) => loadTrackCues(t, read, {
-      near: video.currentTime,
-      signal: ctrl.signal,
-      parallel: token.source && token.source.blob ? 2 : 6,
-      onCue: (s, e, text) => { if (alive()) addCue(entries[i], s, e, text); },
-    })));
-    if (!alive()) return;
-    subs.status = '';
-    paintCC();
-    saveSubCache(ep, [...found, ...entries], chapters);
-  } catch (err) {
-    if (!alive()) return;
-    subs.status = 'No se pudieron leer los subtítulos.';
-    paintCC();
-    console.warn('subs', err);
-  }
+  const read = await rangeReader(ep, token, ctrl.signal);
+  const info = await mp4Info(read, ep.size);
+  if (!alive()) return;
+  const chapters = await mp4Chapters(info, read, video.duration);
+  if (!alive()) return;
+  setChapters(token, chapters);
+  saveChapterCache(ep, chapters);
 }
 
-function saveSubCache(ep, entries, chapters) {
-  const tracks = entries.filter((e) => e.cues && e.cues.length).map((e) => ({ label: e.label, lang: e.lang, note: e.note, cues: e.cues }));
-  idb.put('subcache', { v: 3, tracks, chapters: (chapters || []).map((c) => ({ ...c, end: isFinite(c.end) ? c.end : null })), at: Date.now() }, ep.id).catch(() => {});
+function saveChapterCache(ep, chapters) {
+  idb.put('subcache', { v: 3, tracks: [], chapters: (chapters || []).map((c) => ({ ...c, end: isFinite(c.end) ? c.end : null })), at: Date.now() }, ep.id).catch(() => {});
 }
 
 /** Lector por rangos: del archivo descargado o de MEGA descifrando al vuelo. */
@@ -3505,40 +3366,15 @@ async function rangeReader(ep, token, signal) {
   };
 }
 
-/** Después de descargar un capítulo, deja listos sus subtítulos incrustados para verlo sin conexión. */
-async function cacheEmbeddedSubs(ep) {
+/** Después de descargar un capítulo, deja listos sus capítulos para verlo sin conexión. */
+async function cacheChapters(ep) {
   const have = await idb.get('subcache', ep.id).catch(() => null);
   if (have && have.v === 3) return;
   const blob = await localBlob(ep);
   if (!blob || !/mp4|quicktime/.test(ep.mime)) return;
   const read = async (a, b) => new Uint8Array(await blob.slice(a, b + 1).arrayBuffer());
-  const meta = state.dlMeta.get(ep.id);
-  const entries = [];
-  for (const f of (meta && meta.subs) || []) {
-    const cues = parseSubtitleFile(f.name, f.text);
-    if (cues.length) entries.push({ label: 'Subtítulos', lang: '', note: `Archivo ${f.name.split('.').pop().toUpperCase()}`, cues });
-  }
   const info = await mp4Info(read, ep.size);
-  for (const t of info.tracks) {
-    const cues = [];
-    await loadTrackCues(t, read, { parallel: 2, onCue: (s, e, x) => cues.push([s, e, x]) });
-    cues.sort((a, b) => a[0] - b[0]);
-    entries.push({ label: t.name || langName(t.lang) || 'Subtítulos', lang: t.lang, note: 'Incrustados', cues });
-  }
-  saveSubCache(ep, entries, await mp4Chapters(info, read, null));
-}
-
-async function loadSubFile(file) {
-  try {
-    const text = await file.text();
-    const cues = parseSubtitleFile(file.name, text);
-    if (!cues.length) { toast('Ese archivo no tiene subtítulos que pueda leer.'); return; }
-    const entry = addSubTrack(file.name.replace(/\.[^.]+$/, '').slice(0, 28), '', cues, 'Desde el dispositivo');
-    selectSub(entry);
-    closeMenu();
-  } catch {
-    toast('No se pudo leer el archivo.');
-  }
+  saveChapterCache(ep, await mp4Chapters(info, read, null));
 }
 
 /* ── capítulos e intros ── */
@@ -4076,11 +3912,8 @@ stage.addEventListener('click', (e) => {
   else if (act === 'fs') toggleFullscreen();
   else if (act === 'pip') togglePip();
   else if (act === 'mute') video.muted = !video.muted;
-  else if (act === 'cc') openMenu('subs');
   else if (act === 'speed') openMenu('speed');
   else if (act === 'm-speed') { speed = Number(el.dataset.v); video.playbackRate = speed; paintMenu(); paintControls(); }
-  else if (act === 'm-sub') { selectSub(el.dataset.id === 'off' ? null : subs.tracks.find((t) => t.id === el.dataset.id)); closeMenu(); }
-  else if (act === 'm-size') { state.settings.subSize = el.dataset.v; saveSettings(); paintCC(); paintMenu(); }
   else if (act === 'p-next-now') { ui.nextCard.hidden = true; clearTimeout(nextTimer); playNext(); }
   else if (act === 'p-next-cancel') { clearTimeout(nextTimer); ui.nextCard.hidden = true; }
   else if (act === 'p-dl') downloadThenPlay();
@@ -4090,7 +3923,6 @@ stage.addEventListener('click', (e) => {
   }
 });
 ui.menu.addEventListener('change', (e) => {
-  if (e.target.matches('[data-act="m-file"]') && e.target.files[0]) loadSubFile(e.target.files[0]);
 });
 document.addEventListener('pointerdown', (e) => {
   if (!ui.menu.hidden && !ui.menu.contains(e.target) && !e.target.closest('[data-act="cc"],[data-act="speed"]')) closeMenu();
@@ -4116,7 +3948,6 @@ document.addEventListener('keydown', (e) => {
   else if (k === 'arrowleft' || k === 'j') { e.preventDefault(); seekBy(-10); }
   else if (k === 'f') toggleFullscreen();
   else if (k === 'm') video.muted = !video.muted;
-  else if (k === 'c') { const t = subs.current ? null : (subs.tracks[0] || null); selectSub(t); }
   else if (k === 'n') playNext();
   else if (k === 'b') setLights(!document.body.classList.contains('lights-off'));
   else if (k === 's' && playing && playing.offer) doSkip();
