@@ -119,6 +119,7 @@ const pkey = (k) => `p.${state.profile ? state.profile.id : '_'}.${k}`;
 function loadProfileState() {
   state.progress = LS.get(pkey('progress'), {});
   state.dirty = LS.get(pkey('dirty'), false);
+  if (state.library && migrateProgressKeys(state.progress)) state.dirty = true; // rutas de carpetas renombradas
 }
 function saveProgressLocal() {
   if (!state.profile) return;
@@ -149,22 +150,39 @@ export function episodeNumber(name) {
   return nums ? Number(nums[nums.length - 1]) : null;
 }
 
-/** "1. Fate UBW" → { num: 1, title: "Fate UBW" } */
+/** "1. Fate UBW" → { num: 1, title: "Fate UBW" } · "1.5 OVA" → { num: 1.5, title: "OVA" } (el número decide el orden) */
 export function seasonInfo(name) {
-  const m = /^\s*(\d{1,3})\s*[.)\-_:]?\s+(.*)$/.exec(name) || /^\s*(\d{1,3})\s*$/.exec(name);
-  if (m) return { num: Number(m[1]), title: (m[2] || '').trim() };
+  const m = /^\s*(\d{1,3}(?:[.,]\d{1,2})?)\s*[.)\-_:]?\s+(.*)$/.exec(name) || /^\s*(\d{1,3}(?:[.,]\d{1,2})?)\s*$/.exec(name);
+  if (m) return { num: Number(m[1].replace(',', '.')), title: (m[2] || '').trim() };
   const t = /(?:temporada|season|s)\s*(\d{1,3})\b/i.exec(name);
   return { num: t ? Number(t[1]) : null, title: name.trim() };
 }
 
-/** Nombre de la pestaña de una temporada. Si dos carpetas tienen el mismo número (una temporada en dos partes:
- * "2. Temporada 2 - Parte 1" y "2. Temporada 2 - Parte 2"), se agrega la parte para distinguirlas. */
+/* Carpetas de temporada: el número del inicio decide el ORDEN y el nombre decide la PESTAÑA.
+ *  "2. Fate Zero" → "Fate Zero" · "1.5 OVA" → "OVA" · "3. Temporada 2 - Parte 1" → "Temporada 2 · Parte 1"
+ *  "1. Temporada 1" o solo "1" → "Temporada N", contando solo las temporadas (no OVAs, especiales ni películas). */
+const SPECIAL_RE = /\b(ovas?|oads?|onas?|especial(es)?|specials?|pel[ií]culas?|movies?|films?|recap|resumen|extras?|pr[oó]logo|gekijouban)\b/i;
+const GENERIC_SEASON_RE = /^\s*(?:(?:temporada|season|s)\s*\d{1,3}\b)?\s*(?:[-–·:,]?\s*(?:parte|part|cour)\s*\d{1,2})?\s*$/i;
+/** ¿El nombre de la temporada dice algo propio (sirve para buscarla en AniList y para la pestaña)? */
+const BARE_SPECIAL_RE = /^\s*(ovas?|oads?|onas?|especial(es)?|specials?|pel[ií]culas?|movies?|extras?|recap|resumen)\s*\d{0,2}\s*$/i; // "OVA" a secas no sirve para buscar
+const hasOwnTitle = (se) => !!(se && se.title && !GENERIC_SEASON_RE.test(se.title) && !BARE_SPECIAL_RE.test(se.title));
+const isSpecialSeason = (se) => !!(se && se.title && SPECIAL_RE.test(se.title));
+/** Número de temporada que corresponde: el que dice el nombre ("Temporada 2") o el puesto entre las temporadas. */
+function seasonOrdinal(s, se) {
+  const said = /(?:temporada|season)\s*(\d{1,3})\b/i.exec(se.title || '');
+  if (said) return Number(said[1]);
+  const nums = [...new Set(s.seasons.filter((x) => x.num != null && !isSpecialSeason(x)).map((x) => x.num))].sort((a, b) => a - b);
+  const i = nums.indexOf(se.num);
+  return i >= 0 ? i + 1 : se.num;
+}
 function seasonTab(s, se) {
   if (se.num == null) return se.name;
-  const twin = s.seasons.filter((x) => x.num === se.num).length > 1;
-  if (!twin) return `Temporada ${se.num}`;
-  const part = /\b(?:parte|part|cour)\s*(\d{1,2})\b/i.exec(se.name);
-  return part ? `Temporada ${se.num} · Parte ${part[1]}` : (se.title || `Temporada ${se.num}`);
+  if (hasOwnTitle(se) || isSpecialSeason(se)) return se.title;
+  const n = seasonOrdinal(s, se);
+  const part = /\b(?:parte|part|cour)\s*(\d{1,2})\b/i.exec(se.title || '');
+  if (part) return `Temporada ${n} · Parte ${part[1]}`;
+  const twins = s.seasons.filter((x) => x.num === se.num);
+  return twins.length > 1 ? `Temporada ${n} · Parte ${twins.indexOf(se) + 1}` : `Temporada ${n}`;
 }
 
 function episodeLabel(ep) {
@@ -279,10 +297,24 @@ function buildIndex(lib) {
 }
 
 function setLibrary(lib) {
+  rememberPaths(state.library); // las rutas de antes, por si se renombró o movió una carpeta
   LS.set('library', lib);
   state.library = lib;
   index = buildIndex(lib);
-  migrateProgressKeys(state.progress);
+  rememberPaths(lib);
+  if (migrateProgressKeys(state.progress)) { state.dirty = true; saveProgressLocal(); }
+}
+
+/* El progreso se guarda por ruta del archivo. MEGA le da a cada archivo un id que no cambia al renombrar o mover,
+ * así que Kai recuerda qué ruta tuvo cada id: si una carpeta cambia de nombre, lo visto pasa a la ruta nueva. */
+function rememberPaths(lib) {
+  if (!lib || lib.v !== 2) return;
+  const known = LS.get('pathIds', {}) || {};
+  let changed = false;
+  for (const s of lib.series) for (const se of s.seasons) for (const ep of se.episodes) {
+    if (known[ep.path] !== ep.id) { known[ep.path] = ep.id; changed = true; }
+  }
+  if (changed) LS.set('pathIds', known);
 }
 
 function librarySignature(lib) {
@@ -295,9 +327,12 @@ function migrateProgressKeys(obj) {
   if (!state.library || !state.library.series) return false;
   const prefix = state.settings.root.replace(/^\/+|\/+$/g, '') + '/';
   let changed = false;
+  const known = LS.get('pathIds', {}) || {};
   for (const k of Object.keys(obj)) {
-    if (index.byPath.has(k) || !index.byPath.has(prefix + k)) continue;
-    const nk = prefix + k;
+    if (index.byPath.has(k)) continue;
+    let nk = index.byPath.has(prefix + k) ? prefix + k : null;
+    if (!nk && known[k]) { const e = index.byId.get(known[k]); if (e && e.ep.path !== k) nk = e.ep.path; } // carpeta renombrada o movida
+    if (!nk) continue;
     if (!obj[nk] || obj[nk].u < obj[k].u) obj[nk] = obj[k];
     delete obj[k];
     changed = true;
