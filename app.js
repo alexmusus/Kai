@@ -83,6 +83,7 @@ const ICON = {
 const DARK_TONES = { negro: { label: 'Negro', bg: '#0d0e12' }, gris: { label: 'Gris Culero', bg: '#4d4d4d' } };
 const TONES = { blanco: { label: 'Blanco', bg: '#eef0f4' }, gris: { label: 'Gris', bg: '#c6c8cb' }, celeste: { label: 'Celeste', bg: '#d9e5f0' }, arena: { label: 'Arena', bg: '#e6e0d5' } };
 const DEFAULTS = { root: 'Anime', autoplay: true, autoSkip: true, theme: 'auto' };
+const FICHAS_FILE = '.kai-fichas.json';               // fichas de AniList/TMDB ya encontradas (así los demás no las buscan)
 const SYN_FILE = '.kai-sinopsis.json';                 // sinopsis traducidas al español (se comparten entre dispositivos)
 const SHARED_FILE = '.kai-compartido.json';            // perfiles, intros aprendidas e imágenes elegidas
 const profileFile = (id) => `.kai-progreso-${id}.json`;  // progreso de cada perfil
@@ -939,6 +940,7 @@ async function doSync() {
     await backupProfiles();
     // 1b) sinopsis traducidas (un fallo aquí no frena el progreso)
     try { await syncSynopses(home); } catch (err) { console.warn('sinopsis', err); }
+    try { await syncFichas(home); } catch (err) { console.warn('fichas', err); }
 
     // 2) progreso del perfil activo
     let changedHere = false;
@@ -1771,6 +1773,7 @@ function newsHTML() {
 // las fichas llegan de a una al buscar en AniList: se juntan y se guardan una sola vez (y al salir, si falta)
 let metaTimer = 0;
 function saveMeta() { clearTimeout(metaTimer); metaTimer = setTimeout(flushMeta, 1500); }
+function flushMetaNow() { clearTimeout(metaTimer); metaTimer = 0; LS.set('meta', state.meta); }
 function flushMeta() { if (metaTimer) { clearTimeout(metaTimer); metaTimer = 0; LS.set('meta', state.meta); } }
 addEventListener('pagehide', flushMeta);
 document.addEventListener('visibilitychange', () => { if (document.hidden) flushMeta(); });
@@ -1828,6 +1831,8 @@ async function ensureMeta() {
   metaRunning = true;
   let changed = false;
   try {
+    // antes de buscar nada, lo que otros dispositivos ya encontraron (si MEGA no responde, se busca igual)
+    if (!fichasPulled && state.storage) { try { await syncFichas(state.storage.root, false); } catch (err) { console.warn('fichas', err); fichasPulled = true; } }
     // 1) las fichas guardadas antes de la v29 no traían la nota: se pide solo la nota, todas juntas (1–2 pedidos),
     //    en vez de volver a buscar cada serie y película (eso agotaba el límite de AniList y dejaba otras sin ficha)
     const old = Object.values(state.meta).filter((m) => m && !m.none && typeof m.id === 'number' && m.src !== 'TMDB' && ((m.sv && m.sv < 6) || (m.mv && m.mv < 5)));
@@ -1937,6 +1942,7 @@ async function ensureMeta() {
   } finally {
     metaRunning = false;
   }
+  if (changed) { fichasDirty = true; sync(); }
   if (changed && ['home', 'serie', 'pelicula'].includes(route().view)) softRender();
   setTimeout(translateMissing, 1500);
 }
@@ -2001,6 +2007,40 @@ async function syncSynopses(home) {
     if (fresh && fresh.nodeId) LS.set('synSig', `${fresh.nodeId}:${fresh.size}:${fresh.timestamp || 0}`); else LS.del('synSig');
   }
 }
+/* ── fichas compartidas ──
+ * Lo que un dispositivo encuentra en AniList (o TMDB) se guarda en MEGA (.kai-fichas.json): los demás dispositivos
+ * y perfiles lo usan sin volver a buscar. Gana la ficha más reciente (marca "at"). Si el archivo no se puede leer,
+ * no se toca (nunca se pisa). */
+let fichasDirty = false;
+let fichasPulled = false;
+async function syncFichas(home, write = true) {
+  const nodes = filesNamed(home, FICHAS_FILE);
+  const sig = nodes.map((n) => `${n.nodeId}:${n.size}:${n.timestamp || 0}`).join('|');
+  let remote = null;
+  if (sig && sig !== LS.get('fichasSig', '')) {
+    remote = {};
+    for (const n of nodes) { const d = await readJson(n); if (d && d.items) remote = mergeFichas(remote, d.items); }
+    const before = JSON.stringify(Object.keys(state.meta).map((k) => [k, (state.meta[k] || {}).at]));
+    state.meta = mergeFichas(state.meta, remote);
+    flushMetaNow();
+    LS.set('fichasSig', sig);
+    if (JSON.stringify(Object.keys(state.meta).map((k) => [k, (state.meta[k] || {}).at])) !== before && ['home', 'serie', 'pelicula', 'catalogo'].includes(route().view)) softRender();
+  }
+  fichasPulled = true;
+  if (!write) return;
+  const newer = remote && Object.keys(state.meta).some((k) => state.meta[k] && (!remote[k] || (state.meta[k].at || 0) > (remote[k].at || 0)));
+  if (Object.keys(state.meta).length && (fichasDirty || nodes.length !== 1 || newer)) {
+    fichasDirty = false;
+    const fresh = await writeJson(home, FICHAS_FILE, { v: 1, app: 'kai', items: state.meta }, nodes);
+    if (fresh && fresh.nodeId) LS.set('fichasSig', `${fresh.nodeId}:${fresh.size}:${fresh.timestamp || 0}`); else LS.del('fichasSig');
+  }
+}
+function mergeFichas(a, b) {
+  const out = { ...a };
+  for (const [k, v] of Object.entries(b || {})) if (v && typeof v === 'object' && (!out[k] || (v.at || 0) > (out[k].at || 0))) out[k] = v;
+  return out;
+}
+
 function mergeSyn(a, b) {
   const out = { ...a };
   for (const [k, v] of Object.entries(b || {})) if (v && v.es && (!out[k] || (v.u || 0) > (out[k].u || 0))) out[k] = v;
@@ -4795,7 +4835,7 @@ document.addEventListener('click', async (e) => {
     try { for (const k of Object.keys(localStorage)) if (k.startsWith('kai.') && k !== 'kai.settings') localStorage.removeItem(k); } catch { /* nada */ }
     for (const s of ['chunks', 'dl', 'thumbs', 'subcache']) await idb.clear(s).catch(() => {});
     state.library = null; index = buildIndex(null); state.progress = {}; state.saved.clear(); state.dlMeta.clear();
-    state.profile = null; state.shared = { profiles: [], intros: {}, picks: {}, legacyBy: null }; state.sharedLoaded = false; state.meta = {};
+    state.profile = null; state.shared = { profiles: [], intros: {}, picks: {}, legacyBy: null }; state.sharedLoaded = false; state.meta = {}; fichasPulled = false;
     location.hash = '';
     render();
   }
