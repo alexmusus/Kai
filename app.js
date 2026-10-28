@@ -251,7 +251,10 @@ function findFolder(storage, path) {
   const parts = path.split('/').map((p) => p.trim()).filter(Boolean);
   let node = storage.root;
   for (const p of parts) {
-    node = (node.children || []).find((c) => c.directory && c.name && c.name.toLowerCase() === p.toLowerCase());
+    // si hay dos carpetas con el mismo nombre (p. ej. una "Anime" vieja), se usa la que tiene más cosas:
+    // el orden en que MEGA las entrega puede cambiar y Kai mostraba la vieja al tocar Actualizar
+    const same = (node.children || []).filter((c) => c.directory && c.name && c.name.toLowerCase() === p.toLowerCase());
+    node = same.sort((a, b) => (b.children || []).length - (a.children || []).length)[0];
     if (!node) return null;
   }
   return node;
@@ -1897,7 +1900,8 @@ function newsHTML() {
   });
   return `<p class="settings-label">Novedades</p>
     ${rows.length ? `<ul class="news-list">${rows.join('')}</ul><button class="btn btn-quiet" data-act="news-clear">Limpiar</button>`
-      : '<p class="dim">Aquí aparece lo que se agregue a tu MEGA. Por ahora no hay nada nuevo.</p>'}`;
+      : '<p class="dim">Aquí aparece lo que se agregue a tu MEGA. Por ahora no hay nada nuevo.</p>'}
+    ${!rows.length && lib && lib.series.some((s) => newEpisodes(s).length) ? '<button class="btn btn-quiet" data-act="news-clear">Quitar las burbujas de "nuevo"</button>' : ''}`;
 }
 
 /* ── sinopsis e imágenes ── */
