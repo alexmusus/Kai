@@ -1292,3 +1292,4 @@ html.has-mini body { padding-bottom: var(--mini-space); }
   background: rgba(0, 0, 0, 0.45); border: 1px solid rgba(255, 255, 255, 0.25); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
 }
 .ep-new.is-lang { background: rgba(0, 0, 0, 0.55); color: #fff; }
+img.no-fade { animation: none !important; }

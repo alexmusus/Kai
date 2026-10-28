@@ -3216,6 +3216,22 @@ function episodeRow(ep, { current = false, extra = '', fresh = false, next = fal
   </li>`;
 }
 
+/* Las imágenes aparecen con un fundido solo la primera vez que se cargan. Al redibujar una página (o volver a
+ * ella) las que ya estaban cargadas se muestran de una vez: si no, todas parpadeaban en cada cambio. */
+const seenImgs = new Set();
+function settleImages(root) {
+  for (const img of root.querySelectorAll ? root.querySelectorAll('img') : []) {
+    if (seenImgs.has(img.src) || (img.complete && img.naturalWidth)) { img.classList.add('no-fade'); seenImgs.add(img.src); }
+    else img.addEventListener('load', () => seenImgs.add(img.src), { once: true });
+  }
+}
+new MutationObserver((list) => {
+  for (const m of list) for (const n of m.addedNodes) {
+    if (n.nodeType !== 1) continue;
+    if (n.tagName === 'IMG') settleImages(n.parentNode || n); else settleImages(n);
+  }
+}).observe(document.body, { childList: true, subtree: true });
+
 function paintEpisode(id) {
   const ep = epById(id);
   if (!ep) return;
@@ -4840,7 +4856,15 @@ document.addEventListener('click', async (e) => {
   else if (act === 'pick-mode') { if (picking) endPicking(); else startPicking(); }
   else if (act === 'pick-all' || act === 'pick-unseen' || act === 'pick-dl') pickAction(act);
   else if (act === 'seen-all') paintSeenByAll(el);
-  else if (act === 'news-clear') { LS.set(pkey('news'), []); const box = $('#news'); if (box) box.innerHTML = newsHTML(); }
+  else if (act === 'news-clear') {
+    LS.set(pkey('news'), []);
+    // "Limpiar" también quita las burbujas de "Nuevo" de los pósters: todo lo que hay queda como ya visto
+    if (state.library && state.library.series) saveKnown(Object.fromEntries(state.library.series.map((s) => [s.name, (s.full || s.all).map((e) => e.id)])));
+    lastNew = null;
+    app.querySelectorAll('.tile-badge, .ep-new:not(.is-lang)').forEach((b) => { if (/nuev/i.test(b.textContent)) b.remove(); });
+    paintDock();
+    const box = $('#news'); if (box) box.innerHTML = newsHTML();
+  }
   else if (act === 'movie-dl' || act === 'later-item') {
     const sr = state.library.series[Number(el.dataset.si)];
     const it = sr && collectionItems(sr).find((x) => x.key === el.dataset.key);
