@@ -543,6 +543,7 @@ async function connect() {
     let st;
     try { st = Storage.fromJSON(JSON.parse(JSON.stringify(sess))); } catch { throw new Error('ESID'); }
     await st.reload(true);
+    await settleTree(st);
     st.status = 'ready';
     if (state.storage && state.storage !== st) {
       try { state.storage.api.close(); } catch { /* nada */ }
@@ -553,6 +554,21 @@ async function connect() {
   } finally {
     state.connecting = false;
   }
+}
+
+/* MEGA a veces entrega primero una foto vieja de tus carpetas y enseguida manda los cambios que faltan
+ * (por eso al tocar Actualizar se veía unos segundos One Piece y otras series de hace meses). Antes de usar
+ * el árbol nuevo se espera a que esos cambios dejen de llegar: 2.5 s sin novedades (máximo 20 s). */
+function settleTree(st) {
+  return new Promise((resolve) => {
+    let quiet;
+    const evs = ['add', 'delete', 'move', 'update'];
+    const done = () => { clearTimeout(quiet); clearTimeout(cap); evs.forEach((ev) => st.removeListener(ev, bump)); resolve(); };
+    const bump = () => { clearTimeout(quiet); quiet = setTimeout(done, 2500); };
+    const cap = setTimeout(done, 20000);
+    evs.forEach((ev) => st.on(ev, bump));
+    bump();
+  });
 }
 
 let libraryTimer;
