@@ -232,6 +232,7 @@ export async function mp4Info(read, size) {
   }
   const tracks = [];
   let chapterTrack = null;
+  let audioLang = '';
   for (const trak of boxes(moov, root.start, root.end)) {
     if (trak.type !== 'trak') continue;
     const isChapters = chapterIds.has(trackId(moov, trak));
@@ -240,6 +241,10 @@ export async function mp4Info(read, size) {
     const mdhd = mdia && child(moov, mdia, 'mdhd');
     if (!hdlr || !mdhd) continue;
     const handler = fourcc(moov, hdlr.start + 8);
+    if (handler === 'soun') { // idioma del primer audio (sirve para saber si está doblado)
+      if (!audioLang) audioLang = lang3(moov[mdhd.start] === 1 ? u16(moov, mdhd.start + 32) : u16(moov, mdhd.start + 20));
+      continue;
+    }
     if (!['text', 'sbtl', 'subt'].includes(handler)) continue;
     const stbl = path(moov, mdia, 'minf', 'stbl');
     const stsd = stbl && child(moov, stbl, 'stsd');
@@ -259,7 +264,7 @@ export async function mp4Info(read, size) {
     if (isChapters) chapterTrack = chapterTrack || track;
     else tracks.push(track);
   }
-  return { tracks, chapters: neroChapters(moov, root), chapterTrack };
+  return { tracks, chapters: neroChapters(moov, root), chapterTrack, audioLang };
 }
 
 /** Formato real del video y del audio, leído del encabezado del MP4 (para explicar por qué no se reproduce). */

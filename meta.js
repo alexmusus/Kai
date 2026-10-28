@@ -117,7 +117,13 @@ export function relatedTo(folder, m) {
 }
 /** Busca probando varios textos (serie + temporada, temporada, serie). De cada búsqueda solo acepta un
  * resultado que tenga que ver con el nombre de la carpeta: mejor sin imagen que con la de otro anime. */
+/** Quita "Sub", "Doblado", "Latino"… de un nombre antes de buscarlo ("Shrek (Latino)" → "Shrek"). */
+const LANG_WORDS = /[\s_\-.]*[([]?\b(sub(?:titulad[oa])?|vose|dob(?:lad[oa])?|dub(?:bed)?|latino|castellano|espa[nñ]ol)\b[)\]]?/gi;
+export const noLang = (name) => String(name || '').replace(LANG_WORDS, ' ').replace(/\s+/g, ' ').trim() || String(name || '');
+
 export async function findForSeries(names, folder = names[names.length - 1]) {
+  names = names.map(noLang);
+  folder = noLang(folder);
   for (const q of names) {
     if (!q || q.length < 2) continue;
     const list = await searchAnime(q, 5);
@@ -193,6 +199,7 @@ function movieQueries(name) {
 export function findMovie(name, pause = () => Promise.resolve()) { return findTitle(name, 'movie', pause); }
 /** Busca por un nombre exacto (temporada, OVA o película). `kind`: 'movie', 'tv' u 'ova', según lo que dice la carpeta. */
 export async function findTitle(name, kind = 'tv', pause = () => Promise.resolve()) {
+  name = noLang(name);
   // "Serie OVA" / "Serie Zoku OVA": se busca la serie y, entre sus relacionadas, la OVA o especial que le corresponde
   if (kind === 'ova' && TRAIL_SPECIAL.test(name)) {
     const base = name.replace(TRAIL_SPECIAL, '').trim();
@@ -331,6 +338,7 @@ export async function tmdbCheckKey(key) {
 }
 /** Ficha de una película por el nombre de su carpeta: "El gigante de hierro (1999)" busca "El gigante de hierro" del año 1999. */
 export async function tmdbFindMovie(folderName, key) {
+  folderName = noLang(folderName);
   const year = (/[([]\s*((?:19|20)\d{2})\s*[)\]]|\b((?:19|20)\d{2})\s*$/.exec(folderName) || []).slice(1).find(Boolean) || '';
   const name = folderName.replace(/[([]\s*(?:19|20)\d{2}\s*[)\]]|\b(?:19|20)\d{2}\s*$/g, '').replace(/[._]+/g, ' ').replace(/\s+/g, ' ').trim();
   if (!name) return null;

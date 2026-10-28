@@ -77,6 +77,35 @@ const ICON = {
   grid: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5"/></svg>',
 };
 
+/* ── idioma de cada archivo: "472_0_SUB.mp4" (subtitulado) / "472_0_DOB.mp4" (doblado) ──
+ * Las dos versiones de un capítulo van en la misma carpeta; Kai muestra una sola (la que elijas) y comparte lo visto. */
+const LANG_WORDS = 'sub(?:s|titulad[oa])?|vose|dob(?:lad[oa])?|dub(?:bed)?|lat(?:ino)?|castellano|espa[nñ]ol';
+const LANG_RE = new RegExp(`(?:^|[\\s_.\\-[(])(${LANG_WORDS})(?=$|[\\s_.\\-\\])])`, 'gi');
+const LANG_BOX_RE = new RegExp(`\\s*[[(]\\s*(?:${LANG_WORDS})\\s*[\\])]`, 'gi'); // "[Latino]", "(Sub)"
+export function langOf(name) {
+  const base = String(name || '').replace(/\.[^.]+$/, '');
+  const all = [...base.matchAll(LANG_RE)];
+  if (!all.length) return null;
+  return /^(sub|vose)/i.test(all[all.length - 1][1]) ? 'sub' : 'dob';
+}
+/** El nombre sin la marca de idioma: "472_0_SUB" y "472_0_DOB" son el mismo capítulo; "Howl [Latino]" → "Howl". */
+export function stripLang(name) {
+  return String(name || '').replace(LANG_BOX_RE, '').replace(LANG_RE, '').replace(/[\s_.\-]+$/, '').trim();
+}
+const twinKey = (ep) => stripLang(ep.name.replace(/\.[^.]+$/, '')).toLowerCase();
+const LANG_LABEL = { sub: 'Sub', dob: 'Doblado' };
+/** Idiomas de una lista de capítulos, contando las versiones ocultas en el otro idioma. */
+function langsOf(eps) {
+  const out = new Set();
+  for (const ep of eps) {
+    if (ep.lang) out.add(ep.lang);
+    for (const path of (index.twins && index.twins.get(ep.path)) || []) { const t = index.byPath.get(path); if (t && t.ep.lang) out.add(t.ep.lang); }
+  }
+  return ['sub', 'dob'].filter((l) => out.has(l));
+}
+const langText = (langs) => (langs.length > 1 ? 'Sub y doblado' : langs.length ? LANG_LABEL[langs[0]] : '');
+const langChip = (langs) => (langs.length ? `<span class="lang-chip">${langs.map((l) => (l === 'sub' ? 'SUB' : 'DOB')).join(' · ')}</span>` : '');
+
 /* ───────────────────────── estado ───────────────────────── */
 
 /** Tonos del modo claro (el color de fondo sirve para la barra del sistema). */
@@ -121,6 +150,7 @@ function loadProfileState() {
   state.progress = LS.get(pkey('progress'), {});
   state.dirty = LS.get(pkey('dirty'), false);
   if (state.library && migrateProgressKeys(state.progress)) state.dirty = true; // rutas de carpetas renombradas
+  try { if (state.library) index = buildIndex(state.library); } catch { /* aún no hay índice */ } // el idioma elegido es de cada perfil
 }
 function saveProgressLocal() {
   if (!state.profile) return;
@@ -150,6 +180,7 @@ export function episodeNumber(name) {
   const nums = clean.match(/\d+(?:\.\d+)?/g);
   return nums ? Number(nums[nums.length - 1]) : null;
 }
+
 
 /** "1. Fate UBW" → { num: 1, title: "Fate UBW" } · "1.5 OVA" → { num: 1.5, title: "OVA" } (el número decide el orden) */
 export function seasonInfo(name) {
@@ -283,18 +314,84 @@ function buildLibrary(storage) {
 function buildIndex(lib) {
   const byId = new Map();
   const byPath = new Map();
+  const twins = new Map(); // ruta → rutas del mismo capítulo en el otro idioma
   if (lib && lib.v === 2) {
     lib.series.forEach((s, si) => {
       s.all = [];
-      s.seasons.forEach((se, ki) => se.episodes.forEach((ep, ei) => {
-        const entry = { ep, si, ki, ei };
-        s.all.push(ep);
-        byId.set(ep.id, entry);
-        byPath.set(ep.path, entry);
-      }));
+      s.full = [];
+      s.langs = [];
+      const pref = langPref(s);
+      const heard = LS.get('alang', {}) || {};
+      s.seasons.forEach((se, ki) => {
+        const full = se.full || se.episodes;
+        const groups = new Map();
+        for (const ep of full) {
+          ep.lang = langOf(ep.name) || heard[ep.id] || null;
+          if (ep.lang && !s.langs.includes(ep.lang)) s.langs.push(ep.lang);
+          const k = twinKey(ep);
+          if (!groups.has(k)) groups.set(k, []);
+          groups.get(k).push(ep);
+        }
+        const isTwin = (g) => g.length > 1 && new Set(g.map((e) => e.lang)).size > 1;
+        if ([...groups.values()].some(isTwin)) {
+          se.full = full;
+          se.langs = ['sub', 'dob'].filter((l) => full.some((e) => e.lang === l));
+          // de cada capítulo, la versión elegida; si no existe en ese idioma, la otra
+          se.episodes = full.filter((ep) => {
+            const g = groups.get(twinKey(ep));
+            if (!isTwin(g)) return true;
+            return (g.find((e) => e.lang === pref) || g[0]) === ep;
+          });
+          for (const g of groups.values()) if (isTwin(g)) for (const e of g) twins.set(e.path, g.filter((x) => x !== e).map((x) => x.path));
+        } else {
+          delete se.full;
+          se.langs = null;
+          se.episodes = full;
+        }
+        for (const ep of full) {
+          const entry = { ep, si, ki, ei: se.episodes.indexOf(ep) };
+          byId.set(ep.id, entry);
+          byPath.set(ep.path, entry);
+          s.full.push(ep);
+        }
+        s.all.push(...se.episodes);
+      });
     });
   }
-  return { byId, byPath };
+  return { byId, byPath, twins };
+}
+/** Idioma que se muestra de una serie con las dos versiones: el que elegiste aquí; si no, el del último capítulo
+ *  que viste de ella (así se sigue igual en otro dispositivo); si no, el último que elegiste en cualquier serie. */
+// (con function: el índice se arma antes de que exista pkey)
+function langKey(k) { return `p.${state.profile ? state.profile.id : '_'}.${k}`; }
+function langPref(s) {
+  const own = (LS.get(langKey('lang'), {}) || {})[s.name];
+  if (own) return own;
+  let best = null;
+  for (const se of s.seasons) for (const ep of se.full || se.episodes) {
+    const p = state.progress[ep.path];
+    const l = p && langOf(ep.name);
+    if (l && (!best || (p.u || 0) > best.u)) best = { u: p.u || 0, l };
+  }
+  return best ? best.l : LS.get(langKey('langLast'), 'sub');
+}
+/** Si el archivo no dice SUB/DOB en el nombre, el idioma del audio lo dice: español = doblado, japonés = sub. */
+function learnAudioLang(ep, code) {
+  if (!ep || langOf(ep.name)) return;
+  const l = /^(spa|es|esl|esp)$/i.test(code || '') ? 'dob' : /^(jpn|ja)$/i.test(code || '') ? 'sub' : '';
+  if (!l) return;
+  const heard = LS.get('alang', {}) || {};
+  if (heard[ep.id] === l) return;
+  heard[ep.id] = l;
+  LS.set('alang', heard);
+  index = buildIndex(state.library);
+}
+function setLangPref(s, lang) {
+  const all = LS.get(pkey('lang'), {}) || {};
+  all[s.name] = lang;
+  LS.set(pkey('lang'), all);
+  LS.set(pkey('langLast'), lang);
+  index = buildIndex(state.library);
 }
 
 function setLibrary(lib) {
@@ -312,7 +409,7 @@ function rememberPaths(lib) {
   if (!lib || lib.v !== 2) return;
   const known = LS.get('pathIds', {}) || {};
   let changed = false;
-  for (const s of lib.series) for (const se of s.seasons) for (const ep of se.episodes) {
+  for (const s of lib.series) for (const se of s.seasons) for (const ep of se.full || se.episodes) {
     if (known[ep.path] !== ep.id) { known[ep.path] = ep.id; changed = true; }
   }
   if (changed) LS.set('pathIds', known);
@@ -320,7 +417,7 @@ function rememberPaths(lib) {
 
 function librarySignature(lib) {
   if (!lib) return '';
-  return lib.root + '|' + lib.series.map((s) => s.name + '@' + (s.added || 0) + ':' + s.seasons.map((se) => se.name + '=' + se.episodes.map((e) => e.id + (e.fa ? '+' : '') + e.subs.length).join(',')).join(';')).join('|');
+  return lib.root + '|' + lib.series.map((s) => s.name + '@' + (s.added || 0) + ':' + s.seasons.map((se) => se.name + '=' + (se.full || se.episodes).map((e) => e.id + (e.fa ? '+' : '') + e.subs.length).join(',')).join(';')).join('|');
 }
 
 /** La versión 1 guardaba rutas relativas a la carpeta de series; ahora son desde la raíz de MEGA. */
@@ -661,9 +758,11 @@ function resolveContext(id) {
   if (e) {
     const s = state.library.series[e.si];
     const season = s.seasons[e.ki];
+    // un capítulo en el idioma que no está elegido (desde Descargados, por ejemplo): la lista sigue en su idioma
+    const list = e.ei >= 0 || !season.full ? season.episodes : season.full.filter((x) => !index.twins.has(x.path) || x.lang === e.ep.lang);
     return {
       // la lista del reproductor es solo la temporada: al terminarla, Kai se detiene (no pasa sola a la siguiente)
-      ep: e.ep, list: season.episodes, shown: season.episodes, title: s.name,
+      ep: e.ep, list, shown: list, title: s.name,
       sub: isCollection(s) ? '' : s.seasons.length > 1 ? seasonTab(s, season) : (hasOwnTitle(season) && season.title !== s.name ? season.title : ''),
       ki: e.ki,
       back: isCollection(s) ? movieHref(e.si, itemFor(s, e.ep).key) : seasonHref(e.si, s, e.ki), si: e.si,
@@ -693,7 +792,22 @@ function titleFor(ep) {
 
 /* ───────────────────────── progreso ───────────────────────── */
 
-function prog(ep) { return state.progress[ep.path]; }
+/** Lo visto de un capítulo. Si está en los dos idiomas, cuenta lo de ambos: el minuto del más reciente y,
+ *  si cualquiera de los dos se terminó, queda visto. */
+function prog(ep) {
+  const own = state.progress[ep.path];
+  const tw = index.twins && index.twins.get(ep.path);
+  if (!tw) return own;
+  let best = own;
+  let w = !!(own && own.w);
+  for (const path of tw) {
+    const q = state.progress[path];
+    if (!q) continue;
+    if (q.w) w = true;
+    if (!best || (q.u || 0) > (best.u || 0)) best = q;
+  }
+  return best && best.w !== w ? { ...best, w } : best;
+}
 
 function setProgress(ep, t, d, watched) {
   const cur = state.progress[ep.path] || {};
@@ -1694,7 +1808,7 @@ function knownMap() {
 function saveKnown(k) { knownCache = { key: pkey('known'), val: k }; LS.set(pkey('known'), k); }
 function initKnown() {
   if (!state.profile || !state.library || !state.library.series || knownMap()) return;
-  saveKnown(Object.fromEntries(state.library.series.map((s) => [s.name, s.all.map((e) => e.id)])));
+  saveKnown(Object.fromEntries(state.library.series.map((s) => [s.name, (s.full || s.all).map((e) => e.id)])));
 }
 function newEpisodes(s) {
   const k = knownMap();
@@ -1704,7 +1818,7 @@ function newEpisodes(s) {
 }
 function markSeriesSeen(s) {
   const k = { ...(knownMap() || {}) };
-  k[s.name] = s.all.map((e) => e.id);
+  k[s.name] = [...new Set([...(k[s.name] || []), ...(s.full || s.all).map((e) => e.id)])];
   saveKnown(k);
 }
 let lastNew = null;
@@ -2062,16 +2176,18 @@ const isCollection = (s) => !!s && (COLLECTION_RE.test(plainName(s)) || isCine(s
 const tmdbKey = () => (state.shared.keys && state.shared.keys.tmdb && state.shared.keys.tmdb.v) || '';
 function cleanFileTitle(name) {
   const t = String(name).replace(/\.[^.]+$/, '').replace(/[[(][^\])]*[\])]/g, ' ').replace(/[_.]+/g, ' ')
-    .replace(/\b(1080p|720p|480p|2160p|4k|x26[45]|hevc|aac|sub|subs|dub|latino|esp|spa|bd|bdrip|web|webrip)\b/gi, ' ')
+    .replace(/\b(1080p|720p|480p|2160p|4k|x26[45]|hevc|aac|sub|subs|subtitulado|vose|dub|dob|doblado|lat|latino|castellano|esp|spa|bd|bdrip|web|webrip)\b/gi, ' ')
     .replace(/\s+/g, ' ').trim();
   return /\p{L}{3}/u.test(t) ? t : '';
 }
+/** Clave de una película suelta: el nombre del archivo sin el idioma ("Howl_DOB.mp4" y "Howl_SUB.mp4" son la misma). */
+const movieKey = (ep) => (ep.lang ? stripLang(baseName(ep.name)) : baseName(ep.name));
 /** Las películas de una colección: { key, title, query, eps } */
 function collectionItems(s) {
   const out = [];
   for (const se of s.seasons) {
     if (se.name) out.push({ key: se.name, title: se.title || se.name, query: se.title || se.name, eps: se.episodes });
-    else for (const ep of se.episodes) out.push({ key: baseName(ep.name), title: '', query: cleanFileTitle(ep.name), eps: [ep] });
+    else for (const ep of se.episodes) out.push({ key: movieKey(ep), title: '', query: cleanFileTitle(ep.name), eps: [ep] });
   }
   return out;
 }
@@ -2080,7 +2196,7 @@ function itemFor(s, ep) {
   const e = index.byId.get(ep.id);
   if (!e || !isCollection(s)) return null;
   const se = s.seasons[e.ki];
-  return se && se.name ? { key: se.name, title: se.title || se.name, eps: se.episodes } : { key: baseName(ep.name), title: '', eps: [ep] };
+  return se && se.name ? { key: se.name, title: se.title || se.name, eps: se.episodes } : { key: movieKey(ep), title: '', eps: [ep] };
 }
 function movieImage(s, it) {
   const m = itemMeta(s, it.key);
@@ -2236,10 +2352,11 @@ function factsHTML(s, m, extra = '') {
 }
 /** Etiquetas de la página de una serie, en filas:
  *  arriba lo informativo (capítulos, vistos) | ★ nota de AniList; abajo lo que se toca (año, tipo, géneros → catálogo). */
-function factsRowsHTML(s, m, { count = null, seen = 0, total = 0 } = {}) {
+function factsRowsHTML(s, m, { count = null, seen = 0, total = 0, lang = '' } = {}) {
   const chip = (label, params) => `<a class="fact" href="#/catalogo?${new URLSearchParams(params)}">${esc(label)}</a>`;
   const info = [
     `<span>${esc(count != null ? plural(count, 'capítulo', 'capítulos') : countLabel(s, m))}</span>`,
+    lang ? `<span>${esc(lang)}</span>` : '',
     seen ? `<span>${seen} de ${total} vistos</span>` : '',
   ].filter(Boolean).join('');
   const links = [
@@ -2479,7 +2596,7 @@ function catalogEntries() {
         const title = it.title || (m && m.title) || it.eps[0].name.replace(/\.[^.]+$/, '');
         out.push({
           si, title: movieTitle(s, it), m, img: m && (m.banner || m.cover), year: m && m.year, genres: (m && m.genres) || [], format: 'Película',
-          added: Math.max(0, ...it.eps.map((e) => e.ts || 0)), href: movieHref(si, it.key), movie: it.key, cine: isCine(s),
+          added: Math.max(0, ...it.eps.map((e) => e.ts || 0)), href: movieHref(si, it.key), movie: it.key, cine: isCine(s), langs: langsOf(it.eps),
           words: norm([title, m && m.title, m && m.romaji, m && m.native, s.name].join(' ')),
         });
       }
@@ -2487,17 +2604,17 @@ function catalogEntries() {
       const m = metaFor(s);
       out.push({
         si, title: s.name, m, img: m && (m.banner || m.cover), year: m && m.year, genres: (m && m.genres) || [],
-        format: (m && m.format) || 'Serie', added: s.added || 0, count: s.all.length,
+        format: (m && m.format) || 'Serie', added: s.added || 0, count: s.all.length, langs: langsOf(s.all),
         words: norm([s.name, m && m.title, m && m.romaji, m && m.native, ...s.seasons.map((se) => se.title)].join(' ')),
       });
     }
   });
   return out;
 }
-function filterEntries(list, { q = '', g = '', y = '', f = '' }) {
+function filterEntries(list, { q = '', g = '', y = '', f = '', l = '' }) {
   const terms = norm(q).split(/\s+/).filter(Boolean);
   return list.filter((e) => terms.every((t) => e.words.includes(t))
-    && (!g || e.genres.includes(g)) && (!y || String(e.year) === String(y)) && (!f || e.format === f));
+    && (!g || e.genres.includes(g)) && (!y || String(e.year) === String(y)) && (!f || e.format === f) && (!l || (e.langs || []).includes(l)));
 }
 function sortEntries(list, o) {
   const az = (a, b) => a.title.localeCompare(b.title, 'es', { numeric: true });
@@ -2517,6 +2634,7 @@ function seriesPosterHTML(s, si) {
     <span class="shelf-poster">
       ${m && m.cover ? `<img src="${esc(m.cover)}" alt="" loading="lazy" decoding="async">` : `<span class="is-fallback" ${coverEp ? `data-thumb="${esc(coverEp.id)}"` : ''}><span class="cover-glyph">${esc([...s.name.trim()][0] || '·')}</span></span>`}
       ${fresh ? `<span class="tile-badge">${fresh === 1 ? 'Nuevo' : `${fresh} nuevos`}</span>` : ''}
+      ${langChip(langsOf(s.all))}
       ${pct && pct < 100 ? `<span class="tile-bar"><span style="width:${pct}%"></span></span>` : ''}
     </span>
     <span class="shelf-title">${esc(s.name)}</span>
@@ -2545,7 +2663,7 @@ function entryTile(e) {
 /* Dos catálogos, Series y Películas (?t=series | ?t=peliculas). Al buscar o filtrar por una etiqueta,
  * se busca en todo: series y películas juntas. */
 const CAT_TITLES = { series: 'Series', peliculas: 'Películas' };
-const isFiltering = (st) => !!(st.q || st.g || st.y || st.f);
+const isFiltering = (st) => !!(st.q || st.g || st.y || st.f || st.l);
 function catalogBase(t, st) {
   const all = catalogEntries().filter((e) => !e.cine || st.q); // Cine no se mezcla: solo aparece al buscar
   if (!CAT_TITLES[t] || isFiltering(st)) return all;
@@ -2577,6 +2695,7 @@ function renderCatalog() {
     </form>
     <div class="cat-filters" id="cat-filters">
       ${select('g', 'Género', genres)}${select('y', 'Año', years)}${select('f', 'Tipo', formats)}
+      ${all.some((e) => e.langs && e.langs.length) ? select('l', 'Idioma', [['sub', 'Subtitulado'], ['dob', 'Doblado']]) : ''}
       ${select('o', 'Orden', [['recent', 'Recientes'], ['az', 'A–Z'], ['year', 'Año']], false)}
       <button class="link-btn cat-clear" type="button" data-act="cat-clear" hidden>Quitar filtros</button>
     </div>
@@ -2592,7 +2711,7 @@ function renderCatalog() {
 }
 function catalogState() {
   const val = (n) => { const el = app.querySelector(`#cat-filters [name="${n}"]`); return el ? el.value : ''; };
-  return { q: ($('#cat-q') || {}).value || '', g: val('g'), y: val('y'), f: val('f'), o: val('o') || 'recent' };
+  return { q: ($('#cat-q') || {}).value || '', g: val('g'), y: val('y'), f: val('f'), l: val('l'), o: val('o') || 'recent' };
 }
 function paintCatalog() {
   const box = $('#cat-results');
@@ -2611,11 +2730,11 @@ function paintCatalog() {
     if (posters) hydrateThumbs(box);
   }
   $('#cat-count').textContent = list.length ? plural(list.length, 'título', 'títulos') : (state.library ? 'Nada coincide con la búsqueda o los filtros.' : 'Cargando la biblioteca…');
-  app.querySelector('[data-act="cat-clear"]').hidden = !(st.g || st.y || st.f || st.q);
+  app.querySelector('[data-act="cat-clear"]').hidden = !(st.g || st.y || st.f || st.l || st.q);
   // la dirección refleja la búsqueda (para volver atrás o compartirla), sin redibujar la página
   const params = new URLSearchParams();
   if (t) params.set('t', t);
-  for (const k of ['q', 'g', 'y', 'f']) if (st[k]) params.set(k, st[k]);
+  for (const k of ['q', 'g', 'y', 'f', 'l']) if (st[k]) params.set(k, st[k]);
   if (st.o !== 'recent') params.set('o', st.o);
   const h = '#/catalogo' + (params.toString() ? '?' + params : '');
   if (location.hash !== h) history.replaceState(null, '', h);
@@ -2668,6 +2787,12 @@ function paintHomeSearch() {
 
 /* ── serie ── */
 
+/** Botones Sub | Doblado de una serie que tiene capítulos en los dos idiomas. */
+function langSwitchHTML(s, langs) {
+  if (!langs || langs.length < 2) return '';
+  const cur = langPref(s);
+  return `<div class="lang-switch" role="group" aria-label="Idioma">${langs.map((l) => `<button class="${l === cur ? 'is-on' : ''}" data-act="lang" data-lang="${l}" aria-pressed="${l === cur}">${l === 'sub' ? 'Sub' : 'Doblado'}</button>`).join('')}</div>`;
+}
 /** Dirección de una temporada: con varias, cada una tiene su página (#/serie/3/1); con una sola, la serie. */
 function seasonHref(si, s, ki) { return s && !isCollection(s) && s.seasons.length > 1 ? `#/serie/${si}/${ki}` : `#/serie/${si}`; }
 /** Nombre corto para la tarjeta de una temporada: sin repetir el nombre (largo) de la serie.
@@ -2721,7 +2846,7 @@ function renderSeries(arg) {
             ${multi ? `<p class="tv-kicker"><a href="#/serie/${si}">${esc(s.name)}</a><span>Temporada ${ki + 1} de ${s.seasons.length}</span></p>` : ''}
             <h2 class="tv-title">${esc(multi ? seasonShort(s, season) : s.name)}</h2>
             ${m && m.title && m.title.toLowerCase() !== (multi ? seasonShort(s, season) : s.name).toLowerCase() ? `<p class="tv-alt">${esc(m.title)}${m.native ? ` <span lang="ja">${esc(m.native)}</span>` : ''}</p>` : ''}
-            ${factsRowsHTML(s, m, { count: flat ? null : scope.length, seen, total: scope.length })}
+            ${factsRowsHTML(s, m, { count: flat ? null : scope.length, seen, total: scope.length, lang: langText(langsOf(season.episodes)) })}
           </div>
         </div>
         ${syn ? `<p class="tv-synopsis is-long" id="synopsis">${esc(syn)}</p>` : ''}
@@ -2736,6 +2861,7 @@ function renderSeries(arg) {
         <div class="ep-head">
           <h3 class="ep-heading">${flat ? 'Películas' : 'Episodios'}</h3>
           <button class="pick-toggle" data-act="pick-mode" id="pick-toggle" aria-pressed="false">${ICON.check}<span>Seleccionar</span></button>
+          ${langSwitchHTML(s, season.langs)}
           ${multi ? `<nav class="season-step" aria-label="Otras temporadas">
             ${ki > 0 ? `<a class="step-btn" href="#/serie/${si}/${ki - 1}" data-replace title="${esc(seasonTab(s, s.seasons[ki - 1]))}">${ICON.back}<span>Anterior</span></a>` : ''}
             <a class="step-btn" href="#/serie/${si}" data-replace>${ICON.grid}<span>Temporadas</span></a>
@@ -2788,6 +2914,7 @@ function renderSeasonMenu(s, si) {
       <span class="shelf-poster">
         ${sm && sm.cover ? `<img src="${esc(sm.cover)}" alt="" loading="lazy" decoding="async">` : first ? `<span class="is-fallback" data-thumb="${esc(first.id)}"><span class="cover-glyph">${esc([...t.trim()][0] || '·')}</span></span>` : ''}
         ${isNew ? '<span class="tile-badge">Nuevo</span>' : ki === nextKi && done ? '<span class="tile-badge">Viendo</span>' : ''}
+        ${langChip(langsOf(se.episodes))}
         ${done && !all ? `<span class="tile-bar"><span style="width:${(done / se.episodes.length) * 100}%"></span></span>` : ''}
       </span>
       <span class="shelf-title" title="${esc(seasonTab(s, se))}">${esc(t)}</span>
@@ -2805,7 +2932,7 @@ function renderSeasonMenu(s, si) {
           <div class="series-info">
             <h2 class="tv-title">${esc(s.name)}</h2>
             ${m && m.title && !isFranchise(s) && m.title.toLowerCase() !== s.name.toLowerCase() ? `<p class="tv-alt">${esc(m.title)}${m.native ? ` <span lang="ja">${esc(m.native)}</span>` : ''}</p>` : ''}
-            ${factRows(`<span>${plural(s.seasons.length, 'temporada', 'temporadas')}</span><span>${plural(s.all.length, 'capítulo', 'capítulos')}</span>${seen ? `<span>${seen} vistos</span>` : ''}`, m,
+            ${factRows(`<span>${plural(s.seasons.length, 'temporada', 'temporadas')}</span><span>${plural(s.all.length, 'capítulo', 'capítulos')}</span>${langsOf(s.all).length ? `<span>${esc(langText(langsOf(s.all)))}</span>` : ''}${seen ? `<span>${seen} vistos</span>` : ''}`, m,
               [m && m.year ? `<a class="fact" href="#/catalogo?${new URLSearchParams({ y: m.year })}">${esc(m.year)}</a>` : '', ...((m && m.genres) || []).slice(0, 3).map((g) => `<a class="fact" href="#/catalogo?${new URLSearchParams({ g })}">${esc(g)}</a>`)].join(''))}
           </div>
         </div>
@@ -2818,7 +2945,7 @@ function renderSeasonMenu(s, si) {
         </div>
       </section>
       <section class="ep-section">
-        <div class="ep-head"><h3 class="ep-heading">Temporadas</h3></div>
+        <div class="ep-head"><h3 class="ep-heading">Temporadas</h3>${langSwitchHTML(s, s.seasons.some((se) => se.langs) ? ['sub', 'dob'] : null)}</div>
         <ul class="shelf season-grid" role="list">${cards}</ul>
       </section>
     </main>
@@ -2853,6 +2980,7 @@ function moviePosterHTML(s, si, { it, m, plan }, fresh) {
     <span class="shelf-poster">
       ${m && m.cover ? `<img src="${esc(m.cover)}" alt="" loading="lazy" decoding="async">` : `<span class="is-fallback" data-thumb="${esc(it.eps[0].id)}"><span class="cover-glyph">${esc([...t.trim()][0] || '·')}</span></span>`}
       ${isNew ? '<span class="tile-badge">Nueva</span>' : ''}
+      ${langChip(langsOf(it.eps))}
       ${plan.pct && !plan.seen ? `<span class="tile-bar"><span style="width:${plan.pct}%"></span></span>` : ''}
     </span>
     <span class="shelf-title">${esc(t)}</span>
@@ -2889,7 +3017,7 @@ function renderMovie(arg) {
   const dur = (prog(plan.ep) || {}).d;
   const chip = (label, params) => `<a class="fact" href="#/catalogo?${new URLSearchParams(params)}">${esc(label)}</a>`;
   const facts = factRows(
-    [dur ? `<span>${Math.round(dur / 60)} min</span>` : '', it.eps.length > 1 ? `<span>${it.eps.length} partes</span>` : ''].join(''),
+    [dur ? `<span>${Math.round(dur / 60)} min</span>` : '', it.eps.length > 1 ? `<span>${it.eps.length} partes</span>` : '', langsOf(it.eps).length ? `<span>${esc(langText(langsOf(it.eps)))}</span>` : ''].join(''),
     m,
     [m && m.year ? chip(m.year, { y: m.year }) : '', chip('Película', { f: 'Película' }), ...((m && m.genres) || []).slice(0, 3).map((g) => chip(g, { g }))].join(''),
   );
@@ -2916,6 +3044,7 @@ function renderMovie(arg) {
             : pending.length ? `<button class="tv-btn" data-act="movie-dl" data-si="${si}" data-key="${esc(it.key)}">${ICON.down}<span>Descargar</span></button>`
             : `<span class="tv-btn is-quiet">${ICON.saved}<span>Descargada</span></span>`}
           <button class="tv-btn ${later ? 'is-on' : ''}" data-act="later-item" data-si="${si}" data-key="${esc(it.key)}" aria-pressed="${later}">${later ? ICON.laterOn : ICON.later}<span>Más tarde</span></button>
+          ${langSwitchHTML(s, langsOf(it.eps).length > 1 ? langsOf(it.eps) : null)}
         </div>
       </section>
       ${it.eps.length > 1 ? `<section class="ep-section">
@@ -3059,6 +3188,9 @@ function episodeRow(ep, { current = false, extra = '', fresh = false, next = fal
   const p = prog(ep);
   const pct = p && p.d ? (p.w ? 100 : Math.min(100, (p.t / p.d) * 100)) : 0;
   const seen = !!(p && p.w);
+  // en una temporada con los dos idiomas, el capítulo que solo existe en el otro se marca
+  const sr = e && state.library.series[e.si];
+  const only = sr && sr.seasons[e.ki] && sr.seasons[e.ki].langs && ep.lang && !index.twins.has(ep.path) && ep.lang !== langPref(sr) ? `Solo ${ep.lang === 'sub' ? 'sub' : 'doblado'}` : '';
   const status = current ? '<span class="ep-now"><span class="eq" aria-hidden="true"><i></i><i></i><i></i></span>Reproduciendo</span>'
     : next && !seen ? `<span class="ep-next">${p && p.t > 5 ? `Seguir en ${fmtTime(p.t)}` : 'A continuación'}</span>`
     : episodeStatus(ep);
@@ -3067,7 +3199,7 @@ function episodeRow(ep, { current = false, extra = '', fresh = false, next = fal
       <span class="ep-thumb ${art ? 'has-img is-art' : ''}" ${!art && ep.fa ? `data-thumb="${esc(ep.id)}"` : ''}>
         ${art ? `<img src="${esc(art)}" alt="" loading="lazy" decoding="async">` : ''}
         <span class="ep-num" aria-hidden="true">${movie ? '' : ep.ep != null ? esc(ep.ep) : '·'}</span>
-        <span class="ep-flags">${fresh ? '<span class="ep-new">Nuevo</span>' : ''}${state.saved.has(ep.id) ? `<span class="ep-flag" title="Descargado">${ICON.saved}</span>` : ''}${seen ? `<span class="ep-flag is-seen" title="Visto">${ICON.check}</span>` : ''}</span>
+        <span class="ep-flags">${only ? `<span class="ep-new is-lang">${only}</span>` : ''}${fresh ? '<span class="ep-new">Nuevo</span>' : ''}${state.saved.has(ep.id) ? `<span class="ep-flag" title="Descargado">${ICON.saved}</span>` : ''}${seen ? `<span class="ep-flag is-seen" title="Visto">${ICON.check}</span>` : ''}</span>
         ${codecTagHTML(ep)}
         <span class="ep-play" aria-hidden="true">${ICON.play}</span>
         ${pct ? `<span class="mini-bar"><span style="width:${pct}%"></span></span>` : ''}
@@ -4005,6 +4137,7 @@ async function loadChapters(ep, token) {
   if (!alive()) return;
   const read = await rangeReader(ep, token, ctrl.signal);
   const info = await mp4Info(read, ep.size);
+  learnAudioLang(ep, info.audioLang);
   if (!alive()) return;
   const chapters = await mp4Chapters(info, read, video.duration);
   if (!alive()) return;
@@ -4041,6 +4174,7 @@ async function cacheChapters(ep) {
   if (!blob || !/mp4|quicktime/.test(ep.mime)) return;
   const read = async (a, b) => new Uint8Array(await blob.slice(a, b + 1).arrayBuffer());
   const info = await mp4Info(read, ep.size);
+  learnAudioLang(ep, info.audioLang);
   saveChapterCache(ep, await mp4Chapters(info, read, null));
 }
 
@@ -4725,6 +4859,13 @@ document.addEventListener('click', async (e) => {
     go('#/play/' + encodeURIComponent(o.ep.id));
   }
   else if (act === 'resume-dismiss') { const o = resumeOffer(); if (o) LS.set('nowSeen', o.n.u); render(); }
+  else if (act === 'lang') {
+    const sr = state.library && state.library.series[heroSi];
+    if (!sr) return;
+    setLangPref(sr, el.dataset.lang);
+    if (picking) picking.ids = new Set();
+    softRender();
+  }
   else if (act === 'series-dl') {
     const sr = state.library.series[Number(el.dataset.si)];
     // en la página de una temporada, los siguientes de esa temporada
