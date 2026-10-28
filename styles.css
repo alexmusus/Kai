@@ -1293,3 +1293,8 @@ html.has-mini body { padding-bottom: var(--mini-space); }
 }
 .ep-new.is-lang { background: rgba(0, 0, 0, 0.55); color: #fff; }
 img.no-fade { animation: none !important; }
+
+/* iPhone: al volver atrás deslizando, Safari dibuja tarde lo que lleva desenfoque detrás o sombras muy grandes
+ * (parpadeaban las etiquetas SUB/DUB, "Nuevo" y los títulos grandes). Estas piezas pequeñas van sin desenfoque. */
+.lang-chip, .tile-badge { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgba(0, 0, 0, 0.55); }
+.tv-title { text-shadow: 0 1px 12px color-mix(in srgb, var(--bg) 45%, transparent); }
