@@ -10,7 +10,17 @@ const app = $('#app');
 
 const LS = {
   get(k, d) { try { const v = localStorage.getItem('kai.' + k); return v ? JSON.parse(v) : d; } catch { return d; } },
-  set(k, v) { try { localStorage.setItem('kai.' + k, JSON.stringify(v)); } catch { /* sin espacio */ } },
+  // si el navegador se queda sin espacio, se sueltan copias que se pueden volver a traer de MEGA o de internet
+  // (antes fallaba sin avisar: por ejemplo, las burbujas de "nuevos" volvían al reabrir Kai)
+  set(k, v) {
+    const str = JSON.stringify(v);
+    for (const spare of [null, ['discover'], ['syn', 'synSig'], ['meta', 'fichasSig']]) {
+      if (spare) { if (spare.includes(k)) continue; spare.forEach((x) => { try { localStorage.removeItem('kai.' + x); } catch { /* nada */ } }); }
+      try { localStorage.setItem('kai.' + k, str); if (spare) LS.freed = true; return true; } catch { /* sigue liberando */ }
+    }
+    LS.full = true;
+    return false;
+  },
   del(k) { try { localStorage.removeItem('kai.' + k); } catch { /* nada */ } },
 };
 // La app se llamaba Yoru: se conserva la sesión y el progreso guardados con ese nombre.
@@ -1476,8 +1486,15 @@ const navStack = [location.hash || '#/'];
 let navBackSteps = 0; // pasos que Kai mismo pidió retroceder
 let navReplacing = false;
 const navPage = (h) => String(h || '#/').split('?')[0];
+/* Al volver atrás (deslizar desde el borde en iPhone, o el botón), la página vuelve a donde estaba, no arriba:
+ * si no, Safari muestra la foto de la página donde estabas y luego salta al inicio, y las portadas parpadean. */
+const scrollMemo = new Map();
+let navWasBack = false;
+addEventListener('scroll', () => { scrollMemo.set(location.hash || '#/', window.scrollY); }, { passive: true });
+if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
 function onHashChange() {
   const h = location.hash || '#/';
+  navWasBack = !!navBackSteps || (navStack.length > 1 && navStack[navStack.length - 2] === h);
   if (navBackSteps) { navStack.length = Math.max(1, navStack.length - navBackSteps); navBackSteps = 0; navStack[navStack.length - 1] = h; }
   else if (navReplacing) { navStack[navStack.length - 1] = h; navReplacing = false; }
   else if (navStack.length > 1 && navStack[navStack.length - 2] === h) navStack.pop(); // botón atrás del navegador
@@ -1547,7 +1564,8 @@ function render() {
   paintDock();
   hydrateThumbs(app);
   const key = view + '/' + arg;
-  if (key !== lastRouteKey && view !== 'play') window.scrollTo(0, 0);
+  if (key !== lastRouteKey && view !== 'play') window.scrollTo(0, navWasBack ? scrollMemo.get(location.hash || '#/') || 0 : 0);
+  navWasBack = false;
   if (key !== lastRouteKey && view === 'play' && lastRouteKey.split('/')[0] !== 'play') window.scrollTo(0, 0);
   lastRouteKey = key;
 }
@@ -3221,7 +3239,10 @@ function episodeRow(ep, { current = false, extra = '', fresh = false, next = fal
 const seenImgs = new Set();
 function settleImages(root) {
   for (const img of root.querySelectorAll ? root.querySelectorAll('img') : []) {
-    if (seenImgs.has(img.src) || (img.complete && img.naturalWidth)) { img.classList.add('no-fade'); seenImgs.add(img.src); }
+    if (seenImgs.has(img.src) || (img.complete && img.naturalWidth)) {
+      // ya cargada: sin fundido y dibujada en el mismo instante (sin el cuadro vacío de la carga diferida)
+      img.classList.add('no-fade'); img.decoding = 'sync'; img.loading = 'eager'; seenImgs.add(img.src);
+    }
     else img.addEventListener('load', () => seenImgs.add(img.src), { once: true });
   }
 }
@@ -3377,6 +3398,7 @@ function renderSettings() {
     </section>
     <section class="settings-group">
       <p class="dim">Sesión de MEGA: ${esc((LS.get('session', {}).options || {}).email || '')}</p>
+      <p class="dim">Datos de Kai en este navegador: ${(() => { let n = 0; try { for (const k of Object.keys(localStorage)) if (k.startsWith('kai.')) n += (localStorage.getItem(k) || '').length; } catch { /* nada */ } return n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.round(n / 1024) + ' KB'; })()}${LS.full ? ' · <strong>sin espacio: algo no se pudo guardar</strong>' : LS.freed ? ' · se liberó espacio' : ''}</p>
       <button class="btn btn-quiet" data-act="logout">Cerrar sesión en este dispositivo</button>
     </section>
   </main>`;
@@ -3698,6 +3720,9 @@ function watchDlButton(ep) {
 
 function renderWatch(id) {
   const ctx = resolveContext(id);
+  // ver un capítulo cuenta como haber visto lo nuevo de esa serie (si no, la burbuja seguía en el inicio)
+  const ws = ctx && ctx.si != null && state.library && state.library.series[ctx.si];
+  if (ws && newEpisodes(ws).length) { markSeriesSeen(ws); lastNew = null; }
   if (!ctx) {
     if (LS.get('session', null) && (state.connecting || !state.library)) {
       app.innerHTML = header('') + '<main><section class="empty"><p class="dim">Cargando…</p></section></main>';
