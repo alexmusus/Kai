@@ -661,8 +661,10 @@ function resolveContext(id) {
     const s = state.library.series[e.si];
     const season = s.seasons[e.ki];
     return {
-      ep: e.ep, list: s.all, shown: season.episodes, title: s.name,
-      sub: season.title && season.title !== s.name ? season.title : (season.num != null ? `Temporada ${season.num}` : ''),
+      // la lista del reproductor es solo la temporada: al terminarla, Kai se detiene (no pasa sola a la siguiente)
+      ep: e.ep, list: season.episodes, shown: season.episodes, title: s.name,
+      sub: isCollection(s) ? '' : s.seasons.length > 1 ? seasonTab(s, season) : (hasOwnTitle(season) && season.title !== s.name ? season.title : ''),
+      ki: e.ki,
       back: isCollection(s) ? movieHref(e.si, itemFor(s, e.ep).key) : '#/serie/' + e.si, si: e.si,
     };
   }
@@ -3976,7 +3978,21 @@ video.addEventListener('ended', () => {
   sync();
   stage.classList.add('is-ended');
   const n = neighbor(1);
-  if (!n) { playerMessage(`Terminaste ${playing.ctx.title}.`); return; }
+  if (!n) {
+    // fin de la temporada: no sigue sola. Si hay otra después, se ofrece, pero solo si la tocas.
+    const lib = state.library;
+    const s = playing.ctx.si != null && lib && lib.series[playing.ctx.si];
+    const nextSe = s && !isCollection(s) && playing.ctx.ki != null ? s.seasons[playing.ctx.ki + 1] : null;
+    if (!nextSe) { playerMessage(`Terminaste ${playing.ctx.title}.`); return; }
+    const first = nextSe.episodes.find((e) => !(prog(e) || {}).w) || nextSe.episodes[0];
+    ui.nextCard.innerHTML = `<p>Terminaste ${esc(seasonTab(s, s.seasons[playing.ctx.ki]))}</p>
+      <div class="btn-row">
+        <button class="btn btn-lamp" data-act="p-next-season" data-id="${esc(first.id)}">${ICON.play}<span>Ver ${esc(seasonTab(s, nextSe))}</span></button>
+        <a class="btn" href="${playing.ctx.back}">Volver</a>
+      </div>`;
+    ui.nextCard.hidden = false;
+    return;
+  }
   let left = 6;
   ui.nextCard.innerHTML = `<p>Sigue ${esc(episodeLabel(n))}</p>
     <div class="btn-row">
@@ -4272,6 +4288,7 @@ stage.addEventListener('click', (e) => {
   else if (act === 'speed') openMenu('speed');
   else if (act === 'm-speed') { speed = Number(el.dataset.v); video.playbackRate = speed; paintMenu(); paintControls(); }
   else if (act === 'p-next-now') { ui.nextCard.hidden = true; clearTimeout(nextTimer); playNext(); }
+  else if (act === 'p-next-season') { ui.nextCard.hidden = true; switchTo(epById(el.dataset.id)); }
   else if (act === 'p-next-cancel') { clearTimeout(nextTimer); ui.nextCard.hidden = true; }
   else if (act === 'p-dl') downloadThenPlay();
   else if (act === 'p-folder' && playing) {
