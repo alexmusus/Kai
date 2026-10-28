@@ -1263,3 +1263,7 @@ html.has-mini body { padding-bottom: var(--mini-space); }
 .facts-rows .tv-facts { margin: 0; }
 .tv-facts .fact-sep { padding: 5px 2px; background: none; box-shadow: none; border: 0; -webkit-backdrop-filter: none; backdrop-filter: none; color: var(--faint); }
 .tv-facts .fact-score { font-weight: 650; }
+
+/* Ajustes → Cine */
+.tmdb-form { display: grid; gap: 10px; margin-top: 10px; }
+.tmdb-form .btn { justify-self: start; }

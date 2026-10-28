@@ -1,6 +1,6 @@
 import { Storage } from './vendor/mega.js';
 import { isSubtitleName, mp4Info, mp4Chapters, mp4Formats, mp4QuickFormats, pickIntro, OUTRO_RE as OUTRO } from './subs.js';
-import { searchAnime, animeById, toMeta, findForSeries, findMovie, findTitle, findSeason, translateToSpanish, canTranslate, recommendationsFor, airingTop, toDiscover } from './meta.js';
+import { searchAnime, animeById, toMeta, findForSeries, findMovie, findTitle, findSeason, tmdbFindMovie, tmdbCheckKey, translateToSpanish, canTranslate, recommendationsFor, airingTop, toDiscover } from './meta.js';
 
 const C = window.MegaCore;
 const $ = (s, el = document) => el.querySelector(s);
@@ -838,6 +838,7 @@ function mergeShared(a, b) {
     profiles: Object.values(profiles).sort((x, y) => (x.created || 0) - (y.created || 0)),
     intros: byU(a.intros, b.intros),
     picks: byU(a.picks, b.picks),
+    keys: byU(a.keys, b.keys), // claves de servicios (TMDB para Cine): { tmdb: { v, u } }
     legacyBy: a.legacyBy || b.legacyBy || null,
   };
 }
@@ -929,7 +930,7 @@ async function doSync() {
         saveProgressLocal();
       }
     }
-    const hasShared = state.shared.profiles.length || Object.keys(state.shared.intros).length || Object.keys(state.shared.picks).length;
+    const hasShared = state.shared.profiles.length || Object.keys(state.shared.intros).length || Object.keys(state.shared.picks).length || Object.keys(state.shared.keys || {}).length;
     if (hasShared && (sNodes.length !== 1 || stable(state.shared) !== stable(remoteShared))) {
       await writeJson(home, SHARED_FILE, { v: 3, app: 'kai', ...state.shared }, sNodes);
     }
@@ -1823,6 +1824,24 @@ async function ensureMeta() {
   try {
     for (const s of state.library.series) {
       const pick = null; // todo automático: ya no se usan fichas elegidas a mano
+      if (isCine(s)) {
+        // Cine: cada película en TMDB (sin clave no se busca nada)
+        const key = tmdbKey();
+        if (!key) continue;
+        for (const it of collectionItems(s)) {
+          const k = itemMetaKey(s, it.key);
+          const c = state.meta[k];
+          const age = Date.now() - ((c && c.at) || 0);
+          if (c && c.tm === 1 && c.key === key.slice(-6) && (c.none ? age < 86400000 : age < 30 * 86400000)) continue;
+          let m = null;
+          try { if (it.query) m = await tmdbFindMovie(it.query, key); } catch (err) { console.warn('tmdb', err); break; }
+          state.meta[k] = m ? { ...m, tm: 1, key: key.slice(-6) } : { none: true, id: 0, tm: 1, key: key.slice(-6), at: Date.now() };
+          changed = true;
+          saveMeta();
+          await sleep(250);
+        }
+        continue;
+      }
       if (isCollection(s)) {
         // cada película por separado; la carpeta no se busca
         let failed = false;
@@ -1915,7 +1934,7 @@ async function translateMissing() {
     const disc = LS.get('discover', {}) || {};
     const extra = Object.values(disc).flatMap((d) => (d && d.items) || []);
     for (const m of [...Object.values(state.meta), ...extra]) {
-      if (!m || m.none || !m.id) continue;
+      if (!m || m.none || !m.id || m.src === 'TMDB') continue; // lo de TMDB ya viene en español
       if (state.syn[m.id]) continue;
       // lo que este navegador ya había traducido antes también se comparte
       let es = m.synopsisEs || null;
@@ -1970,7 +1989,14 @@ function mergeSyn(a, b) {
  * y la carpeta se muestra con un mosaico de sus pósters y un texto propio. */
 // "Películas" puede venir con la tilde en cualquier codificación (macOS la guarda separada), o sin tilde
 const COLLECTION_RE = /^(peliculas?|movies?|films?|filmes)\b/i;
-const isCollection = (s) => !!s && COLLECTION_RE.test(String(s.name || '').trim().normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
+/* Cine: películas que no son anime (p. ej. "El gigante de hierro"). Carpeta "Cine" (u "Otras películas") dentro de Anime:
+ * funciona como Películas (estante y página de cada una) pero no sale en el inicio ni en los catálogos, solo con su
+ * botón al final del inicio y al buscar. Sus fichas vienen de TMDB (con la clave que se pone en Ajustes). */
+const CINE_RE = /^(cine|otras peliculas)\b/i;
+const plainName = (s) => String((s && s.name) || '').trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+const isCine = (s) => !!s && CINE_RE.test(plainName(s));
+const isCollection = (s) => !!s && (COLLECTION_RE.test(plainName(s)) || isCine(s));
+const tmdbKey = () => (state.shared.keys && state.shared.keys.tmdb && state.shared.keys.tmdb.v) || '';
 function cleanFileTitle(name) {
   const t = String(name).replace(/\.[^.]+$/, '').replace(/[[(][^\])]*[\])]/g, ' ').replace(/[_.]+/g, ' ')
     .replace(/\b(1080p|720p|480p|2160p|4k|x26[45]|hevc|aac|sub|subs|dub|latino|esp|spa|bd|bdrip|web|webrip)\b/gi, ' ')
@@ -2002,6 +2028,8 @@ const movieHref = (si, key) => `#/pelicula/${si}/${encodeURIComponent(key)}`;
 /** Nombre que se muestra de una película: el de su carpeta, o el de AniList si es un archivo suelto. */
 function movieTitle(s, it) {
   const m = itemMeta(s, it.key);
+  // Cine: el título en español de TMDB, o el nombre de la carpeta sin el año ("El gigante de hierro (1999)")
+  if (isCine(s)) return (m && m.title) || (it.title || it.query || '').replace(/\s*[([]\s*(?:19|20)\d{2}\s*[)\]]\s*$/, '') || it.eps[0].name.replace(/\.[^.]+$/, '');
   return it.title || (m && m.title) || it.query || it.eps[0].name.replace(/\.[^.]+$/, '');
 }
 function itemMeta(s, key) {
@@ -2018,7 +2046,7 @@ function displayMeta(s) {
     return t ? `${t}${it.m && it.m.year ? ` (${it.m.year})` : ''}` : '';
   }).filter(Boolean);
   const list = named.length > 1 ? `${named.slice(0, -1).join(', ')} y ${named[named.length - 1]}` : named[0] || '';
-  const text = `${items.length === 1 ? 'Una película' : `${items.length} películas`} de anime en tu MEGA${list ? `: ${list}` : ''}.`;
+  const text = `${items.length === 1 ? 'Una película' : `${items.length} películas`}${isCine(s) ? '' : ' de anime'} en tu MEGA${list ? `: ${list}` : ''}.`;
   return {
     collection: true, title: '', synopsis: text, synopsisEs: text,
     collage: items.map((it) => it.m && it.m.cover).filter(Boolean).slice(0, 8),
@@ -2285,6 +2313,7 @@ function renderHome() {
 </section>
       ${homeMoviesHTML(lib)}
       <nav class="discover-links" aria-label="Descubrir">
+        ${lib.series.some(isCine) ? `<a class="tv-more" href="#/serie/${lib.series.findIndex(isCine)}">${ICON.grid}<span>${esc(lib.series.find(isCine).name)}</span></a>` : ''}
         <a class="tv-more" href="#/descubrir/porque">${ICON.grid}<span>Porque viste…</span></a>
         <a class="tv-more" href="#/descubrir/emision">${ICON.grid}<span>En emisión</span></a>
       </nav>
@@ -2293,7 +2322,7 @@ function renderHome() {
 }
 /** Fila "Películas" del inicio: las 10 más recientes y el enlace al estante completo. */
 function homeMoviesHTML(lib) {
-  const si = lib.series.findIndex((x) => isCollection(x));
+  const si = lib.series.findIndex((x) => isCollection(x) && !isCine(x));
   if (si < 0) return '';
   const s = lib.series[si];
   const items = shelfItems(s);
@@ -2387,7 +2416,7 @@ function catalogEntries() {
         const title = it.title || (m && m.title) || it.eps[0].name.replace(/\.[^.]+$/, '');
         out.push({
           si, title: movieTitle(s, it), m, img: m && (m.banner || m.cover), year: m && m.year, genres: (m && m.genres) || [], format: 'Película',
-          added: Math.max(0, ...it.eps.map((e) => e.ts || 0)), href: movieHref(si, it.key), movie: it.key,
+          added: Math.max(0, ...it.eps.map((e) => e.ts || 0)), href: movieHref(si, it.key), movie: it.key, cine: isCine(s),
           words: norm([title, m && m.title, m && m.romaji, m && m.native, s.name].join(' ')),
         });
       }
@@ -2455,7 +2484,7 @@ function entryTile(e) {
 const CAT_TITLES = { series: 'Series', peliculas: 'Películas' };
 const isFiltering = (st) => !!(st.q || st.g || st.y || st.f);
 function catalogBase(t, st) {
-  const all = catalogEntries();
+  const all = catalogEntries().filter((e) => !e.cine || st.q); // Cine no se mezcla: solo aparece al buscar
   if (!CAT_TITLES[t] || isFiltering(st)) return all;
   return all.filter((e) => (t === 'peliculas') === !!e.movie);
 }
@@ -3020,6 +3049,7 @@ function renderSettings() {
       <div class="segmented" role="group" aria-label="Tono del modo oscuro">${Object.entries(DARK_TONES).map(([v, o]) => `<button class="seg ${(s.darkTone || 'negro') === v ? 'is-on' : ''}" data-act="set-dark-tone" data-v="${v}" aria-pressed="${(s.darkTone || 'negro') === v}">${o.label}</button>`).join('')}</div>
       <p class="dim settings-hint">El tono claro se usa con el tema Claro y el oscuro con el tema Oscuro; en Automático, cada uno según la hora del sistema.</p>
     </section>
+    <section class="settings-group" id="cine-key">${cineKeyHTML()}</section>
     <section class="settings-group">
       <p class="settings-label">Carpeta de series</p>
       <p class="settings-value">${esc(s.root)}</p>
@@ -3066,7 +3096,46 @@ function renderSettings() {
   });
   paintSpace();
   paintDownloadsWhere();
+  bindCineKey();
   swVersion().then((v) => { const el = $('#app-version'); if (el) el.textContent = v ? v.replace('kai-v', 'Kai ') : 'Sin instalar'; });
+}
+
+/** Ajustes → Cine: la clave de TMDB, guardada en tu MEGA (no en el código) para que todos tus dispositivos la usen. */
+function cineKeyHTML(note = '') {
+  const key = tmdbKey();
+  const lib = state.library;
+  const cine = lib && lib.series && lib.series.find(isCine);
+  return `<p class="settings-label">Cine</p>
+    <p class="dim">Películas que no son anime, en la carpeta <strong>${esc(state.settings.root)}/Cine</strong>, una subcarpeta por película (por ejemplo «El gigante de hierro (1999)»). No salen en el inicio: se abren con el botón Cine al final. Sus pósters y sinopsis vienen de TMDB.</p>
+    ${key ? `<p class="settings-value">Clave de TMDB guardada (…${esc(key.slice(-4))})${cine ? '' : ' · todavía no hay carpeta Cine'}</p>
+      <div class="btn-row"><button class="btn btn-quiet" data-act="tmdb-del">Quitar la clave</button></div>`
+    : `<form class="form tmdb-form" id="tmdb-form" autocomplete="off">
+        <label>Clave de la API de TMDB<input id="tmdb-key" name="k" type="password" spellcheck="false" autocapitalize="off" placeholder="Pega aquí tu clave"></label>
+        <button class="btn" type="submit">Guardar</button>
+      </form>`}
+    ${note ? `<p class="dim" role="status">${esc(note)}</p>` : ''}`;
+}
+function paintCineKey(note) { const el = $('#cine-key'); if (el) { el.innerHTML = cineKeyHTML(note); bindCineKey(); } }
+function bindCineKey() {
+  const f = $('#tmdb-form');
+  if (!f) return;
+  f.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const v = f.k.value.trim();
+    if (!v) return;
+    f.querySelector('button').textContent = 'Revisando…';
+    let ok;
+    try { ok = await tmdbCheckKey(v); } catch { paintCineKey('Sin conexión con TMDB. Intenta de nuevo.'); return; }
+    if (!ok) { paintCineKey('TMDB dice que esa clave no es válida. Copia la «Clave de la API» de themoviedb.org → Ajustes → API.'); return; }
+    setTmdbKey(v);
+    paintCineKey('Lista. Kai ya está buscando las fichas de tus películas de Cine.');
+  });
+}
+function setTmdbKey(v) {
+  state.shared.keys = { ...(state.shared.keys || {}), tmdb: { v, u: Date.now() } };
+  saveShared();
+  sync();
+  setTimeout(ensureMeta, 500);
 }
 
 function downloadsWhereHTML(perm = '') {
@@ -3185,6 +3254,7 @@ function ownedIds() {
   const lib = state.library;
   if (!lib || lib.v !== 2) return out;
   lib.series.forEach((s, si) => {
+    if (isCine(s)) return;
     if (isCollection(s)) { for (const it of collectionItems(s)) { const m = itemMeta(s, it.key); if (m && m.id) out.set(m.id, movieHref(si, it.key)); } }
     else {
       const m = metaFor(s); if (m && m.id) out.set(m.id, '#/serie/' + si);
@@ -4518,6 +4588,7 @@ document.addEventListener('click', async (e) => {
       toast(`${plural(ups.length, 'capítulo', 'capítulos')} en cola de descarga.`);
     }
   }
+  else if (act === 'tmdb-del') { setTmdbKey(''); paintCineKey('Clave quitada.'); }
   else if (act === 'translate') {
     const sr = state.library.series[heroSi];
     const m = sr && state.meta[el.dataset.key ? itemMetaKey(sr, el.dataset.key) : sr.name];

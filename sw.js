@@ -70,8 +70,8 @@ self.addEventListener('fetch', (e) => {
   }
   if (req.method !== 'GET') return;
 
-  // imágenes de AniList: se guardan para verlas sin conexión
-  if (url.hostname.endsWith('anilist.co') && req.destination === 'image') {
+  // imágenes de AniList y de TMDB (Cine): se guardan para verlas sin conexión
+  if ((url.hostname.endsWith('anilist.co') || url.hostname === 'image.tmdb.org') && req.destination === 'image') {
     e.respondWith(cacheFirst(req, ART_CACHE));
     return;
   }

@@ -245,3 +245,63 @@ export async function airingTop() {
   return ((data && data.Page && data.Page.media) || []).filter((m) => !(m.duration && m.duration < SHORT_MIN));
 }
 const SHORT_MIN = 8; // minutos por capítulo
+
+/* ── Cine: películas que no son anime, con fichas de TMDB (themoviedb.org) ──
+ * Necesita una clave gratis de TMDB (Ajustes → Cine). Se acepta la "Clave de la API" (v3) o el token largo (v4). */
+const TMDB = 'https://api.themoviedb.org/3';
+const TMDB_IMG = 'https://image.tmdb.org/t/p/';
+const TMDB_GENRES = {
+  28: 'Acción', 12: 'Aventura', 16: 'Animación', 35: 'Comedia', 80: 'Crimen', 99: 'Documental', 18: 'Drama', 10751: 'Familia',
+  14: 'Fantasía', 36: 'Historia', 27: 'Terror', 10402: 'Música', 9648: 'Misterio', 10749: 'Romance', 878: 'Ciencia ficción',
+  10770: 'Película de TV', 53: 'Suspenso', 10752: 'Bélica', 37: 'Western',
+};
+async function tmdb(path, params, key) {
+  const bearer = key.length > 60; // el token v4 es largo; la clave v3 tiene 32 caracteres
+  const q = new URLSearchParams({ ...params, ...(bearer ? {} : { api_key: key }) });
+  const r = await fetch(`${TMDB}${path}?${q}`, bearer ? { headers: { Authorization: `Bearer ${key}`, Accept: 'application/json' } } : undefined);
+  if (r.status === 401) { const e = new Error('La clave de TMDB no es válida.'); e.code = 'KEY'; throw e; }
+  if (r.status === 429) throw new Error('TMDB pidió esperar un momento.');
+  if (!r.ok) throw new Error('TMDB respondió ' + r.status);
+  return r.json();
+}
+/** ¿La clave funciona? (true / false). Si no hay conexión, lanza error. */
+export async function tmdbCheckKey(key) {
+  try { await tmdb('/configuration', {}, key); return true; } catch (err) { if (err.code === 'KEY') return false; throw err; }
+}
+/** Ficha de una película por el nombre de su carpeta: "El gigante de hierro (1999)" busca "El gigante de hierro" del año 1999. */
+export async function tmdbFindMovie(folderName, key) {
+  const year = (/[([]\s*((?:19|20)\d{2})\s*[)\]]|\b((?:19|20)\d{2})\s*$/.exec(folderName) || []).slice(1).find(Boolean) || '';
+  const name = folderName.replace(/[([]\s*(?:19|20)\d{2}\s*[)\]]|\b(?:19|20)\d{2}\s*$/g, '').replace(/[._]+/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!name) return null;
+  let list = (await tmdb('/search/movie', { query: name, language: 'es-MX', include_adult: 'false', ...(year ? { year } : {}) }, key)).results || [];
+  if (!list.length && year) list = (await tmdb('/search/movie', { query: name, language: 'es-MX', include_adult: 'false' }, key)).results || [];
+  let best = null;
+  let bestScore = 0;
+  for (const m of list.slice(0, 10)) {
+    const fake = { title: { a: m.title, b: m.original_title }, synonyms: [] };
+    let sc = titleScore(name, fake, '');
+    if (year && (m.release_date || '').startsWith(year)) sc += 0.1;
+    sc += Math.min(0.05, (m.popularity || 0) / 2000); // entre dos iguales, la conocida
+    if (sc > bestScore) { best = m; bestScore = sc; }
+  }
+  if (!best || bestScore < 0.7) return null;
+  return {
+    id: 'tmdb:' + best.id, // nunca se confunde con un id de AniList
+    src: 'TMDB',
+    v: 2,
+    title: best.title || best.original_title || '',
+    romaji: best.original_title || '',
+    native: '',
+    synopsis: best.overview || '',
+    synopsisEs: best.overview || '', // TMDB ya la da en español
+    banner: best.backdrop_path ? `${TMDB_IMG}w1280${best.backdrop_path}` : '',
+    cover: best.poster_path ? `${TMDB_IMG}w500${best.poster_path}` : '',
+    color: '',
+    year: best.release_date ? Number(best.release_date.slice(0, 4)) : null,
+    episodes: null,
+    format: 'Película',
+    genres: (best.genre_ids || []).map((g) => TMDB_GENRES[g]).filter(Boolean),
+    score: best.vote_average ? Math.round(best.vote_average * 10) : null, // misma escala que AniList (0–100)
+    at: Date.now(),
+  };
+}
