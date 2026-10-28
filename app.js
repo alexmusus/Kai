@@ -1,6 +1,6 @@
 import { Storage } from './vendor/mega.js';
 import { isSubtitleName, mp4Info, mp4Chapters, mp4Formats, mp4QuickFormats, pickIntro, OUTRO_RE as OUTRO } from './subs.js';
-import { searchAnime, animeById, toMeta, findForSeries, findMovie, findTitle, findSeason, tmdbFindMovie, tmdbCheckKey, translateToSpanish, canTranslate, recommendationsFor, airingTop, toDiscover } from './meta.js';
+import { searchAnime, animeById, toMeta, findForSeries, findMovie, findTitle, findSeason, scoresByIds, tmdbFindMovie, tmdbCheckKey, translateToSpanish, canTranslate, recommendationsFor, airingTop, toDiscover } from './meta.js';
 
 const C = window.MegaCore;
 const $ = (s, el = document) => el.querySelector(s);
@@ -1817,12 +1817,35 @@ function searchNames(s) {
 }
 
 let metaRunning = false;
+/** ¿Ya tiene ficha guardada (encontrada o no) todo lo que se busca de esta serie? */
+function hasAllMeta(s) {
+  if (isCollection(s)) return collectionItems(s).every((it) => state.meta[itemMetaKey(s, it.key)]);
+  const seasonsOk = !usesSeasonMeta(s) || s.seasons.every((se) => !seasonQuery(s, se) || state.meta[itemMetaKey(s, se.name)]);
+  return seasonsOk && (isFranchise(s) || !!state.meta[s.name]);
+}
 async function ensureMeta() {
   if (metaRunning || !navigator.onLine || !state.library || !state.library.series) return;
   metaRunning = true;
   let changed = false;
   try {
-    for (const s of state.library.series) {
+    // 1) las fichas guardadas antes de la v29 no traían la nota: se pide solo la nota, todas juntas (1–2 pedidos),
+    //    en vez de volver a buscar cada serie y película (eso agotaba el límite de AniList y dejaba otras sin ficha)
+    const old = Object.values(state.meta).filter((m) => m && !m.none && typeof m.id === 'number' && m.src !== 'TMDB' && ((m.sv && m.sv < 6) || (m.mv && m.mv < 5)));
+    if (old.length) {
+      try {
+        const sc = await scoresByIds([...new Set(old.map((m) => m.id))]);
+        for (const m of old) {
+          if (m.id in sc) m.score = sc[m.id];
+          if (m.sv) m.sv = 6;
+          if (m.mv) m.mv = 5;
+        }
+        changed = true;
+        saveMeta();
+      } catch (err) { console.warn('anilist notas', err); }
+    }
+    // 2) primero lo que todavía no tiene ficha (p. ej. temporadas recién organizadas), después el resto
+    const order = [...state.library.series].sort((a, b) => Number(hasAllMeta(a)) - Number(hasAllMeta(b)));
+    for (const s of order) {
       const pick = null; // todo automático: ya no se usan fichas elegidas a mano
       if (isCine(s)) {
         // Cine: cada película en TMDB (sin clave no se busca nada)

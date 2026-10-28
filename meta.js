@@ -11,22 +11,55 @@ const FIELDS = `id
   coverImage { extraLarge large color }
   seasonYear episodes format genres averageScore`;
 
-async function gql(query, variables) {
+/* AniList deja hacer 30 pedidos por minuto. Kai lleva la cuenta con lo que AniList responde: cuando quedan pocos,
+ * espera a que se renueve el minuto en vez de fallar; y si aun así responde 429, espera lo que pide y reintenta. */
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+let rlUntil = 0; // no pedir nada antes de esta hora
+async function gql(query, variables, tries = 0) {
+  const wait = rlUntil - Date.now();
+  if (wait > 0) await sleep(wait);
   const r = await fetch(API, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify({ query, variables }),
   });
-  if (r.status === 429) throw new Error('AniList pidió esperar un momento.');
+  const left = Number(r.headers.get('x-ratelimit-remaining'));
+  const reset = Number(r.headers.get('x-ratelimit-reset')) * 1000; // hora (en segundos) en que se renueva
+  if (r.status === 429) {
+    const after = Number(r.headers.get('retry-after')) * 1000 || (reset > Date.now() ? reset - Date.now() : 60000);
+    rlUntil = Date.now() + Math.min(after, 65000) + 500;
+    if (tries < 2) return gql(query, variables, tries + 1);
+    throw new Error('AniList pidió esperar un momento.');
+  }
+  if (r.headers.has('x-ratelimit-remaining') && left <= 1) rlUntil = Math.max(rlUntil, (reset > Date.now() ? reset : Date.now() + 60000) + 500);
   if (!r.ok) throw new Error('AniList respondió ' + r.status);
   const j = await r.json();
   if (j.errors && !j.data) throw new Error(j.errors[0] && j.errors[0].message);
   return j.data;
 }
 
-export async function searchAnime(q, perPage = 8) {
-  const data = await gql(`query ($q: String, $n: Int) { Page(perPage: $n) { media(search: $q, type: ANIME, sort: SEARCH_MATCH) { ${FIELDS} } } }`, { q, n: perPage });
-  return (data && data.Page && data.Page.media) || [];
+// la misma búsqueda no se repite en la sesión (las temporadas de una serie comparten "Yahari Ore no Seishun", etc.)
+const searchMemo = new Map();
+export function searchAnime(q, perPage = 8) {
+  const k = `${perPage}|${q.toLowerCase()}`;
+  if (!searchMemo.has(k)) {
+    const p = gql(`query ($q: String, $n: Int) { Page(perPage: $n) { media(search: $q, type: ANIME, sort: SEARCH_MATCH) { ${FIELDS} } } }`, { q, n: perPage })
+      .then((data) => (data && data.Page && data.Page.media) || []);
+    p.catch(() => searchMemo.delete(k));
+    searchMemo.set(k, p);
+  }
+  return searchMemo.get(k);
+}
+
+/** Notas de AniList de muchas fichas en un solo pedido (para las que se guardaron antes de que Kai mostrara la nota). */
+export async function scoresByIds(ids) {
+  const out = {};
+  for (let i = 0; i < ids.length; i += 40) {
+    const chunk = ids.slice(i, i + 40);
+    const data = await gql(`query { ${chunk.map((id, k) => `a${k}: Media(id: ${Number(id)}, type: ANIME) { id averageScore }`).join(' ')} }`, {});
+    chunk.forEach((id, k) => { const m = data && data[`a${k}`]; if (m) out[id] = m.averageScore || null; });
+  }
+  return out;
 }
 
 export async function animeById(id) {
@@ -125,16 +158,21 @@ export async function findSeason(series, n) {
 export function titleScore(name, m, kind = 'movie') {
   const q = squash(name);
   if (!q) return 0;
-  const titles = [...Object.values(m.title || {}), ...(m.synonyms || [])].map(squash).filter(Boolean);
+  const raw = [...Object.values(m.title || {}), ...(m.synonyms || [])].filter(Boolean);
+  const titles = raw.map(squash).filter(Boolean);
   const words = String(name).split(/[^\p{L}\p{N}]+/u).map(squash).filter((w) => w.length >= 3);
   let best = 0;
+  // "Kaguya-sama wa Kokurasetai" = "Kaguya-sama wa Kokurasetai: Tensaitachi no…" (lo que sigue es un subtítulo, tras ":" o " -")
+  const lowName = String(name).toLowerCase().replace(/\s+/g, ' ').trim();
+  if (lowName.length >= 6 && raw.some((t) => { const lt = String(t).toLowerCase().replace(/\s+/g, ' '); return lt.startsWith(lowName) && /^\s*[:\-–(~]/.test(lt.slice(lowName.length)); })) best = 0.85;
   for (const t of titles) {
     const d = editDistance(q, t);
     best = Math.max(best, 1 - d / Math.max(q.length, t.length));
     // "Kimi no Na wa" dentro de "Kimi no Na wa. (2016)" o al revés también vale
-    if (q.length >= 6 && (t.startsWith(q) || q.startsWith(t))) best = Math.max(best, 0.85);
+    // (solo si lo que sobra es poco: "Yahari… Machigatteiru." no es "Yahari… Machigatteiru. Zoku OVA")
+    if (q.length >= 6 && (t.startsWith(q) || q.startsWith(t)) && Math.abs(t.length - q.length) <= Math.max(6, Math.min(q.length, t.length) * 0.15)) best = Math.max(best, 0.85);
     // "Heaven's Feel I presage flower" dentro de "Fate/stay night Movie: Heaven's Feel - I. presage flower"
-    if (words.length >= 2 && words.every((w) => t.includes(w))) best = Math.max(best, 0.8);
+    if (words.length >= 2 && words.every((w) => t.includes(w)) && t.length <= q.length * 1.6) best = Math.max(best, 0.8);
   }
   const want = { movie: ['MOVIE'], tv: ['TV', 'TV_SHORT', 'ONA'], ova: ['OVA', 'SPECIAL', 'ONA'] }[kind] || [];
   return best + (want.includes(m.format) ? 0.04 : 0);
@@ -144,6 +182,8 @@ export function titleScore(name, m, kind = 'movie') {
 function movieQueries(name) {
   const w = String(name).split(/\s+/).filter(Boolean);
   const out = [w.join(' ')];
+  // nombres largos: también las primeras 3–5 palabras, que suelen bastar (y sirven si más adelante hay algo escrito distinto)
+  if (w.length > 6) out.push(w.slice(0, w.length - 1).join(' '), w.slice(0, 5).join(' '), w.slice(0, 4).join(' '), w.slice(0, 3).join(' '));
   for (let n = w.length - 1; n >= 2; n--) out.push(w.slice(0, n).join(' '));
   for (let i = 0; i + 1 < w.length; i++) out.push(w[i] + ' ' + w[i + 1]);
   for (let k = 1; k <= w.length - 2; k++) out.push(w.slice(k).join(' '));
@@ -153,6 +193,14 @@ function movieQueries(name) {
 export function findMovie(name, pause = () => Promise.resolve()) { return findTitle(name, 'movie', pause); }
 /** Busca por un nombre exacto (temporada, OVA o película). `kind`: 'movie', 'tv' u 'ova', según lo que dice la carpeta. */
 export async function findTitle(name, kind = 'tv', pause = () => Promise.resolve()) {
+  // "Serie OVA" / "Serie Zoku OVA": se busca la serie y, entre sus relacionadas, la OVA o especial que le corresponde
+  if (kind === 'ova' && TRAIL_SPECIAL.test(name)) {
+    const base = name.replace(TRAIL_SPECIAL, '').trim();
+    if (base.replace(/\s/g, '').length >= 3) {
+      const side = await findSideStory(base, pause);
+      if (side) return side;
+    }
+  }
   let best = null;
   let bestScore = 0;
   const qs = movieQueries(name);
@@ -165,9 +213,22 @@ export async function findTitle(name, kind = 'tv', pause = () => Promise.resolve
       const tie = best && Math.abs(sc - bestScore) < 0.02 && (m.seasonYear || 9999) < (best.seasonYear || 9999);
       if (sc > bestScore + 0.02 || tie || (!best && sc > 0)) { best = m; bestScore = Math.max(sc, bestScore); }
     }
-    if (bestScore >= 0.84) break; // ya hay uno claramente igual
+    if (bestScore >= 0.96) break; // casi idéntico y del tipo esperado (si no, se sigue probando: "Serie Zoku" no es "Serie Zoku OVA")
   }
   return bestScore >= 0.72 ? best : null;
+}
+
+const TRAIL_SPECIAL = /[\s.\-–:]*\b(ovas?|oads?|especial(es)?|specials?|extras?)\s*\d{0,2}\s*$/i;
+/** La OVA o especial relacionada con una serie (la más antigua de sus historias paralelas). */
+async function findSideStory(base, pause) {
+  const b = await findTitle(base, 'tv', pause);
+  if (!b) return null;
+  await pause();
+  const data = await gql(`query ($id: Int) { Media(id: $id, type: ANIME) { relations { edges { relationType node { type ${FIELDS} } } } } }`, { id: b.id });
+  const edges = (data && data.Media && data.Media.relations && data.Media.relations.edges) || [];
+  const list = edges.filter((e) => e.node && e.node.type === 'ANIME' && ['SIDE_STORY', 'SPIN_OFF', 'OTHER'].includes(e.relationType) && ['OVA', 'SPECIAL', 'ONA'].includes(e.node.format))
+    .map((e) => e.node).sort((x, y) => (x.seasonYear || 9999) - (y.seasonYear || 9999));
+  return list[0] || null;
 }
 
 /** Traducción en el propio navegador (Chrome reciente). Devuelve null si no se puede sin intervención. */
