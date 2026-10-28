@@ -885,6 +885,20 @@ body.quota-hit .dock-btn::after { content: ''; position: absolute; top: 2px; rig
 .ep-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
 .ep-heading { margin: 0; font: 700 26px/1.1 var(--font-display); letter-spacing: -0.025em; }
 .ep-head .seasons { margin: 0; }
+.tv-kicker { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; margin: 0 0 6px; font-size: 14px; color: var(--dim); font-weight: 600; }
+.tv-kicker a { color: var(--text); text-decoration: none; }
+.tv-kicker a:hover { text-decoration: underline; }
+.season-step { display: flex; gap: 8px; flex-wrap: wrap; }
+.step-btn {
+  display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 14px;
+  border-radius: 999px; font-size: 14px; font-weight: 600; color: var(--text); text-decoration: none;
+  background: var(--glass); box-shadow: inset 0 0 0 1px var(--glass-edge), inset 0 1px 0 var(--glass-hi);
+}
+.step-btn svg { width: 16px; height: 16px; }
+.step-btn.is-next svg { transform: scaleX(-1); }
+@media (hover: hover) { .step-btn:hover { background: var(--glass-strong, var(--glass)); } }
+.season-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+@media (max-width: 520px) { .season-grid { grid-template-columns: repeat(2, 1fr); gap: 18px 12px; } .step-btn[title] span { display: none; } .step-btn[title] { padding: 0 11px; } }
 
 /* episodio: base (filas en explorar y descargados) */
 .episodes { list-style: none; margin: 0; padding: 0; --h: 220; }

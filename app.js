@@ -665,7 +665,7 @@ function resolveContext(id) {
       ep: e.ep, list: season.episodes, shown: season.episodes, title: s.name,
       sub: isCollection(s) ? '' : s.seasons.length > 1 ? seasonTab(s, season) : (hasOwnTitle(season) && season.title !== s.name ? season.title : ''),
       ki: e.ki,
-      back: isCollection(s) ? movieHref(e.si, itemFor(s, e.ep).key) : '#/serie/' + e.si, si: e.si,
+      back: isCollection(s) ? movieHref(e.si, itemFor(s, e.ep).key) : seasonHref(e.si, s, e.ki), si: e.si,
     };
   }
   const node = state.storage && state.storage.files[id];
@@ -1409,7 +1409,7 @@ function render() {
     if (!state.profile) { stopPlayback(); renderProfiles(); paintDock(); lastRouteKey = 'perfiles'; return; }
   }
   if (view === 'perfiles') { stopPlayback(); renderProfiles(); paintDock(); lastRouteKey = 'perfiles'; return; }
-  if (picking && (view !== 'serie' || String(picking.si) !== String(arg))) endPicking(false);
+  if (picking && (view !== 'serie' || String(picking.si) !== arg.split('/')[0])) endPicking(false);
   if (view === 'play') {
     const c = resolveContext(arg);
     const si = c && c.si;
@@ -2628,21 +2628,35 @@ function paintHomeSearch() {
 
 /* ── serie ── */
 
-const currentSeason = {};
+/** Dirección de una temporada: con varias, cada una tiene su página (#/serie/3/1); con una sola, la serie. */
+function seasonHref(si, s, ki) { return s && !isCollection(s) && s.seasons.length > 1 ? `#/serie/${si}/${ki}` : `#/serie/${si}`; }
+/** Nombre corto para la tarjeta de una temporada: sin repetir el nombre (largo) de la serie.
+ *  "Yahari Ore no Seishun… Zoku" → "Zoku"; la que se llama igual que la serie → "Temporada 1". */
+function seasonShort(s, se) {
+  const t = seasonTab(s, se);
+  if (s.name.length < 10 || !t.toLowerCase().startsWith(s.name.toLowerCase())) return t;
+  const rest = t.slice(s.name.length).replace(/^[\s.\-–:,]+/, '').trim();
+  return rest ? rest[0].toUpperCase() + rest.slice(1) : `Temporada ${seasonOrdinal(s, se)}`;
+}
+
 function renderSeries(arg) {
   const lib = state.library;
-  const si = Number(arg);
+  const [siPart, kiPart] = String(arg).split('/');
+  const si = Number(siPart);
   const s = lib && lib.series && lib.series[si];
   if (!s) { go('#/'); return; }
   if (isCollection(s)) { renderShelf(s, si); return; }
   heroSi = si;
   heroUser = true;
-  const flat = isCollection(s); // una colección muestra todas sus películas juntas, sin pestañas
-  const seriesNext = heroPlan(s).next;
-  const ki = flat ? 0 : Math.min(currentSeason[s.name] ?? (seriesNext ? index.byId.get(seriesNext.id).ki : 0), s.seasons.length - 1);
-  const season = flat ? { title: '', episodes: s.all } : s.seasons[ki];
-  // con pestañas, el botón grande es de la temporada que estás mirando
-  const plan = !flat && s.seasons.length > 1 ? seasonPlan(s, season) : heroPlan(s);
+  const flat = false;
+  const multi = s.seasons.length > 1;
+  // con varias temporadas, primero el menú de temporadas; los capítulos, al entrar a una
+  if (multi && kiPart == null) { renderSeasonMenu(s, si); return; }
+  const ki = multi ? Number(kiPart) : 0;
+  if (multi && !(ki >= 0 && ki < s.seasons.length)) { navReplacing = true; location.replace('#/serie/' + si); return; }
+  const season = s.seasons[ki];
+  // con varias temporadas, el botón grande es de la temporada que estás mirando
+  const plan = multi ? seasonPlan(s, season) : heroPlan(s);
   const next = plan.next;
   // cada temporada con su ficha (póster, banner, sinopsis); si no tiene, la de la serie
   const ownMeta = flat ? null : seasonMeta(s, season);
@@ -2664,8 +2678,9 @@ function renderSeries(arg) {
         <div class="series-top">
           ${collage ? `<span class="poster is-collage">${collageHTML(collage)}</span>` : m && m.cover ? `<img class="poster" src="${esc(m.cover)}" alt="" decoding="async">` : (coverEp ? `<span class="poster is-thumb" data-thumb="${esc(coverEp.id)}"></span>` : '')}
           <div class="series-info">
-            <h2 class="tv-title">${esc(s.name)}</h2>
-            ${m && m.title && m.title.toLowerCase() !== s.name.toLowerCase() ? `<p class="tv-alt">${esc(m.title)}${m.native ? ` <span lang="ja">${esc(m.native)}</span>` : ''}</p>` : ''}
+            ${multi ? `<p class="tv-kicker"><a href="#/serie/${si}">${esc(s.name)}</a><span>Temporada ${ki + 1} de ${s.seasons.length}</span></p>` : ''}
+            <h2 class="tv-title">${esc(multi ? seasonShort(s, season) : s.name)}</h2>
+            ${m && m.title && m.title.toLowerCase() !== (multi ? seasonShort(s, season) : s.name).toLowerCase() ? `<p class="tv-alt">${esc(m.title)}${m.native ? ` <span lang="ja">${esc(m.native)}</span>` : ''}</p>` : ''}
             ${factsRowsHTML(s, m, { count: flat ? null : scope.length, seen, total: scope.length })}
           </div>
         </div>
@@ -2673,7 +2688,7 @@ function renderSeries(arg) {
         ${m && !hasSpanish(m) && m.synopsis && canTranslate() ? `<button class="link-btn" data-act="translate"${ownMeta ? ` data-key="${esc(season.name)}"` : ''}>Traducir sinopsis al español</button>` : ''}
         <div class="tv-actions">
           ${next ? `<a class="tv-btn is-primary" href="#/play/${encodeURIComponent(next.id)}">${ICON.play}<span>${esc(plan.label)}</span></a>` : `<span class="tv-done">${esc(plan.label)}</span>`}
-          ${upcoming.length ? `<button class="tv-btn" data-act="series-dl" data-si="${si}">${ICON.down}<span>Descargar ${upcoming.length === 1 ? 'el siguiente' : `los ${upcoming.length} siguientes`}</span></button>` : ''}
+          ${upcoming.length ? `<button class="tv-btn" data-act="series-dl" data-si="${si}"${multi ? ` data-from="${esc(next.id)}"` : ''}>${ICON.down}<span>Descargar ${upcoming.length === 1 ? 'el siguiente' : `los ${upcoming.length} siguientes`}</span></button>` : ''}
           ${flat ? '' : `<button class="tv-btn ${isLater(s) ? 'is-on' : ''}" data-act="later" data-si="${si}" aria-pressed="${isLater(s)}">${isLater(s) ? ICON.laterOn : ICON.later}<span>Más tarde</span></button>`}
         </div>
       </section>
@@ -2681,9 +2696,13 @@ function renderSeries(arg) {
         <div class="ep-head">
           <h3 class="ep-heading">${flat ? 'Películas' : 'Episodios'}</h3>
           <button class="pick-toggle" data-act="pick-mode" id="pick-toggle" aria-pressed="false">${ICON.check}<span>Seleccionar</span></button>
-          ${!flat && s.seasons.length > 1 ? `<nav class="seasons" aria-label="Temporadas">${s.seasons.map((se, i) => `<button class="season ${i === ki ? 'is-on' : ''}" data-act="season" data-i="${i}" aria-pressed="${i === ki}">${esc(seasonTab(s, se))}</button>`).join('')}</nav>` : ''}
+          ${multi ? `<nav class="season-step" aria-label="Otras temporadas">
+            ${ki > 0 ? `<a class="step-btn" href="#/serie/${si}/${ki - 1}" data-replace title="${esc(seasonTab(s, s.seasons[ki - 1]))}">${ICON.back}<span>Anterior</span></a>` : ''}
+            <a class="step-btn" href="#/serie/${si}" data-replace>${ICON.grid}<span>Temporadas</span></a>
+            ${ki < s.seasons.length - 1 ? `<a class="step-btn is-next" href="#/serie/${si}/${ki + 1}" data-replace title="${esc(seasonTab(s, s.seasons[ki + 1]))}"><span>Siguiente</span>${ICON.back}</a>` : ''}
+          </nav>` : ''}
         </div>
-        ${season.title && season.title !== s.name && (s.seasons.length < 2 || season.title !== seasonTab(s, season)) ? `<p class="season-title">${esc(season.title)}</p>` : ''}
+        ${season.title && season.title !== s.name && !multi ? `<p class="season-title">${esc(season.title)}</p>` : ''}
         <ol class="episodes is-grid" id="season-eps">${season.episodes.map((ep) => episodeRow(ep, { fresh: fresh.has(ep.id), next: next && ep.id === next.id })).join('')}</ol>
       </section>
     </main>
@@ -2694,12 +2713,6 @@ function renderSeries(arg) {
       <button class="pick-btn is-primary" data-act="pick-dl" disabled>${ICON.down}<span>Descargar</span></button>
     </div>
   </div>`;
-  app.querySelectorAll('[data-act="season"]').forEach((b) => b.addEventListener('click', () => {
-    currentSeason[s.name] = Number(b.dataset.i);
-    if (picking) picking = { si, ki: Number(b.dataset.i), ids: new Set() };
-    renderSeries(arg);
-    hydrateThumbs(app);
-  }));
   if (picking && (picking.si !== si || picking.ki !== ki)) picking = { si, ki, ids: new Set() };
   paintPick();
   let focusId = null;
@@ -2707,6 +2720,69 @@ function renderSeries(arg) {
   const fli = focusId && app.querySelector(`.ep[data-id="${CSS.escape(focusId)}"]`);
   if (fli) requestAnimationFrame(() => { fli.scrollIntoView({ block: 'center' }); fli.classList.add('is-flash'); });
   // los "nuevos" se muestran esta vez y quedan vistos
+  if (fresh.size) { markSeriesSeen(s); lastNew = null; announceNew(); }
+}
+
+/** Menú de una serie con varias temporadas: la ficha de la serie y una tarjeta por temporada. */
+function renderSeasonMenu(s, si) {
+  const m = displayMeta(s);
+  const plan = heroPlan(s);
+  const next = plan.next;
+  const nextKi = next ? index.byId.get(next.id).ki : -1;
+  const fresh = new Set(newEpisodes(s).map((e) => e.id));
+  const upcoming = next ? [next, ...nextUnseen(next, s.all, 2)].filter((x) => !state.saved.has(x.id)) : [];
+  const syn = synopsisOf(m);
+  const seen = s.all.filter((e) => (prog(e) || {}).w).length;
+  const coverEp = s.all.find((e) => e.fa);
+  // la ficha de una franquicia ("Fate") es la de una de sus temporadas: traducir va a esa
+  const metaKey = isFranchise(s) ? (s.seasons.find((se) => seasonMeta(s, se) === m) || {}).name : '';
+  const cards = s.seasons.map((se, ki) => {
+    const sm = seasonMeta(s, se) || (isFranchise(s) ? null : m);
+    const t = seasonShort(s, se);
+    const done = se.episodes.filter((e) => (prog(e) || {}).w).length;
+    const all = done === se.episodes.length;
+    const isNew = se.episodes.some((e) => fresh.has(e.id));
+    const first = se.episodes.find((e) => e.fa) || se.episodes[0];
+    const sub = [sm && sm.year && seasonMeta(s, se) ? sm.year : '', all ? 'Vista' : done ? `${done} de ${plural(se.episodes.length, 'capítulo', 'capítulos')}` : plural(se.episodes.length, 'capítulo', 'capítulos')].filter(Boolean).join(' · ');
+    return `<li><a class="shelf-item" href="#/serie/${si}/${ki}" style="--h:${hue(t)}">
+      <span class="shelf-poster">
+        ${sm && sm.cover ? `<img src="${esc(sm.cover)}" alt="" loading="lazy" decoding="async">` : first ? `<span class="is-fallback" data-thumb="${esc(first.id)}"><span class="cover-glyph">${esc([...t.trim()][0] || '·')}</span></span>` : ''}
+        ${isNew ? '<span class="tile-badge">Nuevo</span>' : ki === nextKi && done ? '<span class="tile-badge">Viendo</span>' : ''}
+        ${done && !all ? `<span class="tile-bar"><span style="width:${(done / se.episodes.length) * 100}%"></span></span>` : ''}
+      </span>
+      <span class="shelf-title" title="${esc(seasonTab(s, se))}">${esc(t)}</span>
+      <span class="shelf-sub">${esc(sub)}</span>
+    </a></li>`;
+  }).join('');
+  setTint(seriesColor(s));
+  app.innerHTML = header('', { overlay: true }) + `<div class="tv is-series">
+    <div class="series-wash" aria-hidden="true">${m && m.cover ? `<img src="${esc(m.cover)}" alt="">` : ''}</div>
+    <main class="tv-main series-main">
+      <section class="series-hero ${m && m.banner ? 'has-banner' : ''}">
+        ${m && m.banner ? `<div class="banner"><img src="${esc(m.banner)}" alt="" decoding="async"></div>` : ''}
+        <div class="series-top">
+          ${m && m.cover ? `<img class="poster" src="${esc(m.cover)}" alt="" decoding="async">` : (coverEp ? `<span class="poster is-thumb" data-thumb="${esc(coverEp.id)}"></span>` : '')}
+          <div class="series-info">
+            <h2 class="tv-title">${esc(s.name)}</h2>
+            ${m && m.title && !isFranchise(s) && m.title.toLowerCase() !== s.name.toLowerCase() ? `<p class="tv-alt">${esc(m.title)}${m.native ? ` <span lang="ja">${esc(m.native)}</span>` : ''}</p>` : ''}
+            ${factRows(`<span>${plural(s.seasons.length, 'temporada', 'temporadas')}</span><span>${plural(s.all.length, 'capítulo', 'capítulos')}</span>${seen ? `<span>${seen} vistos</span>` : ''}`, m,
+              [m && m.year ? `<a class="fact" href="#/catalogo?${new URLSearchParams({ y: m.year })}">${esc(m.year)}</a>` : '', ...((m && m.genres) || []).slice(0, 3).map((g) => `<a class="fact" href="#/catalogo?${new URLSearchParams({ g })}">${esc(g)}</a>`)].join(''))}
+          </div>
+        </div>
+        ${syn ? `<p class="tv-synopsis is-long" id="synopsis">${esc(syn)}</p>` : ''}
+        ${m && !hasSpanish(m) && m.synopsis && canTranslate() ? `<button class="link-btn" data-act="translate"${metaKey ? ` data-key="${esc(metaKey)}"` : ''}>Traducir sinopsis al español</button>` : ''}
+        <div class="tv-actions">
+          ${next ? `<a class="tv-btn is-primary" href="#/play/${encodeURIComponent(next.id)}">${ICON.play}<span>${esc(plan.label)}</span></a>` : `<span class="tv-done">${esc(plan.label)}</span>`}
+          ${upcoming.length ? `<button class="tv-btn" data-act="series-dl" data-si="${si}">${ICON.down}<span>Descargar ${upcoming.length === 1 ? 'el siguiente' : `los ${upcoming.length} siguientes`}</span></button>` : ''}
+          <button class="tv-btn ${isLater(s) ? 'is-on' : ''}" data-act="later" data-si="${si}" aria-pressed="${isLater(s)}">${isLater(s) ? ICON.laterOn : ICON.later}<span>Más tarde</span></button>
+        </div>
+      </section>
+      <section class="ep-section">
+        <div class="ep-head"><h3 class="ep-heading">Temporadas</h3></div>
+        <ul class="shelf season-grid" role="list">${cards}</ul>
+      </section>
+    </main>
+  </div>`;
   if (fresh.size) { markSeriesSeen(s); lastNew = null; announceNew(); }
 }
 
@@ -2825,9 +2901,8 @@ const pickable = (ep) => !state.saved.has(ep.id) && !state.dls[ep.id] && !state.
 function startPicking() {
   const s = state.library && state.library.series[heroSi];
   if (!s) return;
-  const ki = Math.min(currentSeason[s.name] ?? 0, s.seasons.length - 1);
-  const cur = $('.season.is-on');
-  picking = { si: heroSi, ki: cur ? Number(cur.dataset.i) : ki, ids: new Set() };
+  const ki = Number(route().arg.split('/')[1]) || 0;
+  picking = { si: heroSi, ki: Math.min(ki, s.seasons.length - 1), ids: new Set() };
   paintPick();
 }
 function endPicking(repaint = true) {
@@ -2891,6 +2966,14 @@ function pickAction(act) {
 }
 
 // en modo selección, tocar un capítulo lo marca en vez de abrirlo
+// cambiar de temporada (anterior, siguiente, al menú) no deja una entrada más en el historial
+app.addEventListener('click', (e) => {
+  const a = e.target.closest('a[data-replace]');
+  if (!a || e.metaKey || e.ctrlKey || e.shiftKey) return;
+  e.preventDefault();
+  navReplacing = true;
+  location.replace(a.getAttribute('href'));
+});
 app.addEventListener('click', (e) => {
   if (!picking) return;
   const li = e.target.closest('#season-eps.is-picking .ep');
@@ -4604,9 +4687,11 @@ document.addEventListener('click', async (e) => {
   else if (act === 'resume-dismiss') { const o = resumeOffer(); if (o) LS.set('nowSeen', o.n.u); render(); }
   else if (act === 'series-dl') {
     const sr = state.library.series[Number(el.dataset.si)];
-    const nx = sr && nextFor(sr);
+    // en la página de una temporada, los siguientes de esa temporada
+    const nx = sr && (el.dataset.from ? epById(el.dataset.from) : nextFor(sr));
+    const e = nx && el.dataset.from && index.byId.get(nx.id);
     if (nx) {
-      const ups = [nx, ...nextUnseen(nx, sr.all, 2)].filter((x) => !state.saved.has(x.id));
+      const ups = [nx, ...nextUnseen(nx, e ? sr.seasons[e.ki].episodes : sr.all, 2)].filter((x) => !state.saved.has(x.id));
       ups.forEach((x) => queueDownload(x, sr.name));
       toast(`${plural(ups.length, 'capítulo', 'capítulos')} en cola de descarga.`);
     }
