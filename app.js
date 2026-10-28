@@ -251,8 +251,7 @@ function findFolder(storage, path) {
   const parts = path.split('/').map((p) => p.trim()).filter(Boolean);
   let node = storage.root;
   for (const p of parts) {
-    // si hay dos carpetas con el mismo nombre (p. ej. una "Anime" vieja), se usa la que tiene más cosas:
-    // el orden en que MEGA las entrega puede cambiar y Kai mostraba la vieja al tocar Actualizar
+    // si hay dos carpetas con el mismo nombre, se usa la que tiene más cosas (el orden en que MEGA las entrega puede cambiar)
     const same = (node.children || []).filter((c) => c.directory && c.name && c.name.toLowerCase() === p.toLowerCase());
     node = same.sort((a, b) => (b.children || []).length - (a.children || []).length)[0];
     if (!node) return null;
@@ -409,7 +408,8 @@ function setLangPref(s, lang) {
 
 function setLibrary(lib) {
   rememberPaths(state.library); // las rutas de antes, por si se renombró o movió una carpeta
-  LS.set('library', lib);
+  // si no cabe, mejor no dejar guardada una biblioteca vieja (se mostraría al abrir Kai hasta conectar con MEGA)
+  if (!LS.set('library', lib)) LS.del('library');
   state.library = lib;
   index = buildIndex(lib);
   rememberPaths(lib);
@@ -3402,7 +3402,14 @@ function renderSettings() {
     </section>
     <section class="settings-group">
       <p class="dim">Sesión de MEGA: ${esc((LS.get('session', {}).options || {}).email || '')}</p>
-      <p class="dim">Datos de Kai en este navegador: ${(() => { let n = 0; try { for (const k of Object.keys(localStorage)) if (k.startsWith('kai.')) n += (localStorage.getItem(k) || '').length; } catch { /* nada */ } return n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.round(n / 1024) + ' KB'; })()}${LS.full ? ' · <strong>sin espacio: algo no se pudo guardar</strong>' : LS.freed ? ' · se liberó espacio' : ''}</p>
+      <p class="dim">Datos de Kai en este navegador: ${(() => {
+        const kb = (n) => (n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.round(n / 1024) + ' KB');
+        const sizes = [];
+        try { for (const k of Object.keys(localStorage)) if (k.startsWith('kai.')) sizes.push([k.slice(4), (localStorage.getItem(k) || '').length]); } catch { /* nada */ }
+        const lib = LS.get('library', null);
+        const libInfo = lib && lib.series ? ` · biblioteca guardada: ${lib.series.length} carpetas` : ' · sin biblioteca guardada';
+        return kb(sizes.reduce((a, b) => a + b[1], 0)) + ' (' + sizes.sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, n]) => `${esc(k)} ${kb(n)}`).join(', ') + ')' + libInfo;
+      })()}${LS.full ? ' · <strong>sin espacio: algo no se pudo guardar</strong>' : LS.freed ? ' · se liberó espacio' : ''}</p>
       <button class="btn btn-quiet" data-act="logout">Cerrar sesión en este dispositivo</button>
     </section>
   </main>`;
