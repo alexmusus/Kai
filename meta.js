@@ -9,7 +9,7 @@ const FIELDS = `id
   description(asHtml: false)
   bannerImage
   coverImage { extraLarge large color }
-  seasonYear episodes format genres`;
+  seasonYear episodes format genres averageScore`;
 
 async function gql(query, variables) {
   const r = await fetch(API, {
@@ -69,6 +69,7 @@ export function toMeta(m) {
     episodes: m.episodes || null,
     format: FORMATS[m.format] || '',
     genres: (m.genres || []).map((g) => GENRES[g] || g), // todos: sirven para filtrar en el catálogo
+    score: m.averageScore || null, // nota de AniList (0–100)
     at: Date.now(),
   };
 }
@@ -108,19 +109,35 @@ function editDistance(a, b) {
   }
   return prev[b.length];
 }
-/** Qué tanto se parece un resultado al nombre buscado (0 a 1). */
-export function titleScore(name, m) {
+/** "Shingeki no Kyojin Season 2": se acepta solo si es de esa serie y el título dice ese número (2, 2nd, II…). */
+export async function findSeason(series, n) {
+  const ord = { 2: '2nd', 3: '3rd' }[n] || `${n}th`;
+  const roman = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'][n] || '';
+  const strong = new RegExp(`(season\\s*${n}\\b|${ord}\\s+season|\\b${n}(st|nd|rd|th)?\\s*(期|シーズン)${roman ? `|\\s${roman}$` : ''})`, 'i');
+  const weak = new RegExp(`(\\b${n}\\b|\\b${ord}\\b${roman ? `|\\b${roman}\\b` : ''})`, 'i');
+  const list = (await searchAnime(`${series} Season ${n}`, 8)).filter((m) => relatedTo(series, m));
+  const says = (m, re) => [...Object.values(m.title || {}), ...(m.synonyms || [])].some((t) => t && re.test(t));
+  // primero el que dice "Season N" (así "Season 3 Part 2" no gana cuando se busca la 2)
+  return list.find((m) => says(m, strong)) || list.find((m) => says(m, weak) && !/part\s*\d|parte\s*\d/i.test(m.title.english || m.title.romaji || '')) || null;
+}
+
+/** Qué tanto se parece un resultado al nombre buscado (0 a 1). `kind` da una pequeña ventaja al formato esperado. */
+export function titleScore(name, m, kind = 'movie') {
   const q = squash(name);
   if (!q) return 0;
   const titles = [...Object.values(m.title || {}), ...(m.synonyms || [])].map(squash).filter(Boolean);
+  const words = String(name).split(/[^\p{L}\p{N}]+/u).map(squash).filter((w) => w.length >= 3);
   let best = 0;
   for (const t of titles) {
     const d = editDistance(q, t);
     best = Math.max(best, 1 - d / Math.max(q.length, t.length));
     // "Kimi no Na wa" dentro de "Kimi no Na wa. (2016)" o al revés también vale
     if (q.length >= 6 && (t.startsWith(q) || q.startsWith(t))) best = Math.max(best, 0.85);
+    // "Heaven's Feel I presage flower" dentro de "Fate/stay night Movie: Heaven's Feel - I. presage flower"
+    if (words.length >= 2 && words.every((w) => t.includes(w))) best = Math.max(best, 0.8);
   }
-  return best + (m.format === 'MOVIE' ? 0.04 : 0);
+  const want = { movie: ['MOVIE'], tv: ['TV', 'TV_SHORT', 'ONA'], ova: ['OVA', 'SPECIAL', 'ONA'] }[kind] || [];
+  return best + (want.includes(m.format) ? 0.04 : 0);
 }
 /** Variantes de búsqueda de un nombre: completo, sin las últimas palabras, sin las primeras,
  * y pares de palabras seguidas (basta con que dos palabras estén bien escritas). */
@@ -133,7 +150,9 @@ function movieQueries(name) {
   return [...new Set(out)].filter((q) => q.replace(/\s/g, '').length >= 5).slice(0, 7);
 }
 /** Busca una película por el nombre de su archivo. Devuelve el resultado de AniList o null. */
-export async function findMovie(name, pause = () => Promise.resolve()) {
+export function findMovie(name, pause = () => Promise.resolve()) { return findTitle(name, 'movie', pause); }
+/** Busca por un nombre exacto (temporada, OVA o película). `kind`: 'movie', 'tv' u 'ova', según lo que dice la carpeta. */
+export async function findTitle(name, kind = 'tv', pause = () => Promise.resolve()) {
   let best = null;
   let bestScore = 0;
   const qs = movieQueries(name);
@@ -141,8 +160,10 @@ export async function findMovie(name, pause = () => Promise.resolve()) {
     if (i) await pause();
     const list = await searchAnime(qs[i], 10);
     for (const m of list) {
-      const sc = titleScore(name, m);
-      if (sc > bestScore) { best = m; bestScore = sc; }
+      const sc = titleScore(name, m, kind);
+      // empate (p. ej. "Kaguya-sama wa Kokurasetai" calza igual con sus 3 temporadas): gana la más antigua, la original
+      const tie = best && Math.abs(sc - bestScore) < 0.02 && (m.seasonYear || 9999) < (best.seasonYear || 9999);
+      if (sc > bestScore + 0.02 || tie || (!best && sc > 0)) { best = m; bestScore = Math.max(sc, bestScore); }
     }
     if (bestScore >= 0.84) break; // ya hay uno claramente igual
   }

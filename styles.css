@@ -1257,3 +1257,9 @@ html.has-mini body { padding-bottom: var(--mini-space); }
 .discover-head { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 10px; }
 .discover-cover { width: 84px; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 12px; flex: none; }
 .discover-syn { margin: 0 0 12px; font-size: 14px; line-height: 1.5; color: var(--dim); max-height: 40vh; overflow: auto; }
+
+/* etiquetas de la página de una serie (v29): arriba lo informativo | nota; abajo lo que lleva al catálogo */
+.facts-rows { display: grid; gap: 8px; margin: 10px 0 0; }
+.facts-rows .tv-facts { margin: 0; }
+.tv-facts .fact-sep { padding: 5px 2px; background: none; box-shadow: none; border: 0; -webkit-backdrop-filter: none; backdrop-filter: none; color: var(--faint); }
+.tv-facts .fact-score { font-weight: 650; }

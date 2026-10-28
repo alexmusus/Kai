@@ -1,6 +1,6 @@
 import { Storage } from './vendor/mega.js';
 import { isSubtitleName, mp4Info, mp4Chapters, mp4Formats, mp4QuickFormats, pickIntro, OUTRO_RE as OUTRO } from './subs.js';
-import { searchAnime, animeById, toMeta, findForSeries, findMovie, translateToSpanish, canTranslate, recommendationsFor, airingTop, toDiscover } from './meta.js';
+import { searchAnime, animeById, toMeta, findForSeries, findMovie, findTitle, findSeason, translateToSpanish, canTranslate, recommendationsFor, airingTop, toDiscover } from './meta.js';
 
 const C = window.MegaCore;
 const $ = (s, el = document) => el.querySelector(s);
@@ -1773,12 +1773,44 @@ function saveMeta() { clearTimeout(metaTimer); metaTimer = setTimeout(flushMeta,
 function flushMeta() { if (metaTimer) { clearTimeout(metaTimer); metaTimer = 0; LS.set('meta', state.meta); } }
 addEventListener('pagehide', flushMeta);
 document.addEventListener('visibilitychange', () => { if (document.hidden) flushMeta(); });
+/* Fichas de AniList:
+ *  - Una serie con UNA temporada (o tipo "1. Temporada 1"): se busca con el nombre de la carpeta de la serie.
+ *  - Con varias temporadas, cada temporada que tiene nombre propio ("2. Fate Zero", "1.5 Prólogo UBW") se busca
+ *    con ese nombre exacto y tiene su propio póster, banner y sinopsis. Las genéricas ("2. Temporada 2") buscan
+ *    "Serie Season 2" y solo se aceptan si son de esa serie; si no, usan la ficha de la serie.
+ *  - Si la primera temporada tiene nombre propio, la carpeta de la serie es solo el nombre del grupo ("Fate"):
+ *    no se busca, y la serie se muestra con la ficha de la temporada que estás viendo (o la primera). */
+const usesSeasonMeta = (s) => !!s && !isCollection(s) && s.seasons.length > 1;
+const isFranchise = (s) => usesSeasonMeta(s) && hasOwnTitle(s.seasons[0]);
+function seasonMeta(s, se) {
+  if (!usesSeasonMeta(s) || !se || !se.name) return null;
+  const m = state.meta[itemMetaKey(s, se.name)];
+  return m && !m.none ? m : null;
+}
+/** La temporada que estás viendo: la del último capítulo que tocaste; si no, la primera. */
+function activeSeason(s) {
+  let best = null;
+  for (const ep of s.all) { const p = prog(ep); if (p && (!best || p.u > best.u)) best = { u: p.u, ep }; }
+  const e = best && index.byId.get(best.ep.id);
+  return s.seasons[e ? e.ki : 0];
+}
 function metaFor(s) {
+  if (isFranchise(s)) return seasonMeta(s, activeSeason(s)) || s.seasons.map((se) => seasonMeta(s, se)).find(Boolean) || null;
   const m = state.meta[s.name];
   return m && !m.none ? m : null;
 }
-// La ficha (imagen y sinopsis) se busca solo con el nombre de la carpeta de la serie, y es la misma
-// para todas sus temporadas, OVA y especiales.
+/** Lo que se busca en AniList para una temporada, o null si usa la ficha de la serie. */
+function seasonQuery(s, se) {
+  if (hasOwnTitle(se)) {
+    const t = se.title;
+    const kind = /\b(pel[ií]culas?|movies?|films?|gekijouban)\b/i.test(t) ? 'movie' : SPECIAL_RE.test(t) ? 'ova' : 'tv';
+    // "(Película)", "[OVA]"… solo dicen el tipo: no se buscan
+    const name = t.replace(/[([][^)\]]*[)\]]/g, (x) => (SPECIAL_RE.test(x) ? ' ' : x)).replace(/\s+/g, ' ').trim();
+    return { name: name || t, kind };
+  }
+  const n = seasonOrdinal(s, se);
+  return n > 1 && !isSpecialSeason(se) ? { series: s.name, n } : null;
+}
 function searchNames(s) {
   return [s.name];
 }
@@ -1799,12 +1831,12 @@ async function ensureMeta() {
           const c = state.meta[k];
           const age = Date.now() - ((c && c.at) || 0);
           // todo automático: lo encontrado se guarda 30 días; lo que no se encontró se vuelve a buscar al día siguiente
-          if (c && c.mv === 4 && (c.none ? age < 86400000 : age < 30 * 86400000)) continue;
+          if (c && c.mv === 5 && (c.none ? age < 86400000 : age < 30 * 86400000)) continue;
           let m = null;
           try {
             if (it.query) m = await findMovie(it.query, () => sleep(400));
           } catch (err) { console.warn('anilist', err); failed = true; break; }
-          state.meta[k] = m ? { ...toMeta(m), mv: 4 } : { none: true, id: 0, mv: 4, at: Date.now() };
+          state.meta[k] = m ? { ...toMeta(m), mv: 5 } : { none: true, id: 0, mv: 5, at: Date.now() };
           changed = true;
           saveMeta();
           await sleep(400);
@@ -1812,16 +1844,42 @@ async function ensureMeta() {
         if (failed) break;
         continue;
       }
+      if (usesSeasonMeta(s)) {
+        // cada temporada con su ficha (sm: 1); lo encontrado dura 30 días, lo no encontrado se reintenta al día siguiente
+        let failed = false;
+        for (const se of s.seasons) {
+          const q = seasonQuery(s, se);
+          if (!q) continue;
+          const k = itemMetaKey(s, se.name);
+          const c = state.meta[k];
+          const age = Date.now() - ((c && c.at) || 0);
+          if (c && c.sm === 1 && (c.none ? age < 86400000 : age < 30 * 86400000)) continue;
+          let m = null;
+          try {
+            m = q.name ? await findTitle(q.name, q.kind, () => sleep(400)) : await findSeason(q.series, q.n);
+          } catch (err) { console.warn('anilist', err); failed = true; break; }
+          state.meta[k] = m ? { ...toMeta(m), sm: 1 } : { none: true, id: 0, sm: 1, at: Date.now() };
+          if (m) {
+            const meta = state.meta[k];
+            translateToSpanish(meta.synopsis).then((es) => { if (es) { meta.synopsisEs = es; saveMeta(); if (['home', 'serie'].includes(route().view)) softRender(); } });
+          }
+          changed = true;
+          saveMeta();
+          await sleep(400);
+        }
+        if (failed) break;
+        if (isFranchise(s)) continue; // "Fate": la carpeta de la serie no se busca
+      }
       const cur = state.meta[s.name];
-      // sv: 5 = buscada solo con el nombre de la carpeta (las de antes se vuelven a buscar una vez)
-      const stale = !cur || Date.now() - (cur.at || 0) > (cur.none ? 86400000 : 30 * 86400000) || (pick && pick.id !== (cur.id || 0)) || (!cur.none && cur.v !== 2) || (!pick && cur.sv !== 5);
+      // sv: 6 = buscada solo con el nombre de la carpeta, con la nota de AniList (las de antes se vuelven a buscar una vez)
+      const stale = !cur || Date.now() - (cur.at || 0) > (cur.none ? 86400000 : 30 * 86400000) || (pick && pick.id !== (cur.id || 0)) || (!cur.none && cur.v !== 2) || (!pick && cur.sv !== 6);
       if (!stale) continue;
       try {
         let m = null;
         if (pick && pick.id === 0) m = null;
         else if (pick) m = await animeById(pick.id);
         else m = await findForSeries(searchNames(s), s.name);
-        state.meta[s.name] = m ? { ...toMeta(m), sv: 5 } : { none: true, id: 0, sv: 5, at: Date.now() };
+        state.meta[s.name] = m ? { ...toMeta(m), sv: 6 } : { none: true, id: 0, sv: 6, at: Date.now() };
         if (m) {
           const meta = state.meta[s.name];
           translateToSpanish(meta.synopsis).then((es) => { if (es) { meta.synopsisEs = es; saveMeta(); if (['home', 'serie', 'pelicula'].includes(route().view)) softRender(); } });
@@ -1977,7 +2035,7 @@ function episodeArt(ep) {
   const e = index.byId.get(ep.id);
   const s = e && state.library && state.library.series[e.si];
   if (!s) return '';
-  const m = isCollection(s) ? itemMeta(s, itemFor(s, ep).key) : metaFor(s);
+  const m = isCollection(s) ? itemMeta(s, itemFor(s, ep).key) : (seasonMeta(s, s.seasons[e.ki]) || metaFor(s));
   return m ? m.banner || m.cover || '' : '';
 }
 
@@ -2058,7 +2116,21 @@ function heroPlan(s) {
   const next = nextFor(s);
   const np = next && prog(next);
   const resume = np && np.t > 5 && !np.w;
-  return { next, label: next ? `${resume ? 'Continuar' : 'Ver'} ${episodeLabel(next)}` : 'Serie terminada', left: resume ? fmtLeft(np) : '' };
+  // al empezar otra temporada se dice cuál ("Ver Fate Zero"), no "Ver Episodio 1"
+  const e = next && index.byId.get(next.id);
+  const startsSeason = e && !isCollection(s) && s.seasons.length > 1 && e.ei === 0 && !resume;
+  const label = !next ? 'Serie terminada' : startsSeason ? `Ver ${seasonTab(s, s.seasons[e.ki])}` : `${resume ? 'Continuar' : 'Ver'} ${episodeLabel(next)}`;
+  return { next, label, left: resume ? fmtLeft(np) : '' };
+}
+/** Lo siguiente dentro de UNA temporada (la pestaña que estás mirando). */
+function seasonPlan(s, se) {
+  let cur = null;
+  for (const ep of se.episodes) { const p = prog(ep); if (p && p.t > 5 && !p.w && (!cur || p.u > cur.p.u)) cur = { ep, p }; }
+  const next = cur ? cur.ep : se.episodes.find((e) => !(prog(e) || {}).w) || null;
+  if (!next) return { next: null, label: 'Temporada vista', left: '' };
+  const np = prog(next);
+  const resume = np && np.t > 5 && !np.w;
+  return { next, label: `${resume ? 'Continuar' : 'Ver'} ${episodeLabel(next)}`, left: resume ? fmtLeft(np) : '' };
 }
 
 /** Año, tipo y géneros: cada uno lleva al catálogo filtrado por esa etiqueta. */
@@ -2070,6 +2142,25 @@ function factsHTML(s, m, extra = '') {
     `<span>${esc(countLabel(s, m))}</span>`,
     ...((m && m.genres) || []).slice(0, 3).map((g) => chip(g, { g })),
   ].join('') + extra;
+}
+/** Etiquetas de la página de una serie, en filas:
+ *  arriba lo informativo (capítulos, vistos) | ★ nota de AniList; abajo lo que se toca (año, tipo, géneros → catálogo). */
+function factsRowsHTML(s, m, { count = null, seen = 0, total = 0 } = {}) {
+  const chip = (label, params) => `<a class="fact" href="#/catalogo?${new URLSearchParams(params)}">${esc(label)}</a>`;
+  const info = [
+    `<span>${esc(count != null ? plural(count, 'capítulo', 'capítulos') : countLabel(s, m))}</span>`,
+    seen ? `<span>${seen} de ${total} vistos</span>` : '',
+  ].filter(Boolean).join('');
+  const links = [
+    m && m.year ? chip(m.year, { y: m.year }) : '',
+    m && m.format ? (m.collection ? `<span>${esc(m.format)}</span>` : chip(m.format, { f: m.format })) : '',
+    ...((m && m.genres) || []).slice(0, 3).map((g) => chip(g, { g })),
+  ].join('');
+  return factRows(info, m, links);
+}
+function factRows(info, m, links) {
+  const score = m && m.score ? `${info ? '<span class="fact-sep" aria-hidden="true">|</span>' : ''}<span class="fact-score" title="Nota en ${esc(m.src || 'AniList')}">★ ${esc(m.score)}</span>` : '';
+  return `<div class="facts-rows">${info || score ? `<p class="tv-facts is-info">${info}${score}</p>` : ''}${links ? `<p class="tv-facts">${links}</p>` : ''}</div>`;
 }
 function countLabel(s, m) {
   return m && m.collection ? plural(m.count, 'película', 'películas') : plural(s.all.length, 'capítulo', 'capítulos');
@@ -2494,18 +2585,22 @@ function renderSeries(arg) {
   if (isCollection(s)) { renderShelf(s, si); return; }
   heroSi = si;
   heroUser = true;
-  const m = displayMeta(s);
-  const plan = heroPlan(s);
-  const next = plan.next;
   const flat = isCollection(s); // una colección muestra todas sus películas juntas, sin pestañas
-  const ki = flat ? 0 : Math.min(currentSeason[s.name] ?? (next ? index.byId.get(next.id).ki : 0), s.seasons.length - 1);
+  const seriesNext = heroPlan(s).next;
+  const ki = flat ? 0 : Math.min(currentSeason[s.name] ?? (seriesNext ? index.byId.get(seriesNext.id).ki : 0), s.seasons.length - 1);
   const season = flat ? { title: '', episodes: s.all } : s.seasons[ki];
+  // con pestañas, el botón grande es de la temporada que estás mirando
+  const plan = !flat && s.seasons.length > 1 ? seasonPlan(s, season) : heroPlan(s);
+  const next = plan.next;
+  // cada temporada con su ficha (póster, banner, sinopsis); si no tiene, la de la serie
+  const ownMeta = flat ? null : seasonMeta(s, season);
+  const m = ownMeta || displayMeta(s);
   const fresh = new Set(newEpisodes(s).map((e) => e.id));
-  const upcoming = next ? [next, ...nextUnseen(next, s.all, 2)].filter((x) => !state.saved.has(x.id)) : [];
-  const facts = [m && m.year, m && m.format, countLabel(s, m), ...((m && m.genres) || []).slice(0, 3)].filter(Boolean);
+  const upcoming = next ? [next, ...nextUnseen(next, flat || s.seasons.length < 2 ? s.all : season.episodes, 2)].filter((x) => !state.saved.has(x.id)) : [];
   const syn = synopsisOf(m);
-  const coverEp = s.all.find((e) => e.fa);
-  const seen = s.all.filter((e) => (prog(e) || {}).w).length;
+  const coverEp = season.episodes.find((e) => e.fa) || s.all.find((e) => e.fa);
+  const scope = !flat && s.seasons.length > 1 ? season.episodes : s.all; // con pestañas, los números son de la temporada
+  const seen = scope.filter((e) => (prog(e) || {}).w).length;
   const collage = m && m.collage && m.collage.length ? m.collage : null;
   setTint(seriesColor(s));
   app.innerHTML = header('', { overlay: true }) + `<div class="tv is-series">
@@ -2519,13 +2614,13 @@ function renderSeries(arg) {
           <div class="series-info">
             <h2 class="tv-title">${esc(s.name)}</h2>
             ${m && m.title && m.title.toLowerCase() !== s.name.toLowerCase() ? `<p class="tv-alt">${esc(m.title)}${m.native ? ` <span lang="ja">${esc(m.native)}</span>` : ''}</p>` : ''}
-            <p class="tv-facts">${factsHTML(s, m, seen ? `<span>${seen} de ${s.all.length} vistos</span>` : '')}</p>
+            ${factsRowsHTML(s, m, { count: flat ? null : scope.length, seen, total: scope.length })}
           </div>
         </div>
         ${syn ? `<p class="tv-synopsis is-long" id="synopsis">${esc(syn)}</p>` : ''}
-        ${m && !hasSpanish(m) && m.synopsis && canTranslate() ? '<button class="link-btn" data-act="translate">Traducir sinopsis al español</button>' : ''}
+        ${m && !hasSpanish(m) && m.synopsis && canTranslate() ? `<button class="link-btn" data-act="translate"${ownMeta ? ` data-key="${esc(season.name)}"` : ''}>Traducir sinopsis al español</button>` : ''}
         <div class="tv-actions">
-          ${next ? `<a class="tv-btn is-primary" href="#/play/${encodeURIComponent(next.id)}">${ICON.play}<span>${esc(plan.label)}</span></a>` : '<span class="tv-done">Serie terminada</span>'}
+          ${next ? `<a class="tv-btn is-primary" href="#/play/${encodeURIComponent(next.id)}">${ICON.play}<span>${esc(plan.label)}</span></a>` : `<span class="tv-done">${esc(plan.label)}</span>`}
           ${upcoming.length ? `<button class="tv-btn" data-act="series-dl" data-si="${si}">${ICON.down}<span>Descargar ${upcoming.length === 1 ? 'el siguiente' : `los ${upcoming.length} siguientes`}</span></button>` : ''}
           ${flat ? '' : `<button class="tv-btn ${isLater(s) ? 'is-on' : ''}" data-act="later" data-si="${si}" aria-pressed="${isLater(s)}">${isLater(s) ? ICON.laterOn : ICON.later}<span>Más tarde</span></button>`}
         </div>
@@ -2536,7 +2631,7 @@ function renderSeries(arg) {
           <button class="pick-toggle" data-act="pick-mode" id="pick-toggle" aria-pressed="false">${ICON.check}<span>Seleccionar</span></button>
           ${!flat && s.seasons.length > 1 ? `<nav class="seasons" aria-label="Temporadas">${s.seasons.map((se, i) => `<button class="season ${i === ki ? 'is-on' : ''}" data-act="season" data-i="${i}" aria-pressed="${i === ki}">${esc(seasonTab(s, se))}</button>`).join('')}</nav>` : ''}
         </div>
-        ${season.title && season.title !== s.name ? `<p class="season-title">${esc(season.title)}</p>` : ''}
+        ${season.title && season.title !== s.name && (s.seasons.length < 2 || season.title !== seasonTab(s, season)) ? `<p class="season-title">${esc(season.title)}</p>` : ''}
         <ol class="episodes is-grid" id="season-eps">${season.episodes.map((ep) => episodeRow(ep, { fresh: fresh.has(ep.id), next: next && ep.id === next.id })).join('')}</ol>
       </section>
     </main>
@@ -2625,13 +2720,11 @@ function renderMovie(arg) {
   const busy = it.eps.some((e) => state.dls[e.id] || state.queue.some((q) => q.ep.id === e.id));
   const dur = (prog(plan.ep) || {}).d;
   const chip = (label, params) => `<a class="fact" href="#/catalogo?${new URLSearchParams(params)}">${esc(label)}</a>`;
-  const facts = [
-    m && m.year ? chip(m.year, { y: m.year }) : '',
-    chip('Película', { f: 'Película' }),
-    dur ? `<span>${Math.round(dur / 60)} min</span>` : '',
-    it.eps.length > 1 ? `<span>${it.eps.length} partes</span>` : '',
-    ...((m && m.genres) || []).slice(0, 3).map((g) => chip(g, { g })),
-  ].join('');
+  const facts = factRows(
+    [dur ? `<span>${Math.round(dur / 60)} min</span>` : '', it.eps.length > 1 ? `<span>${it.eps.length} partes</span>` : ''].join(''),
+    m,
+    [m && m.year ? chip(m.year, { y: m.year }) : '', chip('Película', { f: 'Película' }), ...((m && m.genres) || []).slice(0, 3).map((g) => chip(g, { g }))].join(''),
+  );
   const later = isLater(s, it.key);
   setTint((m && m.color) || seriesColor(s));
   app.innerHTML = header('', { overlay: true }) + `<div class="tv is-series is-movie">
@@ -2644,7 +2737,7 @@ function renderMovie(arg) {
           <div class="series-info">
             <h2 class="tv-title">${esc(t)}</h2>
             ${m && m.title && m.title.toLowerCase() !== t.toLowerCase() ? `<p class="tv-alt">${esc(m.title)}${m.native ? ` <span lang="ja">${esc(m.native)}</span>` : ''}</p>` : ''}
-            <p class="tv-facts">${facts}</p>
+            ${facts}
           </div>
         </div>
         ${syn ? `<p class="tv-synopsis is-long" id="synopsis">${esc(syn)}</p>` : ''}
@@ -3093,7 +3186,10 @@ function ownedIds() {
   if (!lib || lib.v !== 2) return out;
   lib.series.forEach((s, si) => {
     if (isCollection(s)) { for (const it of collectionItems(s)) { const m = itemMeta(s, it.key); if (m && m.id) out.set(m.id, movieHref(si, it.key)); } }
-    else { const m = metaFor(s); if (m && m.id) out.set(m.id, '#/serie/' + si); }
+    else {
+      const m = metaFor(s); if (m && m.id) out.set(m.id, '#/serie/' + si);
+      for (const se of s.seasons) { const sm = seasonMeta(s, se); if (sm && sm.id) out.set(sm.id, '#/serie/' + si); }
+    }
   });
   return out;
 }
