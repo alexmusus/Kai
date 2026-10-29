@@ -2431,6 +2431,12 @@ function catHTML(where) {
   }, 3000 + Math.random() * 3000);
 })();
 
+// nombres largos: letra más chica en la portada para no pasar de ~2 líneas
+function titleSize(name) {
+  const n = (name || '').length;
+  return n > 60 ? ' is-xlong' : n > 34 ? ' is-long' : '';
+}
+
 function heroInnerHTML(s, si) {
   const m = displayMeta(s);
   const plan = heroPlan(s);
@@ -2443,7 +2449,7 @@ function heroInnerHTML(s, si) {
     : m && m.cover
     ? `<a class="hero-poster" href="#/serie/${si}" aria-hidden="true" tabindex="-1"><img src="${esc(m.cover)}" alt="" decoding="async"></a>`
     : (coverEp ? `<a class="hero-poster is-thumb" href="#/serie/${si}" aria-hidden="true" tabindex="-1"><span data-thumb="${esc(coverEp.id)}"></span></a>` : '');
-  return `${poster}<div class="tvh-text"><h2 class="tv-title"><span class="tvt">${esc(s.name)}${catHTML('title')}</span></h2>
+  return `${poster}<div class="tvh-text"><h2 class="tv-title${titleSize(s.name)}"><span class="tvt">${esc(s.name)}${catHTML('title')}</span></h2>
     ${m && m.title && m.title.toLowerCase() !== s.name.toLowerCase() ? `<p class="tv-alt">${esc(m.title)}</p>` : ''}
     <p class="tv-facts">${factsHTML(s, m, fresh ? `<span class="tv-new">${fresh === 1 ? '1 nuevo' : `${fresh} nuevos`}</span>` : '')}</p>
     ${syn ? `<p class="tv-synopsis">${esc(syn.replace(/\s*\n+\s*/g, ' '))}</p>` : ''}
