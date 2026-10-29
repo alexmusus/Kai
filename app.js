@@ -2672,7 +2672,7 @@ function renderHome() {
       <section class="tv-row">
         <div class="tv-row-head"><h3 class="tv-row-title">Series</h3>
           <a class="tv-more" href="#/catalogo?t=series">${ICON.grid}<span>Ver catálogo${lib.series.filter((x) => !isCollection(x)).length > HOME_RECENT ? ` (${lib.series.filter((x) => !isCollection(x)).length})` : ''}</span></a></div>
-        <ul class="shelf is-row" role="list">${recentSeries(lib).map(({ s, si }) => seriesPosterHTML(s, si)).join('')}</ul>
+        <ul class="shelf is-row" role="list">${homeSeries(lib).map(({ s, si }) => seriesPosterHTML(s, si)).join('')}</ul>
 </section>
       ${homeMoviesHTML(lib)}
       <nav class="discover-links" aria-label="Descubrir">
@@ -2683,7 +2683,7 @@ function renderHome() {
     </main>
   </div>`;
 }
-/** Fila "Películas" del inicio: las 10 más recientes y el enlace al estante completo. */
+/** Fila "Películas" del inicio: las 10 primeras en orden alfabético y el enlace al estante completo. */
 function homeMoviesHTML(lib) {
   const si = lib.series.findIndex((x) => isCollection(x) && !isCine(x));
   if (si < 0) return '';
@@ -2761,9 +2761,10 @@ const HOME_MOVIES = 10;
 const HOME_CONTINUE = 3;
 const norm = (t) => String(t ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
-function recentSeries(lib) {
+/** Fila "Series" del inicio: en orden alfabético, como el catálogo (pedido de Alex, v37). */
+function homeSeries(lib) {
   return lib.series.map((s, si) => ({ s, si })).filter(({ s }) => !isCollection(s))
-    .sort((a, b) => (b.s.added || 0) - (a.s.added || 0) || a.s.name.localeCompare(b.s.name, 'es', { numeric: true }))
+    .sort((a, b) => a.s.name.localeCompare(b.s.name, 'es', { numeric: true }))
     .slice(0, HOME_RECENT);
 }
 
@@ -2801,9 +2802,9 @@ function filterEntries(list, { q = '', g = '', y = '', f = '', l = '' }) {
 }
 function sortEntries(list, o) {
   const az = (a, b) => a.title.localeCompare(b.title, 'es', { numeric: true });
-  if (o === 'az') return list.sort(az);
+  if (o === 'recent') return list.sort((a, b) => (b.added || 0) - (a.added || 0) || az(a, b));
   if (o === 'year') return list.sort((a, b) => (b.year || 0) - (a.year || 0) || az(a, b));
-  return list.sort((a, b) => (b.added || 0) - (a.added || 0) || az(a, b));
+  return list.sort(az); // por defecto, A–Z (v37)
 }
 /** Una serie como póster vertical (mismo diseño que las películas). */
 function seriesPosterHTML(s, si) {
@@ -2879,7 +2880,7 @@ function renderCatalog() {
     <div class="cat-filters" id="cat-filters">
       ${select('g', 'Género', genres)}${select('y', 'Año', years)}${select('f', 'Tipo', formats)}
       ${all.some((e) => e.langs && e.langs.length) ? select('l', 'Idioma', [['sub', 'Subtitulado'], ['dob', 'Doblado']]) : ''}
-      ${select('o', 'Orden', [['recent', 'Recientes'], ['az', 'A–Z'], ['year', 'Año']], false)}
+      ${select('o', 'Orden', [['az', 'A–Z'], ['recent', 'Recientes'], ['year', 'Año']], false)}
       <button class="link-btn cat-clear" type="button" data-act="cat-clear" hidden>Quitar filtros</button>
     </div>
     <p class="dim cat-count" id="cat-count" aria-live="polite"></p>
@@ -2894,7 +2895,7 @@ function renderCatalog() {
 }
 function catalogState() {
   const val = (n) => { const el = app.querySelector(`#cat-filters [name="${n}"]`); return el ? el.value : ''; };
-  return { q: ($('#cat-q') || {}).value || '', g: val('g'), y: val('y'), f: val('f'), l: val('l'), o: val('o') || 'recent' };
+  return { q: ($('#cat-q') || {}).value || '', g: val('g'), y: val('y'), f: val('f'), l: val('l'), o: val('o') || 'az' };
 }
 function paintCatalog() {
   const box = $('#cat-results');
@@ -2918,7 +2919,7 @@ function paintCatalog() {
   const params = new URLSearchParams();
   if (t) params.set('t', t);
   for (const k of ['q', 'g', 'y', 'f', 'l']) if (st[k]) params.set(k, st[k]);
-  if (st.o !== 'recent') params.set('o', st.o);
+  if (st.o !== 'az') params.set('o', st.o);
   const h = '#/catalogo' + (params.toString() ? '?' + params : '');
   if (location.hash !== h) history.replaceState(null, '', h);
 }
@@ -3149,10 +3150,10 @@ function moviePlan(it) {
   return { ep, label, pct, seen: !next, left: next && p && p.t > 5 ? fmtLeft(p) : '' };
 }
 
-/** Las películas de la colección, las agregadas más recientemente primero. */
+/** Las películas de la colección, en orden alfabético (v37; antes, las más recientes primero). */
 function shelfItems(s) {
   return collectionItems(s).map((it) => ({ it, m: itemMeta(s, it.key), plan: moviePlan(it), added: Math.max(0, ...it.eps.map((e) => e.ts || 0)) }))
-    .sort((a, b) => b.added - a.added || movieTitle(s, a.it).localeCompare(movieTitle(s, b.it), 'es', { numeric: true }));
+    .sort((a, b) => movieTitle(s, a.it).localeCompare(movieTitle(s, b.it), 'es', { numeric: true }));
 }
 function moviePosterHTML(s, si, { it, m, plan }, fresh) {
   const t = movieTitle(s, it);
