@@ -154,31 +154,62 @@ export async function findSeason(series, n) {
   const roman = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'][n] || '';
   const strong = new RegExp(`(season\\s*${n}\\b|${ord}\\s+season|\\b${n}(st|nd|rd|th)?\\s*(期|シーズン)${roman ? `|\\s${roman}$` : ''})`, 'i');
   const weak = new RegExp(`(\\b${n}\\b|\\b${ord}\\b${roman ? `|\\b${roman}\\b` : ''})`, 'i');
-  const list = (await searchAnime(`${series} Season ${n}`, 8)).filter((m) => relatedTo(series, m));
   const says = (m, re) => [...Object.values(m.title || {}), ...(m.synonyms || [])].some((t) => t && re.test(t));
+  // AniList no siempre encuentra "Serie Season 2" (su título dice "Serie 2nd Season"): se prueba de varias formas
+  let list = [];
+  for (const q of [`${series} Season ${n}`, `${series} ${ord} Season`, series]) {
+    list = (await searchAnime(q, q === series ? 15 : 8)).filter((m) => relatedTo(series, m));
+    if (list.some((m) => says(m, strong))) break;
+  }
   // primero el que dice "Season N" (así "Season 3 Part 2" no gana cuando se busca la 2)
   return list.find((m) => says(m, strong)) || list.find((m) => says(m, weak) && !/part\s*\d|parte\s*\d/i.test(m.title.english || m.title.romaji || '')) || null;
 }
 
 /** Qué tanto se parece un resultado al nombre buscado (0 a 1). `kind` da una pequeña ventaja al formato esperado. */
+/** Número de temporada que dice un nombre: "2nd Season", "Season 2", "Temporada 2", "… II". */
+const SEASON_NUM_RE = /(?:\b(\d{1,2})(?:st|nd|rd|th)\s+season\b|\bseason\s*(\d{1,2})\b|\btemporada\s*(\d{1,2})\b|\s(II|III|IV|V|VI)\s*$)/i;
+export function seasonNumOf(text) {
+  const m = SEASON_NUM_RE.exec(String(text || ''));
+  if (!m) return null;
+  if (m[4]) return { II: 2, III: 3, IV: 4, V: 5, VI: 6 }[m[4].toUpperCase()];
+  return Number(m[1] || m[2] || m[3]);
+}
 export function titleScore(name, m, kind = 'movie') {
-  const q = squash(name);
-  if (!q) return 0;
+  const qq = squash(name);
+  if (!qq) return 0;
   const raw = [...Object.values(m.title || {}), ...(m.synonyms || [])].filter(Boolean);
-  const titles = raw.map(squash).filter(Boolean);
+  // "Serie 1st Season": la primera temporada en AniList casi nunca dice "1st Season"; se compara también sin eso
+  const qn = seasonNumOf(name);
+  const q1 = qn === 1 ? squash(String(name).replace(SEASON_NUM_RE, ' ')) : '';
   const words = String(name).split(/[^\p{L}\p{N}]+/u).map(squash).filter((w) => w.length >= 3);
   let best = 0;
   // "Kaguya-sama wa Kokurasetai" = "Kaguya-sama wa Kokurasetai: Tensaitachi no…" (lo que sigue es un subtítulo, tras ":" o " -")
   const lowName = String(name).toLowerCase().replace(/\s+/g, ' ').trim();
   if (lowName.length >= 6 && raw.some((t) => { const lt = String(t).toLowerCase().replace(/\s+/g, ' '); return lt.startsWith(lowName) && /^\s*[:\-–(~]/.test(lt.slice(lowName.length)); })) best = 0.85;
-  for (const t of titles) {
-    const d = editDistance(q, t);
-    best = Math.max(best, 1 - d / Math.max(q.length, t.length));
+  // la temporada se compara escrita igual en ambos lados ("Temporada 2" = "2nd Season" = "Season 2" → "season2")
+  const canon = (text) => squash(String(text).replace(SEASON_NUM_RE, (x) => ` season${seasonNumOf(x)} `));
+  for (const r of raw) {
+    const t0 = squash(r);
+    if (!t0) continue;
+    const tn = seasonNumOf(r);
+    // con número de temporada: "Serie 1st Season" contra "Serie" se compara sin el número; si no, ambos en la forma común
+    const q = qn == null ? qq : qn === 1 && tn == null ? q1 : canon(name);
+    const t = qn == null ? t0 : qn === 1 && tn == null ? t0 : canon(r);
+    const sc = 1 - editDistance(q, t) / Math.max(q.length, t.length);
+    // mismo comienzo largo y final distinto ("Re Zero… Hyouketsu no Kizuna" no es "Re Zero… Memory Snow")
+    let p = 0;
+    while (p < q.length && p < t.length && q[p] === t[p]) p++;
+    const rq = q.slice(p), rt = t.slice(p);
+    const distinct = p >= 10 && rq.length >= 3 && rt.length >= 3 && 1 - editDistance(rq, rt) / Math.max(rq.length, rt.length) < 0.5;
+    // otra temporada ("2nd Season" cuando se busca la 1.ª o la 3.ª) no vale
+    const otherSeason = qn != null && (tn ?? 1) !== qn;
+    const cap = distinct || otherSeason ? 0.6 : 1;
+    best = Math.max(best, Math.min(sc, cap));
     // "Kimi no Na wa" dentro de "Kimi no Na wa. (2016)" o al revés también vale
     // (solo si lo que sobra es poco: "Yahari… Machigatteiru." no es "Yahari… Machigatteiru. Zoku OVA")
-    if (q.length >= 6 && (t.startsWith(q) || q.startsWith(t)) && Math.abs(t.length - q.length) <= Math.max(6, Math.min(q.length, t.length) * 0.15)) best = Math.max(best, 0.85);
+    if (cap === 1 && q.length >= 6 && (t.startsWith(q) || q.startsWith(t)) && Math.abs(t.length - q.length) <= Math.max(6, Math.min(q.length, t.length) * 0.15)) best = Math.max(best, 0.85);
     // "Heaven's Feel I presage flower" dentro de "Fate/stay night Movie: Heaven's Feel - I. presage flower"
-    if (words.length >= 2 && words.every((w) => t.includes(w)) && t.length <= q.length * 1.6) best = Math.max(best, 0.8);
+    if (cap === 1 && words.length >= 2 && words.every((w) => t.includes(w)) && t.length <= q.length * 1.6) best = Math.max(best, 0.8);
   }
   const want = { movie: ['MOVIE'], tv: ['TV', 'TV_SHORT', 'ONA'], ova: ['OVA', 'SPECIAL', 'ONA'] }[kind] || [];
   return best + (want.includes(m.format) ? 0.04 : 0);
@@ -188,6 +219,14 @@ export function titleScore(name, m, kind = 'movie') {
 function movieQueries(name) {
   const w = String(name).split(/\s+/).filter(Boolean);
   const out = [w.join(' ')];
+  // "Serie - Subtítulo": el subtítulo solo suele bastar ("Hyouketsu no Kizuna"), y la serie con el subtítulo
+  const dash = String(name).split(/\s+[-–]\s+/);
+  if (dash.length === 2 && dash[1].replace(/\s/g, '').length >= 5) out.push(dash[1], `${dash[0].split(/\s+/).slice(0, 2).join(' ')} ${dash[1]}`);
+  // "Serie 1st Season": también sin eso; "Serie Temporada 2": como lo escribe AniList ("Serie 2nd Season", "Serie Season 2")
+  const sn = seasonNumOf(name);
+  const bare = String(name).replace(SEASON_NUM_RE, ' ').replace(/\s+/g, ' ').trim();
+  if (sn === 1) out.push(bare);
+  else if (sn > 1) out.push(`${bare} ${{ 2: '2nd', 3: '3rd' }[sn] || sn + 'th'} Season`, `${bare} Season ${sn}`);
   // nombres largos: también las primeras 3–5 palabras, que suelen bastar (y sirven si más adelante hay algo escrito distinto)
   if (w.length > 6) out.push(w.slice(0, w.length - 1).join(' '), w.slice(0, 5).join(' '), w.slice(0, 4).join(' '), w.slice(0, 3).join(' '));
   for (let n = w.length - 1; n >= 2; n--) out.push(w.slice(0, n).join(' '));

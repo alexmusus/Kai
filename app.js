@@ -2052,12 +2052,14 @@ async function ensureMeta() {
           const k = itemMetaKey(s, se.name);
           const c = state.meta[k];
           const age = Date.now() - ((c && c.at) || 0);
-          if (c && c.sm === 1 && (c.none ? age < 86400000 : age < 30 * 86400000)) continue;
+          // las que dicen número de temporada o "Serie - Subtítulo" se buscan de nuevo una vez (v36 las encuentra mejor)
+          const need = /\b(season|temporada)\b|\d(st|nd|rd|th)\b|\s[-–]\s/i.test(se.name) ? 2 : 1;
+          if (c && (c.sm || 0) >= need && (c.none ? age < 86400000 : age < 30 * 86400000)) continue;
           let m = null;
           try {
             m = q.name ? await findTitle(q.name, q.kind, () => sleep(400)) : await findSeason(q.series, q.n);
           } catch (err) { console.warn('anilist', err); failed = true; break; }
-          state.meta[k] = m ? { ...toMeta(m), sm: 1 } : { none: true, id: 0, sm: 1, at: Date.now() };
+          state.meta[k] = m ? { ...toMeta(m), sm: 2 } : { none: true, id: 0, sm: 2, at: Date.now() };
           if (m) {
             const meta = state.meta[k];
             translateToSpanish(meta.synopsis).then((es) => { if (es) { meta.synopsisEs = es; saveMeta(); if (['home', 'serie'].includes(route().view)) softRender(); } });
@@ -2835,11 +2837,16 @@ function langSwitchHTML(s, langs) {
 function seasonHref(si, s, ki) { return s && !isCollection(s) && s.seasons.length > 1 ? `#/serie/${si}/${ki}` : `#/serie/${si}`; }
 /** Nombre corto para la tarjeta de una temporada: sin repetir el nombre (largo) de la serie.
  *  "Yahari Ore no Seishun… Zoku" → "Zoku"; la que se llama igual que la serie → "Temporada 1". */
+/** "2nd Season", "Season 2 Part 2" → "Temporada 2", "Temporada 2 · Parte 2" (todo en español). */
+function spanishSeason(t) {
+  const m = /^\s*(?:(\d{1,2})(?:st|nd|rd|th)\s+season|season\s*(\d{1,2})|temporada\s*(\d{1,2}))(?:\s*[-–·:,]?\s*(?:part|parte|cour)\s*(\d{1,2}))?\s*$/i.exec(t);
+  return m ? `Temporada ${m[1] || m[2] || m[3]}${m[4] ? ` · Parte ${m[4]}` : ''}` : t;
+}
 function seasonShort(s, se) {
   const t = seasonTab(s, se);
-  if (s.name.length < 10 || !t.toLowerCase().startsWith(s.name.toLowerCase())) return t;
+  if (s.name.length < 10 || !t.toLowerCase().startsWith(s.name.toLowerCase())) return spanishSeason(t);
   const rest = t.slice(s.name.length).replace(/^[\s.\-–:,]+/, '').trim();
-  return rest ? rest[0].toUpperCase() + rest.slice(1) : `Temporada ${seasonOrdinal(s, se)}`;
+  return rest ? spanishSeason(rest[0].toUpperCase() + rest.slice(1)) : `Temporada ${seasonOrdinal(s, se)}`;
 }
 
 function renderSeries(arg) {
@@ -2881,7 +2888,7 @@ function renderSeries(arg) {
         <div class="series-top">
           ${collage ? `<span class="poster is-collage">${collageHTML(collage)}</span>` : m && m.cover ? `<img class="poster" src="${esc(m.cover)}" alt="" decoding="async">` : (coverEp ? `<span class="poster is-thumb" data-thumb="${esc(coverEp.id)}"></span>` : '')}
           <div class="series-info">
-            ${multi ? `<p class="tv-kicker"><a href="#/serie/${si}">${esc(s.name)}</a><span>Temporada ${ki + 1} de ${s.seasons.length}</span></p>` : ''}
+            ${multi ? `<p class="tv-kicker"><a href="#/serie/${si}">${esc(s.name)}</a><span>${ki + 1} de ${s.seasons.length}</span></p>` : ''}
             <h2 class="tv-title">${esc(multi ? seasonShort(s, season) : s.name)}</h2>
             ${m && m.title && m.title.toLowerCase() !== (multi ? seasonShort(s, season) : s.name).toLowerCase() ? `<p class="tv-alt">${esc(m.title)}${m.native ? ` <span lang="ja">${esc(m.native)}</span>` : ''}</p>` : ''}
             ${factsRowsHTML(s, m, { count: flat ? null : scope.length, seen, total: scope.length, lang: langText(langsOf(season.episodes)) })}
