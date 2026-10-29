@@ -3070,9 +3070,17 @@ function renderSeries(arg) {
   if (fresh.size) { markSeriesSeen(s); lastNew = null; announceNew(); }
 }
 
+/** La ficha de la página de una serie con varias temporadas: siempre la de la Temporada 1 (v37: antes era la de la
+ *  última temporada vista, y con una OVA se leía raro). Si la Temporada 1 no tiene ficha, la primera temporada que sí. */
+function firstSeasonMeta(s) {
+  if (!isFranchise(s)) return displayMeta(s);
+  const first = s.seasons.find((se) => seasonLabel(s, se) === 'Temporada 1');
+  return (first && seasonMeta(s, first)) || s.seasons.filter((se) => isMainSeason(s, se)).map((se) => seasonMeta(s, se)).find(Boolean) || displayMeta(s);
+}
+
 /** Menú de una serie con varias temporadas: la ficha de la serie y una tarjeta por temporada. */
 function renderSeasonMenu(s, si) {
-  const m = displayMeta(s);
+  const m = firstSeasonMeta(s);
   const plan = heroPlan(s);
   const next = plan.next;
   const nextKi = next ? index.byId.get(next.id).ki : -1;
