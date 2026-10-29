@@ -6,22 +6,24 @@ Reproductor web para ver las series y películas de anime guardadas en una cuent
 
 - **Perfiles** tipo Netflix, cada uno con su propio progreso, sincronizado entre dispositivos.
 - **Biblioteca** armada desde la carpeta `Anime` de MEGA: cada carpeta es una serie y sus subcarpetas son temporadas. Una carpeta `Peliculas` se muestra como un estante de pósters, y cada película (una subcarpeta o un archivo suelto) tiene su propia página con imagen y sinopsis; en el catálogo y la búsqueda salen sueltas.
-- **Temporadas en el orden que tú decides:** el número al inicio de cada carpeta es el orden y el nombre es el de la temporada. Se pueden usar decimales para meter algo en medio sin renombrar lo demás, y si dos carpetas tienen el mismo número son las partes de una temporada:
+- **Temporadas, siempre con la misma forma:** cada carpeta de temporada lleva un número al inicio (el orden) y el nombre tal como viene de animeav1; no hace falta copiar el de AniList. Las OVAs van como `N. OVA` (o `N. [serie] OVA`) justo después de su temporada. Se pueden usar decimales para meter algo en medio sin renombrar lo demás, y si dos carpetas tienen el mismo número son las partes de una temporada:
   ```
-  Anime/Fate/
-    1. Fate stay night Unlimited Blade Works     → "Fate stay night Unlimited Blade Works"
-    1.5 Unlimited Blade Works Prologue (OVA)     → "Unlimited Blade Works Prologue (OVA)"
-    2. Fate Zero                                 → "Fate Zero"
-  Anime/Shingeki no Kyojin/
-    1. Temporada 1                               → "Temporada 1"
-    2. OVA                                       → "OVA"
-    3. Temporada 2                               → "Temporada 2"
-    4. Temporada 3 - Parte 1 / 4. Temporada 3 - Parte 2   → "Temporada 3 · Parte 1/2"
+  Anime/Yahari Ore no Seishun Love Comedy wa Machigatteiru./
+    1. Yahari Ore no Seishun Love Comedy wa Machigatteiru.        → "Temporada 1"
+    2. OVA                                                        → "OVA" (la de la temporada 1)
+    3. Yahari Ore no Seishun Love Comedy wa Machigatteiru. Zoku   → "Temporada 2"
+    4. OVA                                                        → "OVA" (la de Zoku)
+  Anime/Re Zero kara Hajimeru Isekai Seikatsu/
+    1. Re Zero kara Hajimeru Isekai Seikatsu 1st Season           → "Temporada 1"
+    2. Re Zero kara Hajimeru Isekai Seikatsu - Memory Snow        → "Memory Snow"
+    3. Re Zero kara Hajimeru Isekai Seikatsu 2nd Season           → "Temporada 2"
+  Anime/Dorohedoro/
+    1. Temporada 1 · 2. Temporada 2 · 3. OVA                      → "Temporada 1", "Temporada 2", "OVA"
   ```
-  Si renombras o mueves una carpeta, lo visto y el minuto donde ibas no se pierden.
+  Kai decide con AniList qué es cada carpeta: las series se cuentan como "Temporada 1, 2, 3…"; las OVAs, especiales y películas muestran su subtítulo o "OVA" / "Especial" / "Película". Las tarjetas llevan el año y los capítulos, y al entrar a una temporada se ve su nombre completo. Si renombras o mueves una carpeta, lo visto y el minuto donde ibas no se pierden.
 - **Subtitulado y doblado:** el idioma va al final del nombre del archivo: `_SUB` (subtitulado) o `_DUB` (doblado; también `_DOB`, `_LAT`, `[Latino]`). Las dos versiones de un capítulo van en la misma carpeta (`472_0_SUB.mp4` y `472_0_DUB.mp4`) y Kai muestra una sola, con un botón **Sub | Doblado** en la serie o la película; cada perfil recuerda lo que eligió. Lo visto se comparte: si viste el 5 subtitulado, también queda visto doblado. Si un capítulo solo existe en el otro idioma, sale marcado ("Solo sub"). Los pósters llevan una etiqueta SUB / DOB y el catálogo se puede filtrar por idioma. Si el archivo no dice nada, Kai usa el idioma del audio del MP4 (español = doblado) después de reproducirlo una vez.
-- **Menú de temporadas:** al entrar a una serie con varias temporadas salen sus tarjetas (póster, año, capítulos vistos, "Viendo" o "Nuevo"); al tocar una se abren sus capítulos, con botones para la anterior, la siguiente o volver al menú. Si el nombre de la temporada empieza con el nombre de la serie, la tarjeta muestra solo lo que cambia ("Zoku", "Kan").
-- **Fichas por temporada:** cada temporada con nombre propio se busca en AniList con ese nombre exacto (póster, banner, sinopsis y nota). Las OVAs ("[serie] OVA", "[serie] Zoku OVA") se buscan entre las historias relacionadas de esa temporada en AniList. Si la primera temporada tiene nombre propio, el nombre de la carpeta de la serie ("Fate") no se busca: es solo el nombre del grupo. Las carpetas tipo "Temporada 2" buscan "[serie] Season 2" y, si no lo encuentran, usan la ficha de la serie.
+- **Menú de temporadas:** al entrar a una serie con varias temporadas salen sus tarjetas (póster, año, capítulos vistos, "Viendo" o "Nuevo"); al tocar una se abren sus capítulos, con botones para la anterior, la siguiente o volver al menú.
+- **Fichas por temporada:** cada temporada se busca en AniList con el nombre de su carpeta (póster, banner, sinopsis y nota); las tipo "Temporada 2" buscan "[serie] Season 2", y la Temporada 1 usa la ficha de la serie. Una OVA sin subtítulo toma la OVA de la temporada que tiene antes. Si la primera temporada tiene nombre propio, el nombre de la carpeta de la serie ("Fate") no se busca: es solo el nombre del grupo.
 - **Al terminar una temporada, Kai se detiene:** no pasa solo a la siguiente; ofrece un botón para verla si quieres.
 - **Cine** (películas que no son anime): una carpeta `Cine` dentro de `Anime`, con una subcarpeta por película (por ejemplo `El gigante de hierro (1999)`). No sale en el inicio ni en los catálogos: se abre con el botón **Cine** al final del inicio y aparece al buscar. Los pósters, la sinopsis en español y la nota vienen de TMDB; la clave gratis de TMDB se pega una vez en **Ajustes → Cine** y se guarda en tu MEGA (no en el código), así sirve en todos los dispositivos.
 - **Sinopsis e imágenes** de AniList para cada serie y película, automáticas. Las sinopsis se traducen al español en Chrome de computadora (en segundo plano, con el traductor de Chrome) y se guardan en `.kai-sinopsis.json` en tu MEGA, así los demás dispositivos (iPhone, Mac, Android) las ven ya traducidas. La primera vez hay que tocar "Traducir sinopsis al español" en Chrome para que descargue el traductor. Las fichas encontradas (póster, banner, sinopsis, nota) se guardan en `.kai-fichas.json` en tu MEGA: los demás dispositivos y perfiles las usan sin volver a buscar en AniList.

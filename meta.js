@@ -277,6 +277,24 @@ async function findSideStory(base, pause) {
   return list[0] || null;
 }
 
+/** OVAs, especiales y ONAs relacionados con una ficha de AniList (para la carpeta "OVA" que va después de esa temporada),
+ * de la más antigua a la más nueva. */
+const sideMemo = new Map();
+export function sideStoriesOf(id) {
+  if (!sideMemo.has(id)) {
+    const p = gql(`query ($id: Int) { Media(id: $id, type: ANIME) { relations { edges { relationType node { type ${FIELDS} } } } } }`, { id })
+      .then((data) => ((data && data.Media && data.Media.relations && data.Media.relations.edges) || [])
+        .filter((e) => e.node && e.node.type === 'ANIME' && (
+          (['SIDE_STORY', 'SPIN_OFF', 'OTHER', 'SUMMARY'].includes(e.relationType) && ['OVA', 'SPECIAL', 'ONA'].includes(e.node.format))
+          // la OVA de Yahari Kan está como "secuela" de Kan (las series ONA que siguen, como Dorohedoro Season 2, no)
+          || (e.relationType === 'SEQUEL' && ['OVA', 'SPECIAL'].includes(e.node.format))))
+        .map((e) => e.node).sort((x, y) => (x.seasonYear || 9999) - (y.seasonYear || 9999) || x.id - y.id));
+    p.catch(() => sideMemo.delete(id));
+    sideMemo.set(id, p);
+  }
+  return sideMemo.get(id);
+}
+
 /** Traducción en el propio navegador (Chrome reciente). Devuelve null si no se puede sin intervención. */
 let translator = null;
 const withTimeout = (p, ms) => Promise.race([p, new Promise((r) => setTimeout(() => r(null), ms))]);
