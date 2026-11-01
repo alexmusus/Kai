@@ -2,7 +2,7 @@ import { mp4Info, mp4Chapters, mp4Formats, pickIntro, OUTRO_RE as OUTRO } from '
 import { translateToSpanish } from './models/meta-api.js';
 import { $, LS, esc, sleep, fmtTime, fmtSize, plural } from './lib/util.js';
 import { ICON } from './views/icons.js';
-import { DARK_TONES, TONES, state, index, setIndex, saveSettings, pkey, saveShared, visibleProfiles } from './models/store.js';
+import { state, index, setIndex, saveSettings, pkey, saveShared, visibleProfiles } from './models/store.js';
 import { C, megaMessage, login, connect, downloadUrl } from './models/mega.js';
 import { loadProfileState, nodePath, buildLibrary, buildIndex, learnAudioLang, setLangPref, setLibrary, librarySignature } from './models/library.js';
 
@@ -15,6 +15,9 @@ import { startPicking, endPicking, pickAction } from './controllers/picking.js';
 import { isUpdateReady, markUpdateReady, setRegistration, findUpdate } from './models/updates.js';
 import { renderLogin, renderProfiles, avatarHTML } from './views/account.js';
 import { addProfile, useProfile } from './models/profiles.js';
+import { toast, toastCount } from './views/toast.js';
+import { resolvedTheme, paintThemeColor, applyTheme } from './views/theme.js';
+import './views/images.js';
 import { on } from './lib/events.js';
 import { syncShared, syncProgress } from './models/sync.js';
 import { countBytes, noteQuota, quotaUntil, refreshAccountInfo } from './models/quota.js';
@@ -48,6 +51,7 @@ import { renderDiscover, openDiscoverSheet } from './views/discover.js';
 import { showSheet, closeSheet } from './views/sheet.js';
 
 on('quota', paintQuota);
+on('theme', () => { if (dock.classList.contains('is-open')) fillDock(); });
 on('navigate', ({ hash, replace }) => {
   if (replace) { navReplacing = true; location.replace(hash); } else go(hash);
 });
@@ -446,24 +450,6 @@ document.addEventListener('pointerdown', (e) => {
 
 /* ── selección de varios capítulos de una temporada para descargarlos juntos ── */
 
-/* Las imágenes aparecen con un fundido solo la primera vez que se cargan. Al redibujar una página (o volver a
- * ella) las que ya estaban cargadas se muestran de una vez: si no, todas parpadeaban en cada cambio. */
-const seenImgs = new Set();
-function settleImages(root) {
-  for (const img of root.querySelectorAll ? root.querySelectorAll('img') : []) {
-    if (seenImgs.has(img.src) || (img.complete && img.naturalWidth)) {
-      // ya cargada: sin fundido y dibujada en el mismo instante (sin el cuadro vacío de la carga diferida)
-      img.classList.add('no-fade'); img.decoding = 'sync'; img.loading = 'eager'; seenImgs.add(img.src);
-    }
-    else img.addEventListener('load', () => seenImgs.add(img.src), { once: true });
-  }
-}
-new MutationObserver((list) => {
-  for (const m of list) for (const n of m.addedNodes) {
-    if (n.nodeType !== 1) continue;
-    if (n.tagName === 'IMG') settleImages(n.parentNode || n); else settleImages(n);
-  }
-}).observe(document.body, { childList: true, subtree: true });
 
 function paintEpisode(id) {
   const ep = epById(id);
@@ -1128,34 +1114,6 @@ function doSkip() {
 
 /* ── tema y luz ── */
 
-const darkMQ = matchMedia('(prefers-color-scheme: dark)');
-function resolvedTheme() {
-  const t = state.settings.theme;
-  return t === 'light' || t === 'dark' ? t : (darkMQ.matches ? 'dark' : 'light');
-}
-/* color de la barra del sistema; en pantalla completa negro, porque en Android ese color también pinta
- * el hueco de la cámara (en tema claro salía una franja blanca) */
-function paintThemeColor() {
-  const meta = document.querySelector('meta[name="theme-color"]');
-  if (!meta) return;
-  meta.content = isFullscreen() ? '#000000' : resolvedTheme() === 'dark' ? (DARK_TONES[state.settings.darkTone] || DARK_TONES.negro).bg : (TONES[state.settings.tone] || TONES.blanco).bg;
-}
-function applyTheme() {
-  const t = resolvedTheme();
-  document.documentElement.dataset.theme = t;
-  const tone = state.settings.tone;
-  if (t === 'light' && tone && tone !== 'blanco' && TONES[tone]) document.documentElement.dataset.tone = tone;
-  else delete document.documentElement.dataset.tone;
-  if (t === 'dark' && state.settings.darkTone === 'gris') document.documentElement.dataset.dark = 'gris';
-  else delete document.documentElement.dataset.dark;
-  paintThemeColor();
-  if (dock.classList.contains('is-open')) fillDock();
-  document.querySelectorAll('[data-act="theme"]:not(.dock-chip)').forEach((b) => {
-    b.innerHTML = t === 'dark' ? ICON.sun : ICON.moon;
-    b.setAttribute('aria-label', `Cambiar a tema ${t === 'dark' ? 'claro' : 'oscuro'}`);
-  });
-}
-darkMQ.addEventListener('change', applyTheme);
 
 function setLights(off) {
   document.body.classList.toggle('lights-off', off);
@@ -1523,16 +1481,6 @@ document.addEventListener('keydown', (e) => {
 
 /* ───────────────────────── avisos ───────────────────────── */
 
-let toastTimer;
-let toastSeq = 0;
-function toast(text) {
-  toastSeq++;
-  const el = $('#toast');
-  el.textContent = text;
-  el.classList.add('is-on');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove('is-on'), 3800);
-}
 
 /* ───────────────────────── eventos globales ───────────────────────── */
 
@@ -1696,11 +1644,11 @@ document.addEventListener('click', async (e) => {
   } else if (act === 'refresh') {
     el.classList.add('is-spinning');
     try {
-      const seq = toastSeq;
+      const seq = toastCount();
       await connect();
       refreshLibrary();
       await sync();
-      if (toastSeq === seq) toast('Biblioteca actualizada.');
+      if (toastCount() === seq) toast('Biblioteca actualizada.');
     } catch (err) {
       toast(megaMessage(err));
     }
