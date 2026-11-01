@@ -144,3 +144,20 @@ test('reproducción sin conexión no rompe la página', async ({ page }, info) =
   await go(page, '#/');
   expect(k.errors).toEqual([]);
 });
+
+test('etiqueta de códec: nombre y puntito rojo si este navegador no lo reproduce', async ({ page }) => {
+  const { buildFixture } = await import('./fixture.js');
+  const eps = buildFixture().library.series.find((s) => s.name === 'Dorohedoro').seasons[0].episodes;
+  const codecs = {
+    [`${eps[0].id}:${eps[0].size}`]: { video: { codec: 'avc1', profile: 100, bits: 8 }, audio: { codec: 'mp4a' } },
+    [`${eps[1].id}:${eps[1].size}`]: { video: { codec: 'mp2v' }, audio: null }, // MPEG-2: ningún navegador
+  };
+  const k = await openKai(page, '#/', { extraLS: { codecs } });
+  await go(page, '#/serie/' + k.si('Dorohedoro'));
+  const tags = page.locator('.episodes .ep-codec');
+  await expect(tags.nth(0)).toHaveText('H.264');
+  await expect(tags.nth(0)).not.toHaveClass(/is-bad/);
+  await expect(tags.nth(1)).toHaveText('MP2V');
+  await expect(tags.nth(1)).toHaveClass(/is-bad/);
+  expect(k.errors).toEqual([]);
+});

@@ -39,6 +39,8 @@ decide. ESLint lo revisa (`no-restricted-imports`).
 | `news.js` | burbujas de "nuevo" y Novedades (avisa `news`) |
 | `thumbs.js` | miniaturas de MEGA, guardadas en IndexedDB |
 | `idb.js` | IndexedDB: descargas, miniaturas, subtítulos leídos |
+| `downloads.js` | descargas en pedazos, reanudar, carpeta de descargas (avisa `download-changed`, `download-done`, `notice`…) |
+| `media.js` | leer videos por rangos, códec de cada archivo, si este navegador lo reproduce, capítulos guardados |
 
 Fuera de las capas:
 

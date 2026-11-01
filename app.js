@@ -1,4 +1,4 @@
-import { isSubtitleName, mp4Info, mp4Chapters, mp4Formats, mp4QuickFormats, pickIntro, OUTRO_RE as OUTRO } from './models/subs.js';
+import { isSubtitleName, mp4Info, mp4Chapters, mp4Formats, pickIntro, OUTRO_RE as OUTRO } from './models/subs.js';
 import { tmdbCheckKey, translateToSpanish, canTranslate, recommendationsFor, airingTop, toDiscover } from './models/meta-api.js';
 import { $, LS, esc, sleep, debounce, fmtTime, fmtLeft, fmtSize, hue, plural } from './lib/util.js';
 import { ICON } from './views/icons.js';
@@ -25,6 +25,8 @@ import { idb } from './models/idb.js';
 import { saveKnown, initKnown, newEpisodes, markSeriesSeen, newsList, hasUnreadNews, announceNew } from './models/news.js';
 import { epById } from './models/library.js';
 import { thumbFor } from './models/thumbs.js';
+import { saveChapterCache, rangeReader, cacheChapters, formatProblem, formatSummary, rememberCodec } from './models/media.js';
+import { hydrateThumbs, codecTagHTML } from './views/thumbs.js';
 const app = $('#app');
 
 on('quota', paintQuota);
@@ -50,7 +52,6 @@ loadProfileState();
 
 /* ───────────────────────── nombres → capítulos ───────────────────────── */
 
-
 /* ───────────────────────── IndexedDB ───────────────────────── */
 
 /* ───────────────────────── MEGA ───────────────────────── */
@@ -74,94 +75,6 @@ function refreshLibrary(rerender = true) {
 }
 
 /* ───────────────────────── miniaturas ───────────────────────── */
-
-const thumbObserver = 'IntersectionObserver' in window ? new IntersectionObserver((entries) => {
-  for (const e of entries) {
-    if (!e.isIntersecting) continue;
-    thumbObserver.unobserve(e.target);
-    loadThumb(e.target);
-  }
-}, { rootMargin: '300px' }) : null;
-
-function loadThumb(el) {
-  const ep = epById(el.dataset.thumb);
-  if (!ep) return;
-  thumbFor(ep).then((u) => {
-    if (!u) return;
-    const img = new Image();
-    img.alt = '';
-    img.decoding = 'async';
-    img.onload = () => { el.prepend(img); el.classList.add('has-img'); };
-    img.src = u;
-  });
-}
-
-function hydrateThumbs(scope = document) {
-  scope.querySelectorAll('[data-thumb]:not(.thumb-seen)').forEach((el) => {
-    el.classList.add('thumb-seen');
-    if (thumbObserver) thumbObserver.observe(el); else loadThumb(el);
-  });
-  hydrateCodecs(scope);
-}
-
-/* ── códec de cada video, en pequeño sobre la miniatura ──
- * Se lee una sola vez por archivo (solo el principio del índice del MP4) y se guarda.
- * El puntito rojo depende de ESTE dispositivo: el mismo AV1 lo lleva en el iPad M2 y no en el iPhone. */
-const codecCache = LS.get('codecs', {}) || {};
-const codecKey = (ep) => `${ep.id}:${ep.size}`;
-const CODEC_NAMES = { avc1: 'H.264', avc3: 'H.264', hvc1: 'HEVC', hev1: 'HEVC', av01: 'AV1', vp09: 'VP9', vp08: 'VP8', mp4v: 'MPEG-4' };
-function codecTagHTML(ep) {
-  if (!/mp4|quicktime/.test(ep.mime || '')) return '';
-  const f = codecCache[codecKey(ep)];
-  if (!f) return `<span class="ep-codec is-pending" data-codec="${esc(ep.id)}"></span>`;
-  return codecTagInner(f);
-}
-function codecTagInner(f) {
-  if (!f.video) return '';
-  const name = CODEC_NAMES[f.video.codec] || f.video.codec.toUpperCase();
-  const prob = formatProblem(f);
-  return `<span class="ep-codec ${prob ? 'is-bad' : ''}" title="${esc(prob ? `${name}: este dispositivo no lo puede reproducir` : name)}">${prob ? '<i aria-hidden="true"></i>' : ''}${esc(name)}</span>`;
-}
-const codecQueue = [];
-let codecActive = 0;
-const codecObserver = 'IntersectionObserver' in window ? new IntersectionObserver((entries) => {
-  for (const e of entries) {
-    if (!e.isIntersecting) continue;
-    codecObserver.unobserve(e.target);
-    const tag = e.target.querySelector('.ep-codec.is-pending');
-    if (tag) codecQueue.push(tag);
-  }
-  pumpCodecs();
-}, { rootMargin: '200px' }) : null;
-function hydrateCodecs(scope = document) {
-  if (!codecObserver || !navigator.onLine) return;
-  // se observa la miniatura (la etiqueta pendiente está oculta y el navegador no avisa de lo oculto)
-  scope.querySelectorAll('.ep-codec.is-pending:not(.codec-seen)').forEach((el) => {
-    el.classList.add('codec-seen');
-    codecObserver.observe(el.closest('.ep-thumb') || el.parentElement);
-  });
-}
-function pumpCodecs() {
-  while (codecActive < 2 && codecQueue.length) {
-    const el = codecQueue.shift();
-    const ep = epById(el.dataset.codec);
-    if (!ep || !el.isConnected) continue;
-    codecActive++;
-    readCodec(ep).then((f) => {
-      if (!f) return;
-      document.querySelectorAll(`.ep-codec[data-codec="${CSS.escape(ep.id)}"]`).forEach((x) => { x.outerHTML = codecTagInner(f); });
-    }).catch(() => {}).finally(() => { codecActive--; pumpCodecs(); });
-  }
-}
-async function readCodec(ep) {
-  const k = codecKey(ep);
-  if (codecCache[k]) return codecCache[k];
-  const f = await mp4QuickFormats(await rangeReader(ep, null), ep.size);
-  if (!f) return null;
-  codecCache[k] = { video: f.video, audio: f.audio };
-  LS.set('codecs', codecCache);
-  return codecCache[k];
-}
 
 /* ───────────────────────── capítulos fuera de la biblioteca ───────────────────────── */
 
@@ -313,7 +226,6 @@ async function exportCopy(ep) {
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 120000);
 }
-
 
 /* ───────────────────────── rutas y vistas ───────────────────────── */
 
@@ -2241,6 +2153,9 @@ function parkStage() {
   if (stage.parentElement !== parking) parking.appendChild(stage);
 }
 
+/** El archivo descargado que se está reproduciendo, si lo hay (para leerlo por rangos sin ir a MEGA). */
+const sourceBlob = (token) => (token && token.source && token.source.blob) || null;
+
 /* ───────────────────────── motor del reproductor ───────────────────────── */
 
 const ui = {
@@ -2629,7 +2544,7 @@ async function loadChapters(ep, token) {
   // desde MEGA, primero que arranque el video; si está descargado, se lee al instante
   if (!(token.source && token.source.blob)) await whenPlaying(4000);
   if (!alive()) return;
-  const read = await rangeReader(ep, token, ctrl.signal);
+  const read = await rangeReader(ep, sourceBlob(token), ctrl.signal);
   const info = await mp4Info(read, ep.size);
   learnAudioLang(ep, info.audioLang);
   if (!alive()) return;
@@ -2637,39 +2552,6 @@ async function loadChapters(ep, token) {
   if (!alive()) return;
   setChapters(token, chapters);
   saveChapterCache(ep, chapters);
-}
-
-function saveChapterCache(ep, chapters) {
-  idb.put('subcache', { v: 3, tracks: [], chapters: (chapters || []).map((c) => ({ ...c, end: isFinite(c.end) ? c.end : null })), at: Date.now() }, ep.id).catch(() => {});
-}
-
-/** Lector por rangos: del archivo descargado o de MEGA descifrando al vuelo. */
-async function rangeReader(ep, token, signal) {
-  const blob = token && token.source && token.source.blob;
-  if (blob) return async (a, b) => new Uint8Array(await blob.slice(a, b + 1).arrayBuffer());
-  const fk = await C.fileKey(ep.key);
-  let url = await downloadUrl(ep.id);
-  return async (a, b) => {
-    try {
-      return await C.readRange(url, fk, a, b, signal);
-    } catch (err) {
-      if (err.code !== 'HTTP') throw err;
-      url = await downloadUrl(ep.id, true);
-      return C.readRange(url, fk, a, b, signal);
-    }
-  };
-}
-
-/** Después de descargar un capítulo, deja listos sus capítulos para verlo sin conexión. */
-async function cacheChapters(ep) {
-  const have = await idb.get('subcache', ep.id).catch(() => null);
-  if (have && have.v === 3) return;
-  const blob = await localBlob(ep);
-  if (!blob || !/mp4|quicktime/.test(ep.mime)) return;
-  const read = async (a, b) => new Uint8Array(await blob.slice(a, b + 1).arrayBuffer());
-  const info = await mp4Info(read, ep.size);
-  learnAudioLang(ep, info.audioLang);
-  saveChapterCache(ep, await mp4Chapters(info, read, null));
 }
 
 /* ── capítulos e intros ── */
@@ -2906,47 +2788,6 @@ video.addEventListener('ended', () => {
     nextTimer = setTimeout(tick, 1000);
   }
 });
-/* ── formato del video: por qué un navegador no puede reproducir un archivo ── */
-const isSafariUA = /Safari\//.test(navigator.userAgent) && !/Chrome|CriOS|Chromium|Edg|Android|FxiOS/.test(navigator.userAgent);
-function canPlay(type) {
-  try { return !!video.canPlayType(type) || !!(window.MediaSource && MediaSource.isTypeSupported(type)); } catch { return false; }
-}
-/** Si el formato del archivo no se puede reproducir en este navegador: { what, fix }; si no, null.
- * Se le pregunta al propio navegador por el códec exacto, así el aviso vale para cada dispositivo. */
-const hex2 = (n) => (n & 255).toString(16).padStart(2, '0').toUpperCase();
-function formatProblem(f) {
-  if (!f || !f.video) return null;
-  const v = f.video;
-  const a = f.audio || {};
-  const elsewhere = isSafariUA ? 'En Chrome de la PC quizá sí se vea.' : 'Prueba en otro navegador o dispositivo.';
-  if (/^avc[13]$/.test(v.codec)) {
-    if (!canPlay(`video/mp4; codecs="avc1.${hex2(v.profile || 100)}0028"`)) {
-      return v.bits > 8
-        ? { what: 'H.264 de 10 bits (Hi10P)', fix: `Este navegador no reproduce ese formato. ${elsewhere} Lo seguro es la versión en H.264 normal (8 bits).` }
-        : { what: `H.264 (perfil ${v.profile})`, fix: `Este navegador no reproduce ese perfil de H.264. ${elsewhere}` };
-    }
-  } else if (/^(hev1|hvc1)$/.test(v.codec)) {
-    const what = `HEVC (H.265)${v.bits > 8 ? ' de 10 bits' : ''}`;
-    if (v.codec === 'hev1' && isSafariUA) return { what: what + ' marcado como "hev1"', fix: 'Safari solo acepta HEVC marcado como "hvc1". Se arregla sin perder calidad: ffmpeg -i entrada.mp4 -c copy -tag:v hvc1 salida.mp4' };
-    if (!canPlay(`video/mp4; codecs="hvc1.${v.bits > 8 ? '2.4.L120' : '1.6.L93'}.B0"`)) return { what, fix: `Este navegador no reproduce HEVC en este equipo. ${isSafariUA ? '' : 'Safari en iPhone, iPad y Mac sí.'}`.trim() };
-  } else if (v.codec === 'av01') {
-    if (!canPlay(`video/mp4; codecs="av01.0.08M.${v.bits > 8 ? '10' : '08'}"`)) return { what: 'AV1', fix: `Este dispositivo no reproduce AV1. ${elsewhere}` };
-  } else if (!canPlay(`video/mp4; codecs="${{ vp09: `vp09.00.10.${v.bits > 8 ? '10' : '08'}`, vp08: 'vp8', mp4v: 'mp4v.20.8' }[v.codec] || v.codec}"`)) {
-    const names = { mp4v: 'MPEG-4 Part 2 (XviD/DivX)', mp2v: 'MPEG-2', vp08: 'VP8' };
-    return { what: names[v.codec] || `el formato "${v.codec}"`, fix: 'Este navegador no reproduce ese formato de video. Hace falta la versión en H.264.' };
-  }
-  if (/^(ac-3|ec-3)$/.test(a.codec) && !canPlay(`audio/mp4; codecs="${a.codec}"`)) {
-    return { what: `audio Dolby (${a.codec === 'ec-3' ? 'E-AC-3' : 'AC-3'})`, fix: `Este navegador no reproduce ese audio. ${isSafariUA ? '' : 'Safari y Edge sí.'}`.trim() };
-  }
-  if (/^dts/i.test(a.codec || '')) return { what: 'audio DTS', fix: 'Los navegadores no reproducen audio DTS. Hace falta una versión con audio AAC.' };
-  return null;
-}
-function formatSummary(f) {
-  if (!f) return 'formato no leído';
-  const v = f.video;
-  const vs = v ? `${v.codec}${v.profile ? ' perfil ' + v.profile : ''}, ${v.bits} bits` : 'sin video';
-  return `video ${vs}; audio ${(f.audio && f.audio.codec) || 'ninguno'}`;
-}
 
 video.addEventListener('error', async () => {
   if (!playing || !video.getAttribute('src')) return;
@@ -3000,8 +2841,8 @@ async function explainFormat(ep, code) {
   const token = playing;
   stage.classList.add('is-loading');
   let f = null;
-  try { f = await mp4Formats(await rangeReader(ep, token), ep.size); } catch (err) { console.warn('formato', err); }
-  if (f && f.video) { codecCache[codecKey(ep)] = { video: f.video, audio: f.audio }; LS.set('codecs', codecCache); }
+  try { f = await mp4Formats(await rangeReader(ep, sourceBlob(token)), ep.size); } catch (err) { console.warn('formato', err); }
+  if (f && f.video) rememberCodec(ep, f);
   if (playing !== token) return;
   const prob = formatProblem(f);
   const detail = `Detalle: código ${code}; ${formatSummary(f)}`;
