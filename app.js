@@ -1,19 +1,20 @@
 import { isSubtitleName, mp4Info, mp4Chapters, mp4Formats, mp4QuickFormats, pickIntro, OUTRO_RE as OUTRO } from './subs.js';
 import { animeById, toMeta, findForSeries, findMovie, findTitle, findSeason, seasonNumOf, sideStoriesOf, scoresByIds, tmdbFindMovie, tmdbCheckKey, translateToSpanish, canTranslate, recommendationsFor, airingTop, toDiscover } from './meta.js';
-import { $, LS, esc, stable, sleep, debounce, fmtTime, fmtLeft, fmtSize, hue, plural } from './lib/util.js';
+import { $, LS, esc, sleep, debounce, fmtTime, fmtLeft, fmtSize, hue, plural } from './lib/util.js';
 import { ICON } from './views/icons.js';
 import { langText, SPECIAL_RE, hasOwnTitle, isSpecialSeason, seasonOrdinal, seasonTab, MAIN_FORMATS, afterSeriesName, isBareSpecial, specialWord, sortEpisodes } from './models/naming.js';
-import { DARK_TONES, TONES, FICHAS_FILE, SYN_FILE, SHARED_FILE, profileFile, LEGACY_PROGRESS, state, index, setIndex, knownEps, saveSettings, pkey, saveProgressLocal, saveShared, visibleProfiles } from './models/store.js';
+import { DARK_TONES, TONES, FICHAS_FILE, SYN_FILE, profileFile, state, index, setIndex, knownEps, saveSettings, pkey, saveShared, visibleProfiles } from './models/store.js';
 import { C, filesNamed, readJson, writeJson, visibleChildren, megaMessage, login, connect, downloadUrl } from './models/mega.js';
-import { langsOf, loadProfileState, nodePath, findFolder, makeEpisode, isPlayable, buildLibrary, buildIndex, langPref, learnAudioLang, setLangPref, setLibrary, librarySignature, migrateProgressKeys } from './models/library.js';
+import { langsOf, loadProfileState, nodePath, makeEpisode, isPlayable, buildLibrary, buildIndex, langPref, learnAudioLang, setLangPref, setLibrary, librarySignature } from './models/library.js';
 
 import { on } from './lib/events.js';
+import { syncShared, syncProgress } from './models/sync.js';
 import { countBytes, noteQuota, quotaUntil, refreshAccountInfo } from './models/quota.js';
 import { quotaText, paintQuota } from './views/quota.js';
 import { isCine, isCollection, collectionItems, itemMetaKey, itemFor, movieTitle, itemMeta } from './models/collections.js';
 import { prog, setProgress, DEVICE, markNow, isLater, laterList, continueList, mergeProgress } from './models/progress.js';
 import { setLaterFlag } from './models/progress.js';
-import { backupProfiles, profilesFromBackup, mergeShared, normName, dedupeProfiles, finalProfileId } from './models/profiles.js';
+import { profilesFromBackup, normName } from './models/profiles.js';
 const app = $('#app');
 
 on('quota', paintQuota);
@@ -383,71 +384,12 @@ async function doSync() {
   paintSync();
   try {
     // 1) lo compartido entre perfiles
-    const sNodes = filesNamed(home, SHARED_FILE);
-    let remoteShared = { profiles: [], intros: {}, picks: {}, legacyBy: null };
-    for (const n of sNodes) { const d = await readJson(n); if (d) remoteShared = mergeShared(remoteShared, d); }
-    const before = stable(state.shared);
-    state.shared = mergeShared(state.shared, remoteShared);
-    dedupeProfiles();
-    const sharedChanged = stable(state.shared) !== before;
-    saveShared();
-    // si este dispositivo estaba en un perfil que se juntó con otro, pasa al que quedó
-    if (state.profile) {
-      const fid = finalProfileId(state.profile.id);
-      if (fid !== state.profile.id) {
-        const keeper = state.shared.profiles.find((x) => x.id === fid);
-        const mine = state.progress;
-        state.profile = { id: keeper.id, name: keeper.name };
-        LS.set('profile', state.profile);
-        loadProfileState();
-        state.progress = mergeProgress(state.progress, mine);
-        state.dirty = true;
-        saveProgressLocal();
-      }
-    }
-    const hasShared = state.shared.profiles.length || Object.keys(state.shared.intros).length || Object.keys(state.shared.picks).length || Object.keys(state.shared.keys || {}).length;
-    if (hasShared && (sNodes.length !== 1 || stable(state.shared) !== stable(remoteShared))) {
-      await writeJson(home, SHARED_FILE, { v: 3, app: 'kai', ...state.shared }, sNodes);
-    }
-    if (!state.sharedLoaded) { state.sharedLoaded = true; LS.set('sharedLoaded', true); }
-    state.sharedError = false;
-    await backupProfiles();
-    // 1b) sinopsis traducidas (un fallo aquí no frena el progreso)
+    const sharedChanged = await syncShared(home);
+    // 1b) sinopsis traducidas y fichas (un fallo aquí no frena el progreso)
     try { await syncSynopses(home); } catch (err) { console.warn('sinopsis', err); }
     try { await syncFichas(home); } catch (err) { console.warn('fichas', err); }
-
     // 2) progreso del perfil activo
-    let changedHere = false;
-    if (state.profile) {
-      const pid = state.profile.id;
-      const nodes = filesNamed(home, profileFile(pid));
-      const libRoot = findFolder(state.storage, state.settings.root);
-      // el primer perfil se queda con el progreso de antes de que hubiera perfiles
-      const legacy = state.shared.legacyBy === pid ? [
-        ...visibleChildren(home).filter((c) => !c.directory && LEGACY_PROGRESS.includes(c.name)),
-        ...(libRoot ? filesNamed(libRoot, '.progreso.json') : []),
-      ] : [];
-      // progreso de perfiles duplicados que se juntaron con este
-      const absorbed = state.shared.profiles.filter((x) => x.mergedInto === pid).flatMap((x) => filesNamed(home, profileFile(x.id)));
-      legacy.push(...absorbed);
-      let remote = {};
-      for (const n of [...nodes, ...legacy]) {
-        const data = await readJson(n);
-        if (!data) continue;
-        const items = data.items || {};
-        migrateProgressKeys(items);
-        remote = mergeProgress(remote, items);
-        if (data.intros) state.shared.intros = mergeShared(state.shared, { intros: data.intros }).intros;
-      }
-      const merged = mergeProgress(state.progress, remote);
-      changedHere = JSON.stringify(merged) !== JSON.stringify(state.progress);
-      const hasData = Object.keys(merged).length > 0;
-      const needUpload = hasData && (nodes.length !== 1 || legacy.length > 0 || Object.keys(merged).some((k) => !remote[k] || merged[k].u > remote[k].u));
-      state.progress = merged;
-      if (needUpload) await writeJson(home, profileFile(pid), { v: 3, app: 'kai', profile: pid, items: merged }, [...nodes, ...legacy]);
-      state.dirty = false;
-      saveProgressLocal();
-    }
+    const changedHere = await syncProgress(home);
     state.syncState = 'idle';
     if (changedHere || sharedChanged) softRender();
   } catch (err) {
