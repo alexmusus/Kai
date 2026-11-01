@@ -1,109 +1,16 @@
 import { Storage } from './vendor/mega.js';
 import { isSubtitleName, mp4Info, mp4Chapters, mp4Formats, mp4QuickFormats, pickIntro, OUTRO_RE as OUTRO } from './subs.js';
-import { searchAnime, animeById, toMeta, findForSeries, findMovie, findTitle, findSeason, seasonNumOf, sideStoriesOf, scoresByIds, tmdbFindMovie, tmdbCheckKey, translateToSpanish, canTranslate, recommendationsFor, airingTop, toDiscover } from './meta.js';
+import { animeById, toMeta, findForSeries, findMovie, findTitle, findSeason, seasonNumOf, sideStoriesOf, scoresByIds, tmdbFindMovie, tmdbCheckKey, translateToSpanish, canTranslate, recommendationsFor, airingTop, toDiscover } from './meta.js';
+import { $, LS, esc, sleep, debounce, fmtTime, fmtLeft, fmtSize, hue, plural } from './lib/util.js';
+import { ICON } from './views/icons.js';
+import { langOf, stripLang, twinKey, langText, MIME, isVideoName, episodeNumber, seasonInfo, SPECIAL_RE, hasOwnTitle, isSpecialSeason, seasonOrdinal, seasonTab, MAIN_FORMATS, afterSeriesName, isBareSpecial, specialWord, baseName, sortEpisodes } from './models/naming.js';
+import { DARK_TONES, TONES, FICHAS_FILE, SYN_FILE, SHARED_FILE, profileFile, LEGACY_PROGRESS, state, index, setIndex, knownEps, saveSettings, pkey, saveProgressLocal, saveShared, visibleProfiles } from './models/store.js';
 
 const C = window.MegaCore;
-const $ = (s, el = document) => el.querySelector(s);
 const app = $('#app');
 
 /* ───────────────────────── utilidades ───────────────────────── */
 
-const LS = {
-  get(k, d) { try { const v = localStorage.getItem('kai.' + k); return v ? JSON.parse(v) : d; } catch { return d; } },
-  // si el navegador se queda sin espacio, se sueltan copias que se pueden volver a traer de MEGA o de internet
-  // (antes fallaba sin avisar: por ejemplo, las burbujas de "nuevos" volvían al reabrir Kai)
-  set(k, v) {
-    const str = JSON.stringify(v);
-    for (const spare of [null, ['discover'], ['syn', 'synSig'], ['meta', 'fichasSig']]) {
-      if (spare) { if (spare.includes(k)) continue; spare.forEach((x) => { try { localStorage.removeItem('kai.' + x); } catch { /* nada */ } }); }
-      try { localStorage.setItem('kai.' + k, str); if (spare) LS.freed = true; return true; } catch { /* sigue liberando */ }
-    }
-    LS.full = true;
-    return false;
-  },
-  del(k) { try { localStorage.removeItem('kai.' + k); } catch { /* nada */ } },
-};
-// La app se llamaba Yoru: se conserva la sesión y el progreso guardados con ese nombre.
-try {
-  for (const k of Object.keys(localStorage)) {
-    if (k.startsWith('yoru.') && localStorage.getItem('kai.' + k.slice(5)) === null) localStorage.setItem('kai.' + k.slice(5), localStorage.getItem(k));
-    if (k.startsWith('yoru.')) localStorage.removeItem(k);
-  }
-} catch { /* nada */ }
-
-const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
-
-function fmtTime(s) {
-  s = Math.max(0, Math.floor(s || 0));
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  const ss = String(s % 60).padStart(2, '0');
-  return h ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`;
-}
-function fmtLeft(p) {
-  const left = Math.max(0, (p.d || 0) - (p.t || 0));
-  const m = Math.round(left / 60);
-  return m <= 1 ? 'casi al final' : `quedan ${m} min`;
-}
-function fmtSize(b) {
-  if (b >= 1e9) return (b / 1e9).toFixed(1) + ' GB';
-  if (b >= 1e6) return Math.round(b / 1e6) + ' MB';
-  return Math.max(1, Math.round(b / 1e3)) + ' KB';
-}
-function hue(str) {
-  let h = 0;
-  for (const ch of String(str)) h = (h * 31 + ch.codePointAt(0)) % 360;
-  return h;
-}
-const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
-
-const ICON = {
-  menu: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>',
-  back: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>',
-  top: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V6M6 11.5l6-6 6 6"/></svg>',
-  down: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10.5l5 5 5-5M5 20h14"/></svg>',
-  saved: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20h14"/><path d="M7.5 11l3 3 6-6.5"/></svg>',
-  queued: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 8v4.5l3 1.5"/></svg>',
-  more: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5.5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="18.5" cy="12" r="1.3"/></svg>',
-  play: '<svg viewBox="0 0 24 24" aria-hidden="true" class="solid"><path d="M8 5.5v13l10.5-6.5z"/></svg>',
-  pause: '<svg viewBox="0 0 24 24" aria-hidden="true" class="solid"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/></svg>',
-  check: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
-  refresh: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 4v4.5H15"/></svg>',
-  folder: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/></svg>',
-  file: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3.5h7l4 4V20.5H7z"/><path d="M14 3.5v4h4"/></svg>',
-  next: '<svg viewBox="0 0 24 24" aria-hidden="true" class="solid"><path d="M6 5.5v13l9-6.5zM16.5 5.5H19v13h-2.5z"/></svg>',
-  prev: '<svg viewBox="0 0 24 24" aria-hidden="true" class="solid"><path d="M18 5.5v13l-9-6.5zM5 5.5h2.5v13H5z"/></svg>',
-  gear: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.4M12 18.8v2.4M4.2 7.5l2 1.2M17.8 15.3l2 1.2M4.2 16.5l2-1.2M17.8 8.7l2-1.2"/></svg>',
-  home: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.2L12 4.5l8 6.7V19a1.5 1.5 0 0 1-1.5 1.5H15v-5.5H9v5.5H5.5A1.5 1.5 0 0 1 4 19z"/></svg>',
-  image: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="14" rx="2.5"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-4.5 3.5 3 3-2.5 4.5 4"/></svg>',
-  sun: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4L6 18M18 6l1.4-1.4"/></svg>',
-  moon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 14.5A8 8 0 0 1 9.5 4.5a8 8 0 1 0 10 10z"/></svg>',
-  search: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L20 20"/></svg>',
-  close: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
-  later: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10v16l-5-3.6L7 20z"/></svg>',
-  laterOn: '<svg viewBox="0 0 24 24" aria-hidden="true" class="solid"><path d="M7 4h10v16l-5-3.6L7 20z"/></svg>',
-  grid: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5"/></svg>',
-};
-
-/* ── idioma de cada archivo: "472_0_SUB.mp4" (subtitulado) / "472_0_DOB.mp4" (doblado) ──
- * Las dos versiones de un capítulo van en la misma carpeta; Kai muestra una sola (la que elijas) y comparte lo visto. */
-const LANG_WORDS = 'sub(?:s|titulad[oa])?|vose|dob(?:lad[oa])?|dub(?:bed)?|lat(?:ino)?|castellano|espa[nñ]ol';
-const LANG_RE = new RegExp(`(?:^|[\\s_.\\-[(])(${LANG_WORDS})(?=$|[\\s_.\\-\\])])`, 'gi');
-const LANG_BOX_RE = new RegExp(`\\s*[[(]\\s*(?:${LANG_WORDS})\\s*[\\])]`, 'gi'); // "[Latino]", "(Sub)"
-export function langOf(name) {
-  const base = String(name || '').replace(/\.[^.]+$/, '');
-  const all = [...base.matchAll(LANG_RE)];
-  if (!all.length) return null;
-  return /^(sub|vose)/i.test(all[all.length - 1][1]) ? 'sub' : 'dob';
-}
-/** El nombre sin la marca de idioma: "472_0_SUB" y "472_0_DOB" son el mismo capítulo; "Howl [Latino]" → "Howl". */
-export function stripLang(name) {
-  return String(name || '').replace(LANG_BOX_RE, '').replace(LANG_RE, '').replace(/[\s_.\-]+$/, '').trim();
-}
-const twinKey = (ep) => stripLang(ep.name.replace(/\.[^.]+$/, '')).toLowerCase();
-const LANG_LABEL = { sub: 'Sub', dob: 'Doblado' };
 /** Idiomas de una lista de capítulos, contando las versiones ocultas en el otro idioma. */
 function langsOf(eps) {
   const out = new Set();
@@ -113,137 +20,21 @@ function langsOf(eps) {
   }
   return ['sub', 'dob'].filter((l) => out.has(l));
 }
-const langText = (langs) => (langs.length > 1 ? 'Sub y doblado' : langs.length ? LANG_LABEL[langs[0]] : '');
 const langChip = (langs) => (langs.length ? `<span class="lang-chip">${langs.map((l) => (l === 'sub' ? 'SUB' : 'DOB')).join(' · ')}</span>` : '');
 
 /* ───────────────────────── estado ───────────────────────── */
 
-/** Tonos del modo claro (el color de fondo sirve para la barra del sistema). */
-const DARK_TONES = { negro: { label: 'Negro', bg: '#0d0e12' }, gris: { label: 'Gris Culero', bg: '#4d4d4d' } };
-const TONES = { blanco: { label: 'Blanco', bg: '#eef0f4' }, gris: { label: 'Gris', bg: '#c6c8cb' }, celeste: { label: 'Celeste', bg: '#d9e5f0' }, arena: { label: 'Arena', bg: '#e6e0d5' } };
-const DEFAULTS = { root: 'Anime', autoplay: true, autoSkip: true, theme: 'auto' };
-const FICHAS_FILE = '.kai-fichas.json';               // fichas de AniList/TMDB ya encontradas (así los demás no las buscan)
-const SYN_FILE = '.kai-sinopsis.json';                 // sinopsis traducidas al español (se comparten entre dispositivos)
-const SHARED_FILE = '.kai-compartido.json';            // perfiles, intros aprendidas e imágenes elegidas
-const profileFile = (id) => `.kai-progreso-${id}.json`;  // progreso de cada perfil
-const LEGACY_PROGRESS = ['.kai-progreso.json', '.yoru-progreso.json'];
-
-const state = {
-  syn: LS.get('syn', {}) || {}, // sinopsis en español por id de AniList: { es, u }
-  synDirty: false,
-  storage: null,
-  connecting: false,
-  library: LS.get('library', null),
-  profile: LS.get('profile', null),
-  shared: { profiles: [], intros: {}, picks: {}, legacyBy: null, ...LS.get('shared', {}) },
-  sharedLoaded: LS.get('sharedLoaded', false),
-  sharedError: false,
-  meta: LS.get('meta', {}),
-  progress: {},
-  dirty: false,
-  settings: { ...DEFAULTS, ...LS.get('settings', {}) },
-  saved: new Set(),      // descargados completos
-  dlMeta: new Map(),     // id -> metadatos guardados de la descarga
-  dls: {},               // descargas en curso: id -> { loaded, total, ctrl }
-  queue: [],             // descargas en espera: [{ ep, title }]
-  error: null,
-  syncState: 'idle',
-};
-let index = buildIndex(state.library);
-const knownEps = new Map(); // capítulos vistos fuera de la biblioteca (explorar, descargados)
-
-function saveSettings() { LS.set('settings', state.settings); }
-// nada descargado se borra solo: se quita a mano desde Descargados (pedido de Alex, v11)
-delete state.settings.autoRemoveLocal;
-const pkey = (k) => `p.${state.profile ? state.profile.id : '_'}.${k}`;
+setIndex(buildIndex(state.library));
 function loadProfileState() {
   state.progress = LS.get(pkey('progress'), {});
   state.dirty = LS.get(pkey('dirty'), false);
   if (state.library && migrateProgressKeys(state.progress)) state.dirty = true; // rutas de carpetas renombradas
-  try { if (state.library) index = buildIndex(state.library); } catch { /* aún no hay índice */ } // el idioma elegido es de cada perfil
+  try { if (state.library) setIndex(buildIndex(state.library)); } catch { /* aún no hay índice */ } // el idioma elegido es de cada perfil
 }
-function saveProgressLocal() {
-  if (!state.profile) return;
-  LS.set(pkey('progress'), state.progress);
-  LS.set(pkey('dirty'), state.dirty);
-}
-function saveShared() { LS.set('shared', state.shared); }
-const visibleProfiles = () => state.shared.profiles.filter((p) => !p.deleted);
 loadProfileState();
 
 /* ───────────────────────── nombres → capítulos ───────────────────────── */
 
-const VIDEO = /\.(mp4|m4v|webm|mov|mkv)$/i;
-const MIME = { mp4: 'video/mp4', m4v: 'video/mp4', webm: 'video/webm', mov: 'video/quicktime', mkv: 'video/x-matroska' };
-const isVideoName = (n) => VIDEO.test(n || '');
-
-/** "472_5_SUB.mp4" → 5,  "Serie - 05 [1080p].mp4" → 5,  "S01E07.mp4" → 7 */
-export function episodeNumber(name) {
-  const base = name.replace(/\.[^.]+$/, '');
-  let m = /s\d{1,2}\s*e(\d{1,4})/i.exec(base);
-  if (m) return Number(m[1]);
-  m = /^\d+_(\d+(?:\.\d+)?)(?:_|$)/.exec(base);
-  if (m) return Number(m[1]);
-  const clean = base
-    .replace(/\[[^\]]*\]|\([^)]*\)|\{[^}]*\}/g, ' ')
-    .replace(/\b(\d{3,4}p|[xh]\.?26[45]|10\s?bits?|8\s?bits?|aac\d?(\.\d)?|ddp?\d\.\d)\b/gi, ' ');
-  const nums = clean.match(/\d+(?:\.\d+)?/g);
-  return nums ? Number(nums[nums.length - 1]) : null;
-}
-
-
-/** "1. Fate UBW" → { num: 1, title: "Fate UBW" } · "1.5 OVA" → { num: 1.5, title: "OVA" } (el número decide el orden) */
-export function seasonInfo(name) {
-  const m = /^\s*(\d{1,3}(?:[.,]\d{1,2})?)\s*[.)\-_:]?\s+(.*)$/.exec(name) || /^\s*(\d{1,3}(?:[.,]\d{1,2})?)\s*$/.exec(name);
-  if (m) return { num: Number(m[1].replace(',', '.')), title: (m[2] || '').trim() };
-  const t = /(?:temporada|season|s)\s*(\d{1,3})\b/i.exec(name);
-  return { num: t ? Number(t[1]) : null, title: name.trim() };
-}
-
-/* Carpetas de temporada: el número del inicio decide el ORDEN y el nombre decide la PESTAÑA.
- *  "2. Fate Zero" → "Fate Zero" · "1.5 OVA" → "OVA" · "3. Temporada 2 - Parte 1" → "Temporada 2 · Parte 1"
- *  "1. Temporada 1" o solo "1" → "Temporada N", contando solo las temporadas (no OVAs, especiales ni películas). */
-const SPECIAL_RE = /\b(ovas?|oads?|onas?|especial(es)?|specials?|pel[ií]culas?|movies?|films?|recap|resumen|extras?|pr[oó]logo|gekijouban)\b/i;
-const GENERIC_SEASON_RE = /^\s*(?:(?:temporada|season|s)\s*\d{1,3}\b)?\s*(?:[-–·:,]?\s*(?:parte|part|cour)\s*\d{1,2})?\s*$/i;
-/** ¿El nombre de la temporada dice algo propio (sirve para buscarla en AniList y para la pestaña)? */
-const BARE_SPECIAL_RE = /^\s*(ovas?|oads?|onas?|especial(es)?|specials?|pel[ií]culas?|movies?|extras?|recap|resumen)\s*\d{0,2}\s*$/i; // "OVA" a secas no sirve para buscar
-const hasOwnTitle = (se) => !!(se && se.title && !GENERIC_SEASON_RE.test(se.title) && !BARE_SPECIAL_RE.test(se.title));
-const isSpecialSeason = (se) => !!(se && se.title && SPECIAL_RE.test(se.title));
-/** Número de temporada que corresponde: el que dice el nombre ("Temporada 2") o el puesto entre las temporadas. */
-function seasonOrdinal(s, se) {
-  const said = /(?:temporada|season)\s*(\d{1,3})\b/i.exec(se.title || '');
-  if (said) return Number(said[1]);
-  const nums = [...new Set(s.seasons.filter((x) => x.num != null && !isSpecialSeason(x)).map((x) => x.num))].sort((a, b) => a - b);
-  const i = nums.indexOf(se.num);
-  return i >= 0 ? i + 1 : se.num;
-}
-function seasonTab(s, se) {
-  if (se.num == null) return se.name;
-  if (hasOwnTitle(se) || isSpecialSeason(se)) return se.title;
-  const n = seasonOrdinal(s, se);
-  const part = /\b(?:parte|part|cour)\s*(\d{1,2})\b/i.exec(se.title || '');
-  if (part) return `Temporada ${n} · Parte ${part[1]}`;
-  const twins = s.seasons.filter((x) => x.num === se.num);
-  return twins.length > 1 ? `Temporada ${n} · Parte ${twins.indexOf(se) + 1}` : `Temporada ${n}`;
-}
-
-/* Nombres de las tarjetas de temporada (v37): manda lo que AniList dice que es cada carpeta, no cómo se llama.
- *  - Serie de TV (o sin ficha y sin "OVA" en el nombre) → "Temporada N", contando solo las temporadas;
- *    el número que dice la carpeta o AniList ("2nd Season") se respeta; "Part 2" o carpetas con el mismo número → "· Parte 2".
- *  - OVA, especial o película → su subtítulo ("Memory Snow"); si no tiene, "OVA" / "Especial" / "Película".
- *  Dentro de la temporada se muestra el nombre completo de AniList. */
-const MAIN_FORMATS = new Set(['Serie', 'Serie corta', 'ONA']);
-const squashW = (w) => String(w || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^0-9a-z]+/g, '');
-const sameWord = (a, b) => { a = squashW(a); b = squashW(b); return a === b || (Math.min(a.length, b.length) >= 4 && (a.startsWith(b) || b.startsWith(a))); };
-/** Lo que dice la carpeta después del nombre de la serie, aunque esté escrito un poco distinto ("Love Come" / "Love Comedy"). */
-function afterSeriesName(s, title) {
-  const sw = String(s.name).split(/\s+/).filter(Boolean);
-  const tw = String(title || '').split(/\s+/).filter(Boolean);
-  let i = 0;
-  while (i < sw.length && i < tw.length && sameWord(sw[i], tw[i])) i++;
-  if (i < Math.min(2, sw.length)) return String(title || '').trim();
-  return tw.slice(i).join(' ').replace(/^[\s.\-–:,]+/, '').trim();
-}
 /** La ficha propia de la temporada (sin usar la de la serie). */
 function ownSeasonMeta(s, se) {
   const m = se && se.name && state.meta[itemMetaKey(s, se.name)];
@@ -254,20 +45,6 @@ function isMainSeason(s, se) {
   if (isSpecialSeason(se)) return false;
   const m = ownSeasonMeta(s, se);
   return m && m.format ? MAIN_FORMATS.has(m.format) : true;
-}
-/** "OVA" a secas, o "Serie OVA" sin nada más: se busca entre las OVAs de la temporada de antes. */
-function isBareSpecial(s, se) {
-  if (!isSpecialSeason(se)) return false;
-  const rest = afterSeriesName(s, se.title || se.name).replace(/[([][^)\]]*[)\]]/g, ' ').trim();
-  return !rest || BARE_SPECIAL_RE.test(rest);
-}
-function specialWord(se, m) {
-  const t = se.title || se.name || '';
-  if (/\b(pel[ií]culas?|movies?|films?|gekijouban)\b/i.test(t)) return 'Película';
-  if (/\b(ovas?|oads?)\b/i.test(t)) return 'OVA';
-  if (/\b(especial(es)?|specials?)\b/i.test(t)) return 'Especial';
-  if (/\bonas?\b/i.test(t)) return 'ONA';
-  return (m && m.format && m.format !== 'Serie') ? m.format : 'Especial';
 }
 const labelMemo = new WeakMap();
 function seasonLabels(s) {
@@ -322,8 +99,6 @@ function episodeLabel(ep) {
   return ep.ep != null ? `Episodio ${ep.ep}` : ep.name.replace(/\.[^.]+$/, '');
 }
 
-const baseName = (n) => n.replace(/\.[^.]+$/, '').toLowerCase();
-
 function nodePath(node) {
   const parts = [];
   for (let n = node; n && n.parent && n !== state.storage.root; n = n.parent) parts.unshift(n.name);
@@ -362,15 +137,6 @@ function makeEpisode(f, folderPath, siblings = []) {
     ts: f.timestamp || 0, // cuándo llegó a MEGA, para "agregados recientemente"
     subs,
   };
-}
-
-function sortEpisodes(list) {
-  return list.sort((a, b) => {
-    if (a.ep != null && b.ep != null && a.ep !== b.ep) return a.ep - b.ep;
-    if (a.ep != null && b.ep == null) return -1;
-    if (a.ep == null && b.ep != null) return 1;
-    return a.name.localeCompare(b.name, 'es', { numeric: true });
-  });
 }
 
 const isPlayable = (c) => !c.directory && c.name && isVideoName(c.name) && c.key && !goneNodes.has(c.nodeId);
@@ -479,14 +245,14 @@ function learnAudioLang(ep, code) {
   if (heard[ep.id] === l) return;
   heard[ep.id] = l;
   LS.set('alang', heard);
-  index = buildIndex(state.library);
+  setIndex(buildIndex(state.library));
 }
 function setLangPref(s, lang) {
   const all = LS.get(pkey('lang'), {}) || {};
   all[s.name] = lang;
   LS.set(pkey('lang'), all);
   LS.set(pkey('langLast'), lang);
-  index = buildIndex(state.library);
+  setIndex(buildIndex(state.library));
 }
 
 function setLibrary(lib) {
@@ -494,7 +260,7 @@ function setLibrary(lib) {
   // si no cabe, mejor no dejar guardada una biblioteca vieja (se mostraría al abrir Kai hasta conectar con MEGA)
   if (!LS.set('library', lib)) LS.del('library');
   state.library = lib;
-  index = buildIndex(lib);
+  setIndex(buildIndex(lib));
   rememberPaths(lib);
   if (migrateProgressKeys(state.progress)) { state.dirty = true; saveProgressLocal(); }
 }
@@ -5204,7 +4970,7 @@ document.addEventListener('click', async (e) => {
     state.storage = null;
     try { for (const k of Object.keys(localStorage)) if (k.startsWith('kai.') && k !== 'kai.settings') localStorage.removeItem(k); } catch { /* nada */ }
     for (const s of ['chunks', 'dl', 'thumbs', 'subcache']) await idb.clear(s).catch(() => {});
-    state.library = null; index = buildIndex(null); state.progress = {}; state.saved.clear(); state.dlMeta.clear();
+    state.library = null; setIndex(buildIndex(null)); state.progress = {}; state.saved.clear(); state.dlMeta.clear();
     state.profile = null; state.shared = { profiles: [], intros: {}, picks: {}, legacyBy: null }; state.sharedLoaded = false; state.meta = {}; fichasPulled = false;
     location.hash = '';
     render();
