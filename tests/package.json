@@ -5,14 +5,19 @@
   "description": "Herramientas de prueba de Kai. Viven aquí (no en la raíz) para que Cloudflare publique Kai tal cual, sin instalar nada.",
   "scripts": {
     "lint": "cd .. && tests/node_modules/.bin/eslint -c tests/eslint.config.js .",
+    "types": "tsc -p tsconfig.json",
+    "format": "prettier --no-error-on-unmatched-pattern --config .prettierrc.json --write ../lib ../models ../views ../controllers",
+    "format:check": "prettier --no-error-on-unmatched-pattern --config .prettierrc.json --check ../lib ../models ../views ../controllers",
     "test": "vitest run",
     "e2e": "playwright test",
-    "check": "npm run lint && vitest run && playwright test"
+    "check": "npm run lint && npm run types && npm run format:check && vitest run && playwright test"
   },
   "devDependencies": {
     "@playwright/test": "1.64.1",
     "eslint": "^9.39.5",
     "globals": "^17.13.0",
+    "prettier": "^3.9.10",
+    "typescript": "^5.9.3",
     "vitest": "5.0.5"
   }
 }
