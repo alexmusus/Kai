@@ -5,6 +5,8 @@ export default defineConfig({
   testDir: 'e2e',
   timeout: 30_000,
   fullyParallel: true,
+  // el reproductor depende de tiempos reales: en GitHub, un reintento antes de dar por malo un recorrido
+  retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? 'github' : 'list',
   use: {
     baseURL: 'http://127.0.0.1:8123',

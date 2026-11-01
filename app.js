@@ -22,6 +22,7 @@ import { sync, syncing, refreshLibrary, setLater } from './controllers/sync.js';
 import { selectProfile } from './controllers/account.js';
 import { queueDownload, downloadAndWait, pickFolder, dropFolder } from './controllers/downloads.js';
 import { openSheet } from './controllers/sheet.js';
+import { P } from './controllers/player/state.js';
 import { on } from './lib/events.js';
 import { countBytes, noteQuota, quotaUntil, refreshAccountInfo } from './models/quota.js';
 import { paintQuota } from './views/quota.js';
@@ -55,10 +56,10 @@ on('download-changed', (id) => { paintEpisode(id); paintDrawerCount(); });
 on('download-done', (ep) => { cacheChapters(ep).catch(() => {}); });
 on('downloads-removed', () => { if (route().view === 'descargas') renderDownloads(); });
 on('folder-moved', () => paintSpace());
-setInUseCheck((id) => !!(playing && playing.ep.id === id));
-viewState.isPlaying = () => !!playing;
+setInUseCheck((id) => !!(P.playing && P.playing.ep.id === id));
+viewState.isPlaying = () => !!P.playing;
 setPlayer({
-  hasMedia: () => !!(playing && video.currentSrc),
+  hasMedia: () => !!(P.playing && video.currentSrc),
   toMini: () => enterMini(),
   stop: () => stopPlayback(),
   show: (id) => renderWatch(id),
@@ -153,7 +154,6 @@ function paintEpisode(id) {
 const stage = $('#stage');
 const parking = $('#stage-parking');
 const video = $('#video');
-let playing = null;
 
 function watchDlButton(ep) {
   const t = state.dls[ep.id];
@@ -174,7 +174,7 @@ function renderWatch(id) {
     } else go('#/');
     return;
   }
-  const same = playing && playing.ep.id === id && stage.isConnected && app.contains(stage);
+  const same = P.playing && P.playing.ep.id === id && stage.isConnected && app.contains(stage);
   if (!same) {
     leaveMini();
     parkStage();
@@ -189,17 +189,17 @@ function renderWatch(id) {
     </main>`;
     $('#stage-slot').appendChild(stage);
     stage.hidden = false;
-    if (!playing || playing.ep.id !== id) startPlayback(ctx);
-    else playing.ctx = ctx;
+    if (!P.playing || P.playing.ep.id !== id) startPlayback(ctx);
+    else P.playing.ctx = ctx;
   }
   paintWatchInfo();
 }
 
 function paintWatchInfo() {
-  if (!playing || route().view !== 'play') return;
-  const ctx = resolveContext(playing.ep.id) || playing.ctx;
-  playing.ctx = ctx;
-  const ep = playing.ep;
+  if (!P.playing || route().view !== 'play') return;
+  const ctx = resolveContext(P.playing.ep.id) || P.playing.ctx;
+  P.playing.ctx = ctx;
+  const ep = P.playing.ep;
   const i = ctx.list.findIndex((x) => x.id === ep.id);
   const prev = ctx.list[i - 1];
   const next = ctx.list[i + 1];
@@ -242,17 +242,13 @@ const ui = {
   speed: $('#st-speed'), pip: $('#st-pip'), fs: $('#st-fs'), mute: $('#st-mute'), next: $('#st-next'),
   skip: $('#st-skip'), menu: $('#st-menu'), flash: $('#st-flash'), nextCard: $('#p-next'), msg: $('#p-msg'), tap: $('#st-tap'),
 };
-let speed = 1;
-let idleTimer;
-let nextTimer;
-let seeking = false;
 
 async function startPlayback(ctx) {
-  if (playing) finishCurrent();
-  clearTimeout(nextTimer);
+  if (P.playing) finishCurrent();
+  clearTimeout(P.nextTimer);
   const ep = ctx.ep;
   const token = { ep, ctx, objectUrl: null, lastSaved: 0, lastSync: Date.now(), recover: [], source: null, chapters: [], autoSkipped: false, learned: false, undo: null, offer: null };
-  playing = token;
+  P.playing = token;
   ui.msg.hidden = true;
   ui.nextCard.hidden = true;
   closeMenu();
@@ -267,7 +263,7 @@ async function startPlayback(ctx) {
   let src = null;
   let localErr = null;
   const blob = await localBlob(ep, true).catch((err) => { localErr = err; return null; });
-  if (playing !== token) return;
+  if (P.playing !== token) return;
   if (blob) {
     src = token.objectUrl = URL.createObjectURL(blob);
     token.source = { blob };
@@ -276,7 +272,7 @@ async function startPlayback(ctx) {
       src = await streamUrl(ep);
       token.source = { stream: true };
     } catch (err) {
-      if (playing !== token) return;
+      if (P.playing !== token) return;
       return playerMessage(err.message === 'NOSW'
         ? 'La app se está preparando. Recarga la página y vuelve a intentarlo.'
         : megaMessage(err));
@@ -288,16 +284,16 @@ async function startPlayback(ctx) {
   } else {
     return playerMessage('Este capítulo no está descargado y no hay conexión.');
   }
-  if (playing !== token) return;
+  if (P.playing !== token) return;
 
   const p = prog(ep);
   const startAt = p && !p.w && p.t > 5 ? Math.max(0, p.t - 3) : 0;
   // #t= hace que el navegador empiece directo en ese punto, sin un salto aparte
   video.src = startAt ? `${src}#t=${startAt.toFixed(1)}` : src;
   video.addEventListener('loadedmetadata', () => {
-    if (playing !== token) return;
+    if (P.playing !== token) return;
     if (startAt && video.duration && startAt < video.duration - 2 && Math.abs(video.currentTime - startAt) > 2) video.currentTime = startAt;
-    video.playbackRate = speed;
+    video.playbackRate = P.speed;
   }, { once: true });
   setMediaSession(ep, ctx);
   video.play().catch(() => { stage.classList.remove('is-loading'); paintControls(); });
@@ -321,13 +317,13 @@ function playerMessage(text, offerDownload = false, offerFolder = false, detail 
   ui.msg.innerHTML = `<p>${esc(text)}</p>${detail ? `<p class="p-detail">${esc(detail)}</p>` : ''}<div class="btn-row">
     ${offerDownload ? '<button class="btn btn-lamp" data-act="p-dl">Descargar y ver</button>' : ''}
     ${offerFolder ? '<button class="btn btn-lamp" data-act="p-folder">Permitir acceso</button>' : ''}
-    <a class="btn" href="${playing ? playing.ctx.back : '#/'}">Volver</a></div>`;
+    <a class="btn" href="${P.playing ? P.playing.ctx.back : '#/'}">Volver</a></div>`;
   ui.msg.hidden = false;
 }
 
 async function downloadThenPlay() {
-  if (!playing) return;
-  const { ep, ctx } = playing;
+  if (!P.playing) return;
+  const { ep, ctx } = P.playing;
   ui.msg.innerHTML = '<p id="p-dl-status">Descargando…</p>';
   const tick = setInterval(() => {
     const t = state.dls[ep.id];
@@ -336,8 +332,8 @@ async function downloadThenPlay() {
   }, 400);
   await downloadAndWait(ep, ctx.title);
   clearInterval(tick);
-  if (!playing || playing.ep !== ep) return;
-  if (state.saved.has(ep.id)) { playing = null; startPlayback(ctx); }
+  if (!P.playing || P.playing.ep !== ep) return;
+  if (state.saved.has(ep.id)) { P.playing = null; startPlayback(ctx); }
   else playerMessage('No se pudo descargar el capítulo.');
 }
 
@@ -347,7 +343,7 @@ function setMediaSession(ep, ctx) {
     const meta = (art) => new MediaMetadata({ title: episodeLabel(ep), artist: ctx.title, album: 'Kai', artwork: art || [] });
     navigator.mediaSession.metadata = meta();
     thumbFor(ep).then((u) => {
-      if (u && playing && playing.ep === ep) navigator.mediaSession.metadata = meta([{ src: u, sizes: '320x180', type: 'image/jpeg' }]);
+      if (u && P.playing && P.playing.ep === ep) navigator.mediaSession.metadata = meta([{ src: u, sizes: '320x180', type: 'image/jpeg' }]);
     });
     const set = (a, fn) => { try { navigator.mediaSession.setActionHandler(a, fn); } catch { /* nada */ } };
     set('nexttrack', () => playNext());
@@ -358,9 +354,9 @@ function setMediaSession(ep, ctx) {
 }
 
 function neighbor(delta) {
-  if (!playing) return null;
-  const list = playing.ctx.list;
-  const i = list.findIndex((x) => x.id === playing.ep.id);
+  if (!P.playing) return null;
+  const list = P.playing.ctx.list;
+  const i = list.findIndex((x) => x.id === P.playing.ep.id);
   return i >= 0 ? list[i + delta] || null : null;
 }
 function switchTo(ep) {
@@ -381,34 +377,34 @@ function playNext() { const n = neighbor(1); if (n) switchTo(n); }
 function playPrev() { const n = neighbor(-1); if (n) switchTo(n); }
 
 function savePosition(force = false) {
-  if (!playing || !video.duration || !isFinite(video.duration) || !video.currentSrc) return;
+  if (!P.playing || !video.duration || !isFinite(video.duration) || !video.currentSrc) return;
   const now = Date.now();
-  if (!force && now - playing.lastSaved < 4000) return;
-  playing.lastSaved = now;
-  setProgress(playing.ep, video.currentTime, video.duration);
-  markNow(playing.ep, video.currentTime, video.duration);
-  if (force || now - playing.lastSync > 60000) {
-    playing.lastSync = now;
+  if (!force && now - P.playing.lastSaved < 4000) return;
+  P.playing.lastSaved = now;
+  setProgress(P.playing.ep, video.currentTime, video.duration);
+  markNow(P.playing.ep, video.currentTime, video.duration);
+  if (force || now - P.playing.lastSync > 60000) {
+    P.playing.lastSync = now;
     sync();
   }
 }
 
 function finishCurrent() {
-  if (!playing) return;
+  if (!P.playing) return;
   savePosition(true);
-  if (playing.objectUrl) {
-    const u = playing.objectUrl;
+  if (P.playing.objectUrl) {
+    const u = P.playing.objectUrl;
     setTimeout(() => URL.revokeObjectURL(u), 1500);
   }
 }
 
 function stopPlayback() {
-  clearTimeout(nextTimer);
+  clearTimeout(P.nextTimer);
   if (document.body.classList.contains('lights-off')) setLights(false);
-  if (playing) {
+  if (P.playing) {
     video.pause();
     finishCurrent();
-    playing = null;
+    P.playing = null;
   }
   resetChapters();
   closeMenu();
@@ -423,7 +419,7 @@ function stopPlayback() {
 
 const mini = $('#mini');
 function enterMini() {
-  if (!playing) return;
+  if (!P.playing) return;
   if (stage.classList.contains('kai-fs')) setKaiFullscreen(false);
   else if (isFullscreen()) exitFullscreen();
   if (document.body.classList.contains('lights-off')) setLights(false);
@@ -443,9 +439,9 @@ function leaveMini() {
   document.documentElement.classList.remove('has-mini');
 }
 function paintMini() {
-  if (mini.hidden || !playing) return;
-  $('#mini-title').textContent = episodeLabel(playing.ep);
-  $('#mini-sub').textContent = playing.ctx.title || '';
+  if (mini.hidden || !P.playing) return;
+  $('#mini-title').textContent = episodeLabel(P.playing.ep);
+  $('#mini-sub').textContent = P.playing.ctx.title || '';
   const t = $('#mini-toggle');
   t.innerHTML = video.paused ? ICON.play : ICON.pause;
   t.setAttribute('aria-label', video.paused ? 'Reproducir' : 'Pausar');
@@ -457,7 +453,7 @@ function paintMini() {
 // al volver de la ventana flotante del sistema con el botón "volver a la pestaña", regresa al reproductor grande
 function backFromSystemPip() {
   setTimeout(() => {
-    if (playing && !video.paused && route().view !== 'play') go('#/play/' + encodeURIComponent(playing.ep.id));
+    if (P.playing && !video.paused && route().view !== 'play') go('#/play/' + encodeURIComponent(P.playing.ep.id));
   }, 60);
 }
 video.addEventListener('leavepictureinpicture', backFromSystemPip);
@@ -480,9 +476,9 @@ function paintControls() {
     stage.classList.toggle('is-paused', v);
   });
   const d = isFinite(video.duration) ? video.duration : 0;
-  const t = seeking ? Number(ui.seek.value) : video.currentTime;
+  const t = P.seeking ? Number(ui.seek.value) : video.currentTime;
   ui.seek.max = String(d || 0);
-  if (!seeking) ui.seek.value = String(t || 0);
+  if (!P.seeking) ui.seek.value = String(t || 0);
   let buf = 0;
   for (let i = 0; i < video.buffered.length; i++) {
     if (video.buffered.start(i) <= t + 0.5) buf = Math.max(buf, video.buffered.end(i));
@@ -492,14 +488,14 @@ function paintControls() {
   setOnce('time', `${fmtTime(t)} / ${fmtTime(d)}`, (v) => { ui.time.textContent = v; });
   setOnce('next', !neighbor(1), (v) => { ui.next.hidden = v; });
   paintSkip(t, d);
-  const ch = chapterAt(seeking ? t : video.currentTime);
+  const ch = chapterAt(P.seeking ? t : video.currentTime);
   setOnce('chapter', ch && ch.title ? ch.title : '', (v) => { ui.chapter.textContent = v; });
   setOnce('mute', video.muted || video.volume === 0, (v) => {
     ui.mute.innerHTML = v
       ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></svg>'
       : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg>';
   });
-  setOnce('speed', speed === 1 ? '1×' : `${speed}×`, (v) => { ui.speed.textContent = v; });
+  setOnce('speed', P.speed === 1 ? '1×' : `${P.speed}×`, (v) => { ui.speed.textContent = v; });
   setOnce('fs', isFullscreen(), (v) => {
     ui.fs.setAttribute('aria-label', v ? 'Salir de pantalla completa' : 'Pantalla completa');
     stage.classList.toggle('is-fs', v);
@@ -508,9 +504,9 @@ function paintControls() {
 
 function wake() {
   stage.classList.remove('is-idle');
-  clearTimeout(idleTimer);
-  idleTimer = setTimeout(() => {
-    if (!video.paused && ui.menu.hidden && !seeking) stage.classList.add('is-idle');
+  clearTimeout(P.idleTimer);
+  P.idleTimer = setTimeout(() => {
+    if (!video.paused && ui.menu.hidden && !P.seeking) stage.classList.add('is-idle');
   }, 2800);
 }
 
@@ -584,17 +580,16 @@ function paintMenu() {
   if (ui.menu.hidden && !ui.menu.dataset.kind) return;
   const kind = ui.menu.dataset.kind;
   if (kind === 'speed') {
-    ui.menu.innerHTML = `<p class="menu-title">Velocidad</p>${[0.75, 1, 1.25, 1.5, 2].map((v) => `<button class="menu-item ${v === speed ? 'is-on' : ''}" data-act="m-speed" data-v="${v}">${v === 1 ? 'Normal' : v + '×'}</button>`).join('')}`;
+    ui.menu.innerHTML = `<p class="menu-title">Velocidad</p>${[0.75, 1, 1.25, 1.5, 2].map((v) => `<button class="menu-item ${v === P.speed ? 'is-on' : ''}" data-act="m-speed" data-v="${v}">${v === 1 ? 'Normal' : v + '×'}</button>`).join('')}`;
   }
 }
 
 /* ── capítulos del MP4 ("Intro", "Parte A"…) ──
  * Los videos traen los subtítulos dentro de la imagen, así que Kai ya no busca pistas ni archivos de subtítulos:
  * solo lee los capítulos, y desde MEGA lo hace cuando el video ya empezó, para no quitarle velocidad al arranque. */
-let chapCtrl = null;
 function resetChapters() {
-  if (chapCtrl) chapCtrl.abort();
-  chapCtrl = null;
+  if (P.chapCtrl) P.chapCtrl.abort();
+  P.chapCtrl = null;
 }
 
 /** Espera a que el video esté sonando (o a que pase `ms`, por si no arranca solo). */
@@ -610,12 +605,12 @@ async function initChapters(ep, token) {
   // mientras no se sepa si el video trae capítulos, Kai no adivina dónde está la intro (ni salta sola con lo aprendido)
   token.chaptersDone = false;
   const giveUp = setTimeout(() => { token.chaptersDone = true; }, 12000);
-  try { await loadChapters(ep, token); } catch (err) { if (playing === token) console.warn('capítulos', err); } finally { clearTimeout(giveUp); token.chaptersDone = true; }
+  try { await loadChapters(ep, token); } catch (err) { if (P.playing === token) console.warn('capítulos', err); } finally { clearTimeout(giveUp); token.chaptersDone = true; }
 }
 async function loadChapters(ep, token) {
   const ctrl = new AbortController();
-  chapCtrl = ctrl;
-  const alive = () => playing === token && !ctrl.signal.aborted;
+  P.chapCtrl = ctrl;
+  const alive = () => P.playing === token && !ctrl.signal.aborted;
   const cached = await idb.get('subcache', ep.id).catch(() => null);
   if (!alive()) return;
   if (cached && cached.v === 3) { setChapters(token, cached.chapters || []); return; }
@@ -638,7 +633,7 @@ async function loadChapters(ep, token) {
 const median = (a) => { const b = [...a].sort((x, y) => x - y); return b.length ? b[Math.floor(b.length / 2)] : 0; };
 
 function setChapters(token, chapters) {
-  if (playing !== token) return;
+  if (P.playing !== token) return;
   token.chapters = (chapters || []).map((c) => ({ ...c, end: c.end == null || !isFinite(c.end) ? (video.duration || Infinity) : c.end }));
   token.intro = pickIntro(token.chapters); // el opening de verdad (no el pedacito de anime que a veces va antes)
   token.chaptersDone = true;
@@ -647,26 +642,26 @@ function setChapters(token, chapters) {
 }
 
 function chapterAt(t) {
-  const list = playing && playing.chapters;
+  const list = P.playing && P.playing.chapters;
   return list ? list.find((c) => t >= c.start && t < c.end) : null;
 }
 
 function paintMarks() {
   const el = $('#st-marks');
   const d = video.duration;
-  const list = (playing && playing.chapters) || [];
+  const list = (P.playing && P.playing.chapters) || [];
   el.innerHTML = d && isFinite(d) ? list.filter((c) => c.start > 0.5 && c.start < d).map((c) => `<span style="left:${(c.start / d) * 100}%"></span>`).join('') : '';
 }
 
 /* Sin capítulos, Kai aprende por serie dónde saltaste el opening. */
 function introStats() { return state.shared.intros || {}; }
 function learnIntro(from, to) {
-  if (!playing || playing.learned) return;
+  if (!P.playing || P.playing.learned) return;
   const len = to - from;
   if (from > 360 || len < 40 || len > 150) return;
-  playing.learned = true;
+  P.playing.learned = true;
   const all = introStats();
-  const key = playing.ctx.title;
+  const key = P.playing.ctx.title;
   const st = all[key] || { starts: [], lens: [] };
   st.starts = [...st.starts, Math.round(from)].slice(-5);
   st.lens = [...st.lens, Math.round(len)].slice(-5);
@@ -677,7 +672,7 @@ function learnIntro(from, to) {
   state.dirty = true;
 }
 function learnedIntro() {
-  const st = playing && introStats()[playing.ctx.title];
+  const st = P.playing && introStats()[P.playing.ctx.title];
   if (!st || !st.lens.length) return null;
   const len = median(st.lens);
   const recent = st.starts.slice(-3);
@@ -688,13 +683,13 @@ function learnedIntro() {
 
 /** Qué ofrece el botón flotante en este momento: saltar intro, ir al siguiente o deshacer. */
 function skipOffer(t, d) {
-  if (!playing || !d) return null;
-  if (playing.undo && Date.now() < playing.undo.until) return { label: 'Volver a la intro', act: 'undo' };
+  if (!P.playing || !d) return null;
+  if (P.playing.undo && Date.now() < P.playing.undo.until) return { label: 'Volver a la intro', act: 'undo' };
   const ch = chapterAt(t);
-  if (ch && ch === playing.intro && t < ch.end - 2) return { label: 'Saltar intro', to: ch.end, sure: true };
+  if (ch && ch === P.playing.intro && t < ch.end - 2) return { label: 'Saltar intro', to: ch.end, sure: true };
   if (ch && OUTRO.test(ch.title) && neighbor(1)) return { label: 'Siguiente capítulo', act: 'next' };
-  if (!playing.chaptersDone) return null;
-  if (playing.intro) return null; // con el opening marcado en el MP4 no hace falta adivinar
+  if (!P.playing.chaptersDone) return null;
+  if (P.playing.intro) return null; // con el opening marcado en el MP4 no hace falta adivinar
   if (d < 400 || t > 360) return null;
   const li = learnedIntro();
   if (li && li.sure) {
@@ -708,15 +703,15 @@ function skipOffer(t, d) {
 
 function paintSkip(t, d) {
   const offer = skipOffer(t, d);
-  playing && (playing.offer = offer);
+  P.playing && (P.playing.offer = offer);
   ui.skip.hidden = !offer;
   if (!offer) return;
   if (ui.skip.textContent !== offer.label) ui.skip.textContent = offer.label;
   ui.skip.classList.toggle('is-sticky', !!(offer.sure || offer.act));
   // saltar solo: únicamente cuando Kai sabe dónde está la intro
-  if (offer.sure && state.settings.autoSkip && !playing.autoSkipped && !video.paused) {
-    playing.autoSkipped = true;
-    playing.undo = { at: t, until: Date.now() + 6000 };
+  if (offer.sure && state.settings.autoSkip && !P.playing.autoSkipped && !video.paused) {
+    P.playing.autoSkipped = true;
+    P.playing.undo = { at: t, until: Date.now() + 6000 };
     seekSure(Math.min(d - 1, offer.to));
     paintSkip(video.currentTime, d);
   }
@@ -724,10 +719,10 @@ function paintSkip(t, d) {
 
 /** Salta a un punto y comprueba que llegó: si el navegador se queda corto (aún no tenía esa parte), lo intenta otra vez. */
 function seekSure(to) {
-  const tok = playing;
+  const tok = P.playing;
   let tries = 0;
   const check = () => {
-    if (playing !== tok) return;
+    if (P.playing !== tok) return;
     if (video.currentTime < to - 1.5 && tries < 3) { tries++; video.currentTime = to; video.addEventListener('seeked', check, { once: true }); }
   };
   video.currentTime = to;
@@ -735,17 +730,17 @@ function seekSure(to) {
 }
 
 function doSkip() {
-  if (!playing) return;
+  if (!P.playing) return;
   const o = skipOffer(video.currentTime, video.duration);
   if (!o) return;
   if (o.act === 'undo') {
-    video.currentTime = playing.undo.at;
-    playing.undo = null;
-    playing.autoSkipped = true;
+    video.currentTime = P.playing.undo.at;
+    P.playing.undo = null;
+    P.playing.autoSkipped = true;
   } else if (o.act === 'next') playNext();
   else {
     const from = video.currentTime;
-    playing.autoSkipped = true;
+    P.playing.autoSkipped = true;
     seekSure(Math.min(video.duration - 1, o.to));
     if (o.guess) learnIntro(from, o.to);
   }
@@ -764,12 +759,11 @@ function setLights(off) {
 
 /* ── cuota de MEGA ── */
 
-let lastStreamError = '';
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('message', (e) => {
     if (e.data && e.data.type === 'mega-bytes') countBytes(e.data.n);
     if (e.data && e.data.type === 'mega-quota') noteQuota(e.data.timeLeft || 3600);
-    if (e.data && e.data.type === 'stream-error') lastStreamError = String(e.data.msg || '').slice(0, 80);
+    if (e.data && e.data.type === 'stream-error') P.lastStreamError = String(e.data.msg || '').slice(0, 80);
     // el service worker encontró el enlace de MEGA caducado: se pide otro y se le responde por su canal
     if (e.data && e.data.type === 'need-url' && e.ports && e.ports[0]) {
       const port = e.ports[0];
@@ -780,14 +774,14 @@ if ('serviceWorker' in navigator) {
 
 /* ── eventos del video ── */
 
-video.addEventListener('timeupdate', () => { if (!seeking) paintControls(); savePosition(); maybePrefetchNext(); });
+video.addEventListener('timeupdate', () => { if (!P.seeking) paintControls(); savePosition(); maybePrefetchNext(); });
 
 /** En los últimos minutos baja en silencio el inicio del siguiente capítulo (unos 3 MB) para que empiece sin espera. */
 function maybePrefetchNext() {
-  if (!playing || playing.prefetched || state.settings.prefetchNext === false || !navigator.onLine) return;
+  if (!P.playing || P.playing.prefetched || state.settings.prefetchNext === false || !navigator.onLine) return;
   const d = video.duration;
   if (!isFinite(d) || d - video.currentTime > 150) return;
-  playing.prefetched = true;
+  P.playing.prefetched = true;
   const n = neighbor(1);
   const sw = navigator.serviceWorker && navigator.serviceWorker.controller;
   if (!n || !sw || state.saved.has(n.id) || quotaUntil() > 0) return;
@@ -802,22 +796,22 @@ video.addEventListener('waiting', () => stage.classList.add('is-loading'));
 ['playing', 'canplay', 'seeked'].forEach((ev) => video.addEventListener(ev, () => stage.classList.remove('is-loading')));
 video.addEventListener('volumechange', paintControls);
 video.addEventListener('ended', () => {
-  if (!playing) return;
-  setProgress(playing.ep, video.duration, video.duration, true);
+  if (!P.playing) return;
+  setProgress(P.playing.ep, video.duration, video.duration, true);
   sync();
   stage.classList.add('is-ended');
   const n = neighbor(1);
   if (!n) {
     // fin de la temporada: no sigue sola. Si hay otra después, se ofrece, pero solo si la tocas.
     const lib = state.library;
-    const s = playing.ctx.si != null && lib && lib.series[playing.ctx.si];
-    const nextSe = s && !isCollection(s) && playing.ctx.ki != null ? s.seasons[playing.ctx.ki + 1] : null;
-    if (!nextSe) { playerMessage(`Terminaste ${playing.ctx.title}.`); return; }
+    const s = P.playing.ctx.si != null && lib && lib.series[P.playing.ctx.si];
+    const nextSe = s && !isCollection(s) && P.playing.ctx.ki != null ? s.seasons[P.playing.ctx.ki + 1] : null;
+    if (!nextSe) { playerMessage(`Terminaste ${P.playing.ctx.title}.`); return; }
     const first = nextSe.episodes.find((e) => !(prog(e) || {}).w) || nextSe.episodes[0];
-    ui.nextCard.innerHTML = `<p>Terminaste ${esc(seasonLabel(s, s.seasons[playing.ctx.ki]))}</p>
+    ui.nextCard.innerHTML = `<p>Terminaste ${esc(seasonLabel(s, s.seasons[P.playing.ctx.ki]))}</p>
       <div class="btn-row">
         <button class="btn btn-lamp" data-act="p-next-season" data-id="${esc(first.id)}">${ICON.play}<span>Ver ${esc(seasonLabel(s, nextSe))}</span></button>
-        <a class="btn" href="${playing.ctx.back}">Volver</a>
+        <a class="btn" href="${P.playing.ctx.back}">Volver</a>
       </div>`;
     ui.nextCard.hidden = false;
     return;
@@ -834,29 +828,29 @@ video.addEventListener('ended', () => {
       left -= 1;
       const c = $('#p-count');
       if (c) c.textContent = left;
-      if (left <= 0) { ui.nextCard.hidden = true; playNext(); } else nextTimer = setTimeout(tick, 1000);
+      if (left <= 0) { ui.nextCard.hidden = true; playNext(); } else P.nextTimer = setTimeout(tick, 1000);
     };
-    nextTimer = setTimeout(tick, 1000);
+    P.nextTimer = setTimeout(tick, 1000);
   }
 });
 
 video.addEventListener('error', async () => {
-  if (!playing || !video.getAttribute('src')) return;
-  const { ep } = playing;
+  if (!P.playing || !video.getAttribute('src')) return;
+  const { ep } = P.playing;
   const at = video.currentTime;
   // Un tropiezo de MEGA o de la red no termina la reproducción: se pide un enlace nuevo y se sigue
   // en el mismo punto. Hasta 4 intentos en 3 minutos, para no quedar en un ciclo si de verdad no hay forma.
   const now = Date.now();
   const code = video.error ? video.error.code : 0;
-  playing.recover = (playing.recover || []).filter((t) => now - t < 180000);
+  P.playing.recover = (P.playing.recover || []).filter((t) => now - t < 180000);
   // código 3 (decodificar) o 4 (formato no soportado): repetir no sirve más de una vez; se revisa el formato
   const formatError = code === 3 || code === 4;
-  if (formatError && (playing.recover.length >= 1 || playing.objectUrl)) { explainFormat(ep, code); return; }
-  if (!playing.objectUrl && playing.recover.length < 4 && navigator.onLine) {
-    playing.recover.push(now);
+  if (formatError && (P.playing.recover.length >= 1 || P.playing.objectUrl)) { explainFormat(ep, code); return; }
+  if (!P.playing.objectUrl && P.playing.recover.length < 4 && navigator.onLine) {
+    P.playing.recover.push(now);
     stage.classList.add('is-loading');
-    if (playing.recover.length > 1) await sleep(1500 * (playing.recover.length - 1));
-    if (!playing || playing.ep !== ep) return;
+    if (P.playing.recover.length > 1) await sleep(1500 * (P.playing.recover.length - 1));
+    if (!P.playing || P.playing.ep !== ep) return;
     try {
       // se comprueba el enlace nuevo; un tropiezo pasajero de MEGA aquí no cuenta como fallo
       for (let tries = 1; ; tries++) {
@@ -868,7 +862,7 @@ video.addEventListener('error', async () => {
           const passing = !err.status || err.status === 408 || err.status === 429 || err.status >= 500;
           if (!passing || tries >= 3 || /QUOTA|509/.test(String(err.code || err.message))) throw err;
           await sleep(1500 * tries);
-          if (!playing || playing.ep !== ep) return;
+          if (!P.playing || P.playing.ep !== ep) return;
         }
       }
       video.src = await streamUrl(ep);
@@ -882,36 +876,35 @@ video.addEventListener('error', async () => {
   }
   // detalle para saber la causa si vuelve a pasar (código del navegador y último error del service worker)
   const me = video.error;
-  const detail = `Detalle: ${me ? `código ${me.code}${me.message ? `, ${me.message.slice(0, 80)}` : ''}` : 'sin código'}${lastStreamError ? `; ${lastStreamError}` : ''}; ${playing.recover.length} intentos`;
+  const detail = `Detalle: ${me ? `código ${me.code}${me.message ? `, ${me.message.slice(0, 80)}` : ''}` : 'sin código'}${P.lastStreamError ? `; ${P.lastStreamError}` : ''}; ${P.playing.recover.length} intentos`;
   if (/\.mkv$/i.test(ep.name)) playerMessage('Este navegador no reproduce archivos MKV. Usa la versión MP4 del capítulo.');
-  else if (!playing.objectUrl && navigator.onLine) playerMessage('No se pudo reproducir en línea. Puedes descargarlo y verlo desde el dispositivo.', true, false, detail);
+  else if (!P.playing.objectUrl && navigator.onLine) playerMessage('No se pudo reproducir en línea. Puedes descargarlo y verlo desde el dispositivo.', true, false, detail);
   else playerMessage('No se pudo reproducir este capítulo en este navegador.');
 });
 
 async function explainFormat(ep, code) {
-  const token = playing;
+  const token = P.playing;
   stage.classList.add('is-loading');
   let f = null;
   try { f = await mp4Formats(await rangeReader(ep, sourceBlob(token)), ep.size); } catch (err) { console.warn('formato', err); }
   if (f && f.video) rememberCodec(ep, f);
-  if (playing !== token) return;
+  if (P.playing !== token) return;
   const prob = formatProblem(f);
   const detail = `Detalle: código ${code}; ${formatSummary(f)}`;
   if (prob) playerMessage(`Este video viene en ${prob.what}. ${prob.fix}`, false, false, detail);
   else playerMessage('Este navegador no pudo reproducir el video, aunque su formato parece normal. El archivo podría estar dañado o incompleto en MEGA.', !token.objectUrl, false, detail);
 }
 
-let seekFrom = null;
-ui.seek.addEventListener('input', () => { if (!seeking) seekFrom = video.currentTime; seeking = true; paintControls(); wake(); });
+ui.seek.addEventListener('input', () => { if (!P.seeking) P.seekFrom = video.currentTime; P.seeking = true; paintControls(); wake(); });
 ui.seek.addEventListener('change', () => {
   const to = Number(ui.seek.value);
-  if (seekFrom != null && !(playing && playing.chapters && playing.chapters.length)) learnIntro(seekFrom, to);
+  if (P.seekFrom != null && !(P.playing && P.playing.chapters && P.playing.chapters.length)) learnIntro(P.seekFrom, to);
   video.currentTime = to;
-  seeking = false;
-  seekFrom = null;
+  P.seeking = false;
+  P.seekFrom = null;
   paintControls();
 });
-ui.seek.addEventListener('pointerup', () => { if (seeking) { video.currentTime = Number(ui.seek.value); seeking = false; } });
+ui.seek.addEventListener('pointerup', () => { if (P.seeking) { video.currentTime = Number(ui.seek.value); P.seeking = false; } });
 
 /* Gestos sobre el video.
  * Mouse: un clic pausa, doble clic pantalla completa.
@@ -919,10 +912,6 @@ ui.seek.addEventListener('pointerup', () => { if (seeking) { video.currentTime =
  * (cada toque rápido extra suma otros 10 s); mantener presionado reproduce a 2× mientras no se suelte.
  * Deslizar: en la página, arriba = pantalla completa y abajo = mini reproductor; en pantalla completa,
  * abajo = salir. */
-let lastTap = 0;
-let lastTapSide = '';
-let tapTimer;
-let lastTouchEnd = 0;
 const holdEl = $('#st-hold');
 
 /** ¿El reproductor está girado 90° con CSS (iPhone vertical en pantalla completa)? */
@@ -944,54 +933,53 @@ const DOUBLE_TAP = 300;
 function handleTouchTap(fx, downAt = Date.now()) {
   const side = tapSide(fx);
   const now = Date.now();
-  const gap = downAt - lastTap;
+  const gap = downAt - P.lastTap;
   // racha de toques: tras un doble toque, cada toque rápido del mismo lado suma otros 10 s
-  if (lastTapSide === side + '-streak' && gap < 650 && side !== 'center') {
-    lastTap = now;
+  if (P.lastTapSide === side + '-streak' && gap < 650 && side !== 'center') {
+    P.lastTap = now;
     seekBy(side === 'left' ? -10 : 10);
     return;
   }
-  if (gap < DOUBLE_TAP && lastTapSide === side) {
-    clearTimeout(tapTimer);
-    lastTap = now;
-    if (side === 'center') { lastTapSide = ''; togglePlay(); return; }
-    lastTapSide = side + '-streak';
+  if (gap < DOUBLE_TAP && P.lastTapSide === side) {
+    clearTimeout(P.tapTimer);
+    P.lastTap = now;
+    if (side === 'center') { P.lastTapSide = ''; togglePlay(); return; }
+    P.lastTapSide = side + '-streak';
     seekBy(side === 'left' ? -10 : 10);
     return;
   }
-  lastTap = now;
-  lastTapSide = side;
-  clearTimeout(tapTimer);
-  tapTimer = setTimeout(() => {
+  P.lastTap = now;
+  P.lastTapSide = side;
+  clearTimeout(P.tapTimer);
+  P.tapTimer = setTimeout(() => {
     if (stage.classList.contains('is-idle') || video.paused) wake(); else stage.classList.add('is-idle');
   }, DOUBLE_TAP + 60);
 }
 
-let touch = null; // gesto táctil en curso
 function endHold() {
-  if (!touch || !touch.hold) return;
-  touch.hold = false;
-  video.playbackRate = speed;
+  if (!P.touch || !P.touch.hold) return;
+  P.touch.hold = false;
+  video.playbackRate = P.speed;
   holdEl.classList.remove('is-on');
 }
 ui.tap.addEventListener('pointerdown', (e) => {
   if (e.pointerType !== 'touch' || !e.isPrimary) return;
   try { ui.tap.setPointerCapture(e.pointerId); } catch { /* nada */ }
   const p = videoPoint(e);
-  if (Date.now() - lastTap < DOUBLE_TAP) clearTimeout(tapTimer); // puede ser el segundo toque: no ocultar controles todavía
-  touch = { id: e.pointerId, x: p.x, y: p.y, w: p.w, h: p.h, mode: null, hold: false, at: Date.now() };
-  const t = touch;
+  if (Date.now() - P.lastTap < DOUBLE_TAP) clearTimeout(P.tapTimer); // puede ser el segundo toque: no ocultar controles todavía
+  P.touch = { id: e.pointerId, x: p.x, y: p.y, w: p.w, h: p.h, mode: null, hold: false, at: Date.now() };
+  const t = P.touch;
   t.timer = setTimeout(() => {
-    if (touch !== t || t.mode || !video.currentSrc || video.paused || video.ended) return;
+    if (P.touch !== t || t.mode || !video.currentSrc || video.paused || video.ended) return;
     t.hold = true;
     t.mode = 'hold';
     video.playbackRate = 2;
     holdEl.classList.add('is-on');
-    clearTimeout(tapTimer);
+    clearTimeout(P.tapTimer);
   }, 500);
 });
 ui.tap.addEventListener('pointermove', (e) => {
-  const t = touch;
+  const t = P.touch;
   if (!t || e.pointerId !== t.id) return;
   const p = videoPoint(e);
   const dx = p.x - t.x;
@@ -1016,10 +1004,10 @@ ui.tap.addEventListener('pointermove', (e) => {
   }
 });
 function touchEnd(e, cancelled) {
-  const t = touch;
+  const t = P.touch;
   if (!t || e.pointerId !== t.id) return;
   clearTimeout(t.timer);
-  lastTouchEnd = Date.now();
+  P.lastTouchEnd = Date.now();
   if (t.hold) endHold();
   else if (t.mode === 'down' || t.mode === 'fs-down') {
     stage.style.transition = 'transform 0.2s, opacity 0.2s';
@@ -1028,23 +1016,23 @@ function touchEnd(e, cancelled) {
     setTimeout(() => { stage.style.transition = ''; }, 220);
     if (!cancelled && t.dist > 70) {
       if (t.mode === 'fs-down') exitFullscreen(); // vuelve al reproductor normal
-      else if (playing) goBack(playing.ctx.back); // queda en el mini reproductor
+      else if (P.playing) goBack(P.playing.ctx.back); // queda en el mini reproductor
     }
   } else if (t.mode === 'up') {
     if (!cancelled && t.dist > 60) toggleFullscreen();
   }
   else if (!t.mode && !cancelled) handleTouchTap(t.x / Math.max(1, t.w), t.at);
-  touch = null;
+  P.touch = null;
 }
 ui.tap.addEventListener('pointerup', (e) => touchEnd(e, false));
 ui.tap.addEventListener('pointercancel', (e) => touchEnd(e, true));
 ui.tap.addEventListener('contextmenu', (e) => e.preventDefault()); // mantener presionado no abre el menú del sistema
 
 ui.tap.addEventListener('click', (e) => {
-  if (Date.now() - lastTouchEnd < 800) return; // ya lo manejaron los gestos táctiles
+  if (Date.now() - P.lastTouchEnd < 800) return; // ya lo manejaron los gestos táctiles
   if (e.pointerType === 'mouse' || (!e.pointerType && matchMedia('(hover: hover)').matches)) {
-    clearTimeout(tapTimer);
-    tapTimer = setTimeout(() => { togglePlay(); }, 200);
+    clearTimeout(P.tapTimer);
+    P.tapTimer = setTimeout(() => { togglePlay(); }, 200);
     wake();
     return;
   }
@@ -1053,7 +1041,7 @@ ui.tap.addEventListener('click', (e) => {
 });
 ui.tap.addEventListener('dblclick', (e) => {
   if (!matchMedia('(hover: hover)').matches) return;
-  clearTimeout(tapTimer);
+  clearTimeout(P.tapTimer);
   e.preventDefault();
   toggleFullscreen();
 });
@@ -1074,14 +1062,14 @@ stage.addEventListener('click', (e) => {
   else if (act === 'pip') togglePip();
   else if (act === 'mute') video.muted = !video.muted;
   else if (act === 'speed') openMenu('speed');
-  else if (act === 'm-speed') { speed = Number(el.dataset.v); video.playbackRate = speed; paintMenu(); paintControls(); }
-  else if (act === 'p-next-now') { ui.nextCard.hidden = true; clearTimeout(nextTimer); playNext(); }
+  else if (act === 'm-speed') { P.speed = Number(el.dataset.v); video.playbackRate = P.speed; paintMenu(); paintControls(); }
+  else if (act === 'p-next-now') { ui.nextCard.hidden = true; clearTimeout(P.nextTimer); playNext(); }
   else if (act === 'p-next-season') { ui.nextCard.hidden = true; switchTo(epById(el.dataset.id)); }
-  else if (act === 'p-next-cancel') { clearTimeout(nextTimer); ui.nextCard.hidden = true; }
+  else if (act === 'p-next-cancel') { clearTimeout(P.nextTimer); ui.nextCard.hidden = true; }
   else if (act === 'p-dl') downloadThenPlay();
-  else if (act === 'p-folder' && playing) {
-    const ctx = playing.ctx;
-    dirAccess(state.dlMeta.get(playing.ep.id)?.dirKey, true).then((d) => { if (d) { playing = null; startPlayback(ctx); flushFolder(); } });
+  else if (act === 'p-folder' && P.playing) {
+    const ctx = P.playing.ctx;
+    dirAccess(state.dlMeta.get(P.playing.ep.id)?.dirKey, true).then((d) => { if (d) { P.playing = null; startPlayback(ctx); flushFolder(); } });
   }
 });
 ui.menu.addEventListener('change', (e) => {
@@ -1099,7 +1087,7 @@ document.addEventListener('pointerdown', (e) => {
 if (!(document.pictureInPictureEnabled || video.webkitSupportsPresentationMode)) ui.pip.hidden = true;
 
 document.addEventListener('keydown', (e) => {
-  if (route().view !== 'play' || !playing) {
+  if (route().view !== 'play' || !P.playing) {
     if (e.key === 'Escape') { closeSheet(); closeDrawer(); if (viewState.picking) endPicking(); }
     return;
   }
@@ -1112,7 +1100,7 @@ document.addEventListener('keydown', (e) => {
   else if (k === 'm') video.muted = !video.muted;
   else if (k === 'n') playNext();
   else if (k === 'b') setLights(!document.body.classList.contains('lights-off'));
-  else if (k === 's' && playing && playing.offer) doSkip();
+  else if (k === 's' && P.playing && P.playing.offer) doSkip();
   else if (k === 'p') playPrev();
   else if (k === 'escape') { if (!ui.menu.hidden) closeMenu(); else if (stage.classList.contains('kai-fs')) setKaiFullscreen(false); }
   else return;
@@ -1131,7 +1119,7 @@ document.addEventListener('click', async (e) => {
     e.preventDefault();
     const id = decodeURIComponent(link.getAttribute('href').slice('#/play/'.length));
     const ep = epById(id) || (resolveContext(id) || {}).ep;
-    if (ep && (!playing || playing.ep.id !== id)) switchTo(ep);
+    if (ep && (!P.playing || P.playing.ep.id !== id)) switchTo(ep);
     return;
   }
   const focusLink = e.target.closest('a[data-focus]');
@@ -1160,7 +1148,7 @@ document.addEventListener('click', async (e) => {
   else if (act === 'cat-clear') { const t = (app.querySelector('.catalog') || {}).dataset?.t; go('#/catalogo' + (t ? '?t=' + t : '')); }
   else if (act === 'apply-update') applyUpdate();
   else if (act === 'dismiss-update') { const n = $('#update-notice'); if (n) n.remove(); }
-  else if (act === 'mini-open' && playing) go('#/play/' + encodeURIComponent(playing.ep.id));
+  else if (act === 'mini-open' && P.playing) go('#/play/' + encodeURIComponent(P.playing.ep.id));
   else if (act === 'mini-toggle') togglePlay();
   else if (act === 'mini-close') stopPlayback();
   else if (act === 'dir-pick') pickFolder();
@@ -1189,7 +1177,7 @@ document.addEventListener('click', async (e) => {
   }
   else if (act === 'later') { const sr = state.library.series[Number(el.dataset.si)]; if (sr) setLater(sr, '', !isLater(sr)); }
   else if (act === 'resume-here') {
-    const o = resumeOffer(!!playing);
+    const o = resumeOffer(!!P.playing);
     if (!o) { render(); return; }
     LS.set('nowSeen', o.n.u);
     const p = prog(o.ep);
@@ -1197,7 +1185,7 @@ document.addEventListener('click', async (e) => {
     if (!p || Math.abs((p.t || 0) - o.n.t) > 5) setProgress(o.ep, o.n.t, o.n.d || (p && p.d) || 0, false);
     go('#/play/' + encodeURIComponent(o.ep.id));
   }
-  else if (act === 'resume-dismiss') { const o = resumeOffer(!!playing); if (o) LS.set('nowSeen', o.n.u); render(); }
+  else if (act === 'resume-dismiss') { const o = resumeOffer(!!P.playing); if (o) LS.set('nowSeen', o.n.u); render(); }
   else if (act === 'lang') {
     const sr = state.library && state.library.series[viewState.heroSi];
     if (!sr) return;
@@ -1246,7 +1234,7 @@ document.addEventListener('click', async (e) => {
   else if (act === 'set-tone') { state.settings.tone = el.dataset.v; saveSettings(); applyTheme(); renderSettings(); }
   else if (act === 'lights') setLights(false);
 
-  else if (act === 'back') goBack(playing ? playing.ctx.back : '#/');
+  else if (act === 'back') goBack(P.playing ? P.playing.ctx.back : '#/');
   else if (act === 'home') goHome();
   else if (act === 'dl' && ep) {
     if (state.dls[ep.id] || state.queue.some((q) => q.ep.id === ep.id)) removeDownload(ep.id);
@@ -1254,15 +1242,15 @@ document.addEventListener('click', async (e) => {
     else queueDownload(ep);
   } else if (act === 'more' && ep) openSheet(ep);
   else if (act === 'discover-open') openDiscoverSheet(Number(el.dataset.id));
-  else if (act === 'w-more' && playing) openSheet(playing.ep);
-  else if (act === 'w-dl' && playing) {
-    const cur = playing.ep;
+  else if (act === 'w-more' && P.playing) openSheet(P.playing.ep);
+  else if (act === 'w-dl' && P.playing) {
+    const cur = P.playing.ep;
     if (state.saved.has(cur.id)) { if (confirm(`¿Quitar ${episodeLabel(cur)} del dispositivo?`)) removeDownload(cur.id); }
     else if (state.dls[cur.id] || state.queue.some((q) => q.ep.id === cur.id)) removeDownload(cur.id);
-    else queueDownload(cur, playing.ctx.title);
-  } else if (act === 'w-dl-next' && playing) {
-    const ups = nextUnseen(playing.ep, playing.ctx.list, 3).filter((x) => !state.saved.has(x.id));
-    ups.forEach((x) => queueDownload(x, playing.ctx.title));
+    else queueDownload(cur, P.playing.ctx.title);
+  } else if (act === 'w-dl-next' && P.playing) {
+    const ups = nextUnseen(P.playing.ep, P.playing.ctx.list, 3).filter((x) => !state.saved.has(x.id));
+    ups.forEach((x) => queueDownload(x, P.playing.ctx.title));
     toast(`${plural(ups.length, 'capítulo', 'capítulos')} en cola de descarga.`);
     paintWatchInfo();
   } else if (act === 'set-root') {

@@ -1,0 +1,103 @@
+/*
+ * El reproductor con un capítulo de verdad: un video de prueba (VP9 + Opus, 2:30, con capítulos "Avance inicial",
+ * "Opening" y "Parte A") guardado como si estuviera descargado, así se reproduce sin conexión y sin MEGA.
+ */
+import { test, expect } from '@playwright/test';
+import fs from 'node:fs';
+import { openKai } from './kai.js';
+import { buildFixture } from './fixture.js';
+
+const VIDEO = 'tests/e2e/media/capitulo.mp4';
+const SIZE = fs.statSync(new URL('./media/capitulo.mp4', import.meta.url)).size;
+
+/** Abre Kai con los dos primeros capítulos de Dorohedoro descargados (el video de prueba). */
+async function openWithDownloads(page, hash = '#/', extra = {}) {
+  const { ls } = buildFixture();
+  const dor = ls.library.series.find((s) => s.name === 'Dorohedoro');
+  const eps = dor.seasons[0].episodes.slice(0, 2);
+  for (const e of eps) e.size = SIZE;
+  // sin progreso guardado en Dorohedoro: empieza desde el principio
+  const progress = Object.fromEntries(Object.entries(ls['p.pA.progress']).filter(([k]) => !k.includes('Dorohedoro')));
+  const k = await openKai(page, '#/', { realClock: true, extraLS: { library: ls.library, 'p.pA.progress': progress, ...extra } });
+  await page.evaluate(async ({ eps, url }) => {
+    const blob = await (await fetch(url)).blob();
+    const db = await new Promise((res, rej) => {
+      const r = indexedDB.open('yoru', 2);
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => rej(r.error);
+    });
+    await new Promise((res, rej) => {
+      const tx = db.transaction(['dl', 'chunks'], 'readwrite');
+      for (const ep of eps) {
+        tx.objectStore('dl').put({ id: ep.id, done: true, ep, title: 'Dorohedoro', size: ep.size, mime: ep.mime, path: ep.path, at: 1 });
+        tx.objectStore('chunks').put({ id: ep.id, i: 0, blob });
+      }
+      tx.oncomplete = res;
+      tx.onerror = () => rej(tx.error);
+    });
+    db.close();
+  }, { eps, url: '/' + VIDEO });
+  await page.evaluate((h) => { location.hash = h; }, hash);
+  await page.reload();
+  await page.waitForTimeout(400);
+  return { ...k, eps };
+}
+const time = (page) => page.evaluate(() => document.querySelector('#video').currentTime);
+
+test('reproduce un capítulo descargado: controles, intro, velocidad, progreso y mini reproductor', async ({ page }) => {
+  const k = await openWithDownloads(page);
+  await page.evaluate((id) => { location.hash = '#/play/' + id; }, k.eps[0].id);
+  const video = page.locator('#video');
+  await expect.poll(() => page.evaluate(() => document.querySelector('#video').readyState), { timeout: 10000 }).toBeGreaterThan(1);
+  await page.evaluate(() => { const v = document.querySelector('#video'); v.muted = true; return v.play(); });
+  await expect.poll(() => time(page), { timeout: 10000 }).toBeGreaterThan(0.5);
+  await expect(page.locator('#app')).toContainText('Dorohedoro');
+
+  // las marcas de capítulos del MP4; al entrar al Opening (5 s → 1:35) lo salta solo y ofrece volver
+  await expect.poll(() => page.locator('#st-marks *').count(), { timeout: 10000 }).toBeGreaterThan(0);
+  await page.evaluate(() => { document.querySelector('#video').currentTime = 10; });
+  await expect.poll(() => time(page), { timeout: 10000 }).toBeGreaterThan(94);
+  await expect(page.locator('#st-skip')).toHaveText('Volver a la intro');
+  await page.locator('#st-skip').click();
+  await expect.poll(() => time(page)).toBeLessThan(20);
+  // ya no lo vuelve a saltar solo; el botón lo salta a mano
+  await expect(page.locator('#st-skip')).toHaveText('Saltar intro');
+  await page.locator('#st-skip').click();
+  await expect.poll(() => time(page)).toBeGreaterThan(94);
+
+  // ±10 s con el teclado
+  const before = await time(page);
+  await page.keyboard.press('ArrowLeft');
+  await expect.poll(() => time(page)).toBeLessThan(before - 5);
+
+  // velocidad
+  await page.locator('#st-speed').click();
+  await page.locator('#st-menu [data-v="1.5"], #st-menu button:has-text("1.5")').first().click();
+  await expect.poll(() => page.evaluate(() => document.querySelector('#video').playbackRate)).toBe(1.5);
+
+  // al salir, sigue sonando en el mini reproductor y el progreso queda guardado (cada 4 s)
+  await page.waitForTimeout(4500);
+  await page.evaluate(() => { location.hash = '#/'; });
+  await expect(page.locator('#mini')).toBeVisible();
+  const saved = await page.evaluate((path) => JSON.parse(localStorage.getItem('kai.p.pA.progress'))[path], k.eps[0].path);
+  expect(saved.t).toBeGreaterThan(80);
+  expect(saved.w).toBe(false);
+  await page.locator('#mini [data-act="mini-close"]').click();
+  await expect(page.locator('#mini')).toBeHidden();
+  await expect(video).toHaveCount(1);
+  expect(k.errors).toEqual([]);
+});
+
+test('al terminar un capítulo queda visto y ofrece el siguiente', async ({ page }) => {
+  const k = await openWithDownloads(page, '#/', { settings: { root: 'Anime', autoplay: false, autoSkip: true, theme: 'dark', cat: false } });
+  await page.evaluate((id) => { location.hash = '#/play/' + id; }, k.eps[0].id);
+  await expect.poll(() => page.evaluate(() => document.querySelector('#video').readyState), { timeout: 10000 }).toBeGreaterThan(1);
+  await page.evaluate(() => { const v = document.querySelector('#video'); v.muted = true; v.currentTime = 147; return v.play(); });
+  await expect(page.locator('#p-next')).toBeVisible({ timeout: 15000 });
+  await expect(page.locator('#p-next')).toContainText('Episodio 2');
+  const saved = await page.evaluate((path) => JSON.parse(localStorage.getItem('kai.p.pA.progress'))[path], k.eps[0].path);
+  expect(saved.w).toBe(true);
+  await page.locator('[data-act="p-next-now"]').click();
+  await expect(page).toHaveURL(new RegExp(`#/play/${k.eps[1].id}$`));
+  expect(k.errors).toEqual([]);
+});
