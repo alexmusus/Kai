@@ -4,12 +4,15 @@
   "type": "module",
   "description": "Herramientas de prueba de Kai. Viven aquí (no en la raíz) para que Cloudflare publique Kai tal cual, sin instalar nada.",
   "scripts": {
+    "lint": "cd .. && tests/node_modules/.bin/eslint -c tests/eslint.config.js .",
     "test": "vitest run",
     "e2e": "playwright test",
-    "check": "vitest run && playwright test"
+    "check": "npm run lint && vitest run && playwright test"
   },
   "devDependencies": {
     "@playwright/test": "1.64.1",
+    "eslint": "^9.39.5",
+    "globals": "^17.13.0",
     "vitest": "5.0.5"
   }
 }
