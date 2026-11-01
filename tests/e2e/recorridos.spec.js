@@ -276,3 +276,29 @@ test('hoja de opciones de un capítulo: marcar como visto y deshacer', async ({ 
   await expect(page.locator('#sheet')).toBeHidden();
   expect(k.errors).toEqual([]);
 });
+
+test('volver: Anterior/Siguiente no dejan entradas de más, y el menú lleva a las páginas', async ({ page }) => {
+  const k = await openKai(page, '#/');
+  const si = k.si(k.yah);
+  await page.locator(`.shelf a[href="#/serie/${si}"]`).click();
+  await page.locator(`.season-grid a[href="#/serie/${si}/0"]`).click();
+  await page.locator('.step-btn.is-next').click();
+  await page.locator('.step-btn.is-next').click();
+  await expect(page).toHaveURL(new RegExp(`#/serie/${si}/2$`));
+  await page.locator('.bar [data-act="back"]').click();
+  await expect(page).toHaveURL(new RegExp(`#/serie/${si}$`)); // directo al menú, sin pasar por la 1 y la 0
+  await page.locator('.bar [data-act="back"]').click();
+  await expect(page).toHaveURL(/#\/$/);
+  // el botón flotante: abre el menú, lleva a Ajustes y vuelve al inicio
+  await page.locator('#dock .dock-btn').click();
+  await page.locator('#dock .dock-item[href="#/ajustes"]').click();
+  await expect(page).toHaveURL(/#\/ajustes$/);
+  await page.locator('.bar [data-act="home"]').click();
+  await expect(page).toHaveURL(/#\/$/);
+  // la hoja de opciones pone en cola con el nombre de la serie (sin conexión: avisa)
+  await go(page, '#/serie/' + k.si('Dorohedoro'));
+  await page.locator('#season-eps .ep').nth(0).locator('[data-act="more"]').click();
+  await page.locator('#sheet [data-act="save"]').click();
+  await expect(page.locator('#toast')).toHaveText('Necesitas conexión para descargar.');
+  expect(k.errors).toEqual([]);
+});

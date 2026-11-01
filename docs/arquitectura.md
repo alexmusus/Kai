@@ -42,6 +42,19 @@ decide. ESLint lo revisa (`no-restricted-imports`).
 | `downloads.js` | descargas en pedazos, reanudar, carpeta de descargas (avisa `download-changed`, `download-done`, `notice`…) |
 | `media.js` | leer videos por rangos, códec de cada archivo, si este navegador lo reproduce, capítulos guardados |
 
+| Controlador | De qué se encarga |
+|---|---|
+| `router.js` | qué página se dibuja, historial de "volver", scroll al volver; el reproductor se registra con `setPlayer` |
+| `dock.js` | botón flotante: menú, flecha para subir, tocar fuera solo cierra |
+| `sync.js` | cuándo sincronizar y qué redibujar después |
+| `account.js` | entrar a MEGA, crear y elegir perfil |
+| `downloads.js` | elegir carpeta, copia aparte, poner en cola con el nombre de la serie |
+| `sheet.js` | hoja de opciones de un capítulo |
+| `picking.js` | "Seleccionar" varios capítulos |
+
+Las vistas (`views/`) dibujan; si necesitan navegar avisan `navigate`, y los formularios avisan `login` y
+`profile-create`. Ninguna vista llama a un controlador.
+
 Fuera de las capas:
 
 | Archivo | Por qué está aparte |

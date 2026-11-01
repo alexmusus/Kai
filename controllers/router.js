@@ -34,7 +34,10 @@ const player = {
   /** detiene y cierra el video */ stop: () => {},
   /** dibuja la página de reproducción de ese capítulo @param {string} id */ show: (id) => {},
   /** redibuja la información junto al video (sin tocar el video) */ refreshInfo: () => {},
+  /** guarda dónde quedó el video ahora */ save: () => {},
 };
+/** El reproductor registrado (para quien necesite guardarlo o detenerlo, p. ej. al cambiar de perfil). */
+export const playerHooks = player;
 /** @param {Partial<typeof player>} api */
 export function setPlayer(api) {
   Object.assign(player, api);

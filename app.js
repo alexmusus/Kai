@@ -1,37 +1,36 @@
 import { mp4Info, mp4Chapters, mp4Formats, pickIntro, OUTRO_RE as OUTRO } from './models/subs.js';
 import { translateToSpanish } from './models/meta-api.js';
-import { $, LS, esc, sleep, fmtTime, fmtSize, plural } from './lib/util.js';
+import { $, LS, esc, sleep, fmtTime, plural } from './lib/util.js';
 import { ICON } from './views/icons.js';
 import { state, index, setIndex, saveSettings, pkey, saveShared, visibleProfiles } from './models/store.js';
-import { C, megaMessage, login, connect, downloadUrl } from './models/mega.js';
-import { loadProfileState, nodePath, buildLibrary, buildIndex, learnAudioLang, setLangPref, setLibrary, librarySignature } from './models/library.js';
+import { C, megaMessage, connect, downloadUrl } from './models/mega.js';
+import { loadProfileState, nodePath, buildIndex, learnAudioLang, setLangPref } from './models/library.js';
 
-import * as downloads from './models/downloads.js';
-import { setInUseCheck, removeAllDownloads, refreshSaved, resumePendingDownloads, removeDownload, localBlob, holdWake, getDir, dirAccess, flushFolder, useFolder, forgetFolder } from './models/downloads.js';
+import { setInUseCheck, removeAllDownloads, refreshSaved, resumePendingDownloads, removeDownload, localBlob, holdWake, getDir, dirAccess, flushFolder } from './models/downloads.js';
 import { episodeLabel } from './models/collections.js';
 import { nextUnseen, resumeOffer } from './models/progress.js';
 import { viewState } from './views/view-state.js';
 import { startPicking, endPicking, pickAction } from './controllers/picking.js';
 import { isUpdateReady, markUpdateReady, setRegistration, findUpdate } from './models/updates.js';
 import { renderLogin, renderProfiles } from './views/account.js';
-import { addProfile, useProfile } from './models/profiles.js';
 import { toast, toastCount } from './views/toast.js';
 import { resolvedTheme, paintThemeColor, applyTheme } from './views/theme.js';
 import './views/images.js';
 import { setPlayer, go, goHome, goBack, render, softRender, onHashChange, setRouteKey } from './controllers/router.js';
 import { dock, paintDock, fillDock, closeDrawer, toggleDock } from './controllers/dock.js';
+import { sync, syncing, refreshLibrary, setLater } from './controllers/sync.js';
+import { selectProfile } from './controllers/account.js';
+import { queueDownload, downloadAndWait, pickFolder, dropFolder } from './controllers/downloads.js';
+import { openSheet } from './controllers/sheet.js';
 import { on } from './lib/events.js';
-import { syncShared, syncProgress } from './models/sync.js';
 import { countBytes, noteQuota, quotaUntil, refreshAccountInfo } from './models/quota.js';
 import { paintQuota } from './views/quota.js';
-import { isCollection, collectionItems, itemMetaKey, itemFor, movieTitle } from './models/collections.js';
+import { isCollection, collectionItems, itemMetaKey, movieTitle } from './models/collections.js';
 import { prog, setProgress, markNow, isLater } from './models/progress.js';
-import { setLaterFlag } from './models/progress.js';
-import { profilesFromBackup, normName } from './models/profiles.js';
 import { seasonLabel, saveMeta } from './models/fichas.js';
-import { setTmdbKey, ensureMeta, saveSyn, translateMissing, syncSynopses, syncFichas, resetFichas } from './models/fichas-sync.js';
+import { setTmdbKey, ensureMeta, saveSyn, translateMissing, resetFichas } from './models/fichas-sync.js';
 import { idb } from './models/idb.js';
-import { saveKnown, initKnown, newEpisodes, markSeriesSeen, announceNew } from './models/news.js';
+import { saveKnown, newEpisodes, markSeriesSeen } from './models/news.js';
 import { epById } from './models/library.js';
 import { thumbFor } from './models/thumbs.js';
 import { saveChapterCache, rangeReader, cacheChapters, formatProblem, formatSummary, rememberCodec } from './models/media.js';
@@ -41,13 +40,13 @@ import { header, app } from './views/components.js';
 import { setHero } from './views/home.js';
 import { dlButton, episodeRow } from './views/episodes.js';
 import { route } from './lib/route.js';
-import { resolveContext, titleFor } from './models/context.js';
+import { resolveContext } from './models/context.js';
 import { paintSync, paintDrawerCount, paintNewsDot } from './views/dock.js';
 import { openHomeSearch, closeHomeSearch } from './views/catalog.js';
 import { renderDownloads } from './views/downloads.js';
 import { newsHTML, paintSeenByAll, renderSettings, paintCineKey, paintDownloadsWhere, paintSpace } from './views/settings.js';
 import { openDiscoverSheet } from './views/discover.js';
-import { showSheet, closeSheet } from './views/sheet.js';
+import { closeSheet } from './views/sheet.js';
 
 on('quota', paintQuota);
 on('theme', () => { if (dock.classList.contains('is-open')) fillDock(); });
@@ -64,6 +63,7 @@ setPlayer({
   stop: () => stopPlayback(),
   show: (id) => renderWatch(id),
   refreshInfo: () => paintWatchInfo(),
+  save: () => savePosition(true),
 });
 on('news', () => paintNewsDot());
 on('tree-changed', () => refreshLibrary());
@@ -83,23 +83,6 @@ loadProfileState();
 
 /* ───────────────────────── MEGA ───────────────────────── */
 
-function refreshLibrary(rerender = true) {
-  if (!state.storage) return;
-  const before = librarySignature(state.library);
-  const hadError = !!state.error;
-  try {
-    const lib = buildLibrary(state.storage);
-    if (librarySignature(lib) !== before || !state.library || state.library.v !== 2) setLibrary(lib);
-    state.error = null;
-    initKnown();
-    announceNew();
-    ensureMeta();
-  } catch (err) {
-    state.error = err;
-  }
-  const changed = librarySignature(state.library) !== before || hadError !== !!state.error;
-  if (rerender && changed) softRender();
-}
 
 /* ───────────────────────── miniaturas ───────────────────────── */
 
@@ -109,89 +92,10 @@ function refreshLibrary(rerender = true) {
 
 /** Lo que quedó viendo este perfil en otro dispositivo hace poco, si conviene ofrecer seguir aquí. */
 
-function setLater(s, itemKey, on) {
-  setLaterFlag(s, itemKey, on);
-  toast(on ? 'Agregado a Más tarde.' : 'Quitado de Más tarde.');
-  softRender();
-  sync();
-}
 
-let syncing = null;
-function sync() {
-  if (syncing) return syncing;
-  syncing = doSync().finally(() => { syncing = null; });
-  return syncing;
-}
-
-async function doSync() {
-  if (!state.storage || !navigator.onLine) return;
-  const home = state.storage.root;
-  state.syncState = 'syncing';
-  paintSync();
-  try {
-    // 1) lo compartido entre perfiles
-    const sharedChanged = await syncShared(home);
-    // 1b) sinopsis traducidas y fichas (un fallo aquí no frena el progreso)
-    try { await syncSynopses(home); } catch (err) { console.warn('sinopsis', err); }
-    try { await syncFichas(home); } catch (err) { console.warn('fichas', err); }
-    // 2) progreso del perfil activo
-    const changedHere = await syncProgress(home);
-    state.syncState = 'idle';
-    if (changedHere || sharedChanged) softRender();
-  } catch (err) {
-    state.syncState = 'error';
-    if (!state.sharedLoaded) {
-      state.sharedError = true;
-      state.sharedErrorMsg = megaMessage((err && err.cause) || err); // el motivo real: cuota, sesión, red…
-      // sin poder leer el archivo de perfiles (p. ej. sin cuota), se muestran los del respaldo para poder entrar;
-      // no se escribe nada en MEGA hasta poder leer el archivo de verdad
-      for (const p of profilesFromBackup()) if (!state.shared.profiles.some((x) => x.id === p.id)) state.shared.profiles.push(p);
-      if (!state.profile || route().view === 'perfiles') render();
-    }
-    console.warn('sync', err);
-  }
-  paintSync();
-}
 
 /* ───────────────────────── descargas ───────────────────────── */
 
-/** Pone un capítulo en la cola de descargas (con el nombre de su serie para agruparlo en Descargados). */
-function queueDownload(ep, title) {
-  downloads.queueDownload(ep, title || titleFor(ep));
-}
-function downloadAndWait(ep, title) {
-  return downloads.downloadAndWait(ep, title || titleFor(ep));
-}
-
-/** Elegir la carpeta de descargas (Chrome y Edge): el selector del navegador y el permiso. */
-async function pickFolder() {
-  let d;
-  try { d = await window.showDirectoryPicker({ id: 'kai-descargas', mode: 'readwrite', startIn: 'videos' }); } catch { return; } // canceló
-  if (!(await dirAccess(d, true))) { toast('Kai necesita permiso para guardar en esa carpeta.'); return; }
-  await useFolder(d);
-  toast(`Las descargas se guardarán en «${d.name}».`);
-  if (route().view === 'ajustes') renderSettings();
-  flushFolder();
-}
-function dropFolder() {
-  if (!confirm('Las descargas nuevas se guardarán dentro de la app. Lo que ya está en la carpeta se queda ahí y Kai lo sigue usando.')) return;
-  forgetFolder();
-  if (route().view === 'ajustes') renderSettings();
-}
-
-/** Copia aparte del capítulo (Safari, iPhone, Firefox): el navegador la guarda en Descargas o en Archivos. */
-async function exportCopy(ep) {
-  const blob = await localBlob(ep, true).catch(() => null);
-  if (!blob) { toast('Primero descarga el capítulo.'); return; }
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = ep.name;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 120000);
-}
 
 /* ───────────────────────── rutas y vistas ───────────────────────── */
 
@@ -201,52 +105,9 @@ async function exportCopy(ep) {
 
 /* ── entrar ── */
 
-on('login', async ({ email, password, code, needCode }) => {
-  try {
-    await login(email, password, code);
-    viewState.loginNote = '';
-    refreshLibrary(false);
-    location.hash = '#/';
-    render();
-    sync();
-  } catch (err) {
-    const m = megaMessage(err);
-    if (m === 'MFA') renderLogin('', true, email);
-    else renderLogin(m, needCode, email);
-  }
-});
 
 /* ── perfiles ── */
 
-on('profile-create', (name) => createProfile(name));
-async function createProfile(name) {
-  // antes de crear, vuelve a mirar MEGA por si otro dispositivo ya creó perfiles
-  if (navigator.onLine) {
-    try {
-      await connect();
-      if (syncing) await syncing.catch(() => {});
-      await sync();
-    } catch { /* se revisa abajo */ }
-    if (!state.sharedLoaded || state.sharedError) { renderProfiles(); return; }
-  }
-  const same = visibleProfiles().find((x) => normName(x.name) === normName(name));
-  if (same) {
-    toast(`Ya tenías el perfil ${same.name}; entraste con ese.`);
-    selectProfile(same.id);
-    return;
-  }
-  selectProfile(addProfile(name).id);
-}
-
-function selectProfile(id) {
-  const p = visibleProfiles().find((x) => x.id === id);
-  if (!p) return;
-  if (state.profile && state.profile.id !== id) { savePosition(true); stopPlayback(); }
-  useProfile(p);
-  location.hash = '#/';
-  render();
-  sync();
-}
 /* ── capítulos nuevos ── */
 
 /* ── sinopsis e imágenes ── */
@@ -286,46 +147,6 @@ function paintEpisode(id) {
 
 /* ── hoja de opciones de un capítulo ── */
 
-function openSheet(ep) {
-  const p = prog(ep);
-  const saved = state.saved.has(ep.id);
-  const busy = !!state.dls[ep.id] || state.queue.some((q) => q.ep.id === ep.id);
-  const ctx = resolveContext(ep.id);
-  const upcoming = ctx ? nextUnseen(ep, ctx.list, 3).filter((x) => !state.saved.has(x.id)) : [];
-  const ie = index.byId.get(ep.id);
-  const series = ie ? state.library.series[ie.si] : null;
-  const movie = series ? itemFor(series, ep) : null; // solo las películas de la colección
-  const sheet = showSheet(`<div class="sheet-back" data-act="close"></div>
-    <div class="sheet-panel" role="dialog" aria-modal="true" aria-label="${esc(episodeLabel(ep))}">
-      <p class="sheet-title">${esc(episodeLabel(ep))}</p>
-      <p class="sheet-sub">${esc(ep.name)}, ${fmtSize(ep.size)}</p>
-      <button class="sheet-btn" data-act="toggle-seen">${p && p.w ? 'Marcar como no visto' : 'Marcar como visto'}</button>
-      ${p && p.t > 5 && !p.w ? '<button class="sheet-btn" data-act="restart">Ver desde el principio</button>' : ''}
-      ${saved || busy ? `<button class="sheet-btn" data-act="unsave">${busy ? 'Cancelar descarga' : 'Quitar del dispositivo'}</button>` : '<button class="sheet-btn" data-act="save">Descargar para ver sin conexión</button>'}
-      ${upcoming.length ? `<button class="sheet-btn" data-act="save-next">Descargar ${upcoming.length === 1 ? 'el siguiente' : `los ${upcoming.length} siguientes`}</button>` : ''}
-      ${saved && (state.dlMeta.get(ep.id) || {}).where !== 'folder' ? '<button class="sheet-btn" data-act="export">Guardar copia en el dispositivo</button>' : ''}
-      ${movie ? `<button class="sheet-btn" data-act="later-movie">${isLater(series, movie.key) ? 'Quitar de Más tarde' : 'Ver más tarde'}</button>` : ''}
-      <button class="sheet-btn is-quiet" data-act="close">Cerrar</button>
-    </div>`, async (e) => {
-    const el = e.target.closest('[data-act]');
-    if (!el) return;
-    const act = el.dataset.act;
-    closeSheet();
-    if (act === 'toggle-seen') {
-      const now = prog(ep);
-      setProgress(ep, now && now.w ? 0 : (now && now.d) || 0, (now && now.d) || 0, !(now && now.w));
-      softRender(); sync();
-    } else if (act === 'restart') {
-      setProgress(ep, 0, (p && p.d) || 0, false);
-      go('#/play/' + encodeURIComponent(ep.id));
-    } else if (act === 'save') queueDownload(ep);
-    else if (act === 'save-next') { upcoming.forEach((x) => queueDownload(x, ctx.title)); toast(`${plural(upcoming.length, 'capítulo', 'capítulos')} en cola de descarga.`); }
-    else if (act === 'unsave') removeDownload(ep.id);
-    else if (act === 'export') exportCopy(ep);
-    else if (act === 'later-movie') setLater(series, movie.key, !isLater(series, movie.key));
-  });
-  sheet.querySelector('.sheet-btn').focus();
-}
 
 /* ───────────────────────── página de reproducción ───────────────────────── */
 
