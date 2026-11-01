@@ -9,7 +9,7 @@ importScripts('core.js');
 const VERSION = 'kai-v37';
 const SHELL = [
   './', 'styles.css', 'app.js', 'subs.js', 'meta.js', 'core.js',
-  'lib/util.js', 'models/naming.js', 'models/store.js', 'views/icons.js',
+  'lib/util.js', 'models/naming.js', 'models/store.js', 'models/mega.js', 'models/library.js', 'views/icons.js',
   'vendor/mega.js', 'manifest.webmanifest', 'icon-32.png', 'icon-180.png', 'icon-192.png', 'icon-512.png',
   'gato/sentado.webp', 'gato/sentado-cierra.webp', 'gato/echado.webp',
 ];
