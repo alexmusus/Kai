@@ -378,12 +378,6 @@ async function readCodec(ep) {
   return codecCache[k];
 }
 
-function coverHTML(name, ep, cls = '') {
-  const initial = esc([...String(name).trim()][0] || '·');
-  return `<div class="cover ${cls}" style="--h:${hue(name)}" ${ep && ep.fa ? `data-thumb="${esc(ep.id)}"` : ''}>
-    <span class="cover-glyph" aria-hidden="true">${initial}</span></div>`;
-}
-
 /* ───────────────────────── capítulos fuera de la biblioteca ───────────────────────── */
 
 function epById(id) {
@@ -1439,7 +1433,6 @@ function selectProfile(id) {
   LS.set('profile', state.profile);
   loadProfileState();
   initKnown();
-  lastNew = null;
   announceNew();
   location.hash = '#/';
   render();
@@ -1471,7 +1464,6 @@ function markSeriesSeen(s) {
   k[s.name] = [...new Set([...(k[s.name] || []), ...(s.full || s.all).map((e) => e.id)])];
   saveKnown(k);
 }
-let lastNew = null;
 /* Al importar varios capítulos, MEGA avisa de cada archivo por separado: los cambios se juntan
  * unos segundos y se muestra un solo aviso ("Hay contenido nuevo: Fate (3), Frieren (1)"). */
 /* Novedades: lo nuevo que llega a MEGA ya no sale como aviso en el inicio; se anota en Ajustes → Novedades
@@ -1497,7 +1489,7 @@ function paintNewsDot() {
 const NEWS_IDS_MAX = 4000;
 function announceNew() {
   if (!state.library || !state.library.series || !state.profile) return;
-  let told = LS.get(pkey('newsIds'), null);
+  const told = LS.get(pkey('newsIds'), null);
   const first = !Array.isArray(told);
   const seen = new Set(first ? [] : told);
   const added = [];
@@ -1511,7 +1503,6 @@ function announceNew() {
   }
   if (first || added.length) LS.set(pkey('newsIds'), [...seen].slice(-NEWS_IDS_MAX));
   LS.del(pkey('newsCount'));
-  lastNew = null;
   paintNewsDot();
 }
 function newsHTML() {
@@ -1617,7 +1608,6 @@ async function ensureMeta() {
     // 2) primero lo que todavía no tiene ficha (p. ej. temporadas recién organizadas), después el resto
     const order = [...state.library.series].sort((a, b) => Number(hasAllMeta(a)) - Number(hasAllMeta(b)));
     for (const s of order) {
-      const pick = null; // todo automático: ya no se usan fichas elegidas a mano
       if (isCine(s)) {
         // Cine: cada película en TMDB (sin clave no se busca nada)
         const key = tmdbKey();
@@ -2108,7 +2098,6 @@ function heroInnerHTML(s, si) {
   const m = displayMeta(s);
   const plan = heroPlan(s);
   const fresh = newEpisodes(s).length;
-  const facts = [m && m.year, m && m.format, countLabel(s, m), ...((m && m.genres) || []).slice(0, 3)].filter(Boolean);
   const syn = synopsisOf(m);
   const coverEp = s.all.find((e) => e.fa);
   const poster = m && m.collage && m.collage.length
@@ -2597,7 +2586,7 @@ function renderSeries(arg) {
   const fli = focusId && app.querySelector(`.ep[data-id="${CSS.escape(focusId)}"]`);
   if (fli) requestAnimationFrame(() => { fli.scrollIntoView({ block: 'center' }); fli.classList.add('is-flash'); });
   // los "nuevos" se muestran esta vez y quedan vistos
-  if (fresh.size) { markSeriesSeen(s); lastNew = null; announceNew(); }
+  if (fresh.size) { markSeriesSeen(s); announceNew(); }
 }
 
 /** La ficha de la página de una serie con varias temporadas: siempre la de la Temporada 1 (v37: antes era la de la
@@ -2671,7 +2660,7 @@ function renderSeasonMenu(s, si) {
       </section>
     </main>
   </div>`;
-  if (fresh.size) { markSeriesSeen(s); lastNew = null; announceNew(); }
+  if (fresh.size) { markSeriesSeen(s); announceNew(); }
 }
 
 /* ── películas: el estante (la carpeta) y la página de cada una ── */
@@ -2717,7 +2706,7 @@ function renderShelf(s, si) {
     <p class="dim shelf-count">${plural(items.length, 'película', 'películas')}</p>
     <ul class="shelf" role="list">${items.map((x) => moviePosterHTML(s, si, x, fresh)).join('')}</ul>
   </main>`;
-  if (fresh.size) { markSeriesSeen(s); lastNew = null; announceNew(); }
+  if (fresh.size) { markSeriesSeen(s); announceNew(); }
 }
 
 function renderMovie(arg) {
@@ -3432,7 +3421,7 @@ function renderWatch(id) {
   const ctx = resolveContext(id);
   // ver un capítulo cuenta como haber visto lo nuevo de esa serie (si no, la burbuja seguía en el inicio)
   const ws = ctx && ctx.si != null && state.library && state.library.series[ctx.si];
-  if (ws && newEpisodes(ws).length) { markSeriesSeen(ws); lastNew = null; }
+  if (ws && newEpisodes(ws).length) markSeriesSeen(ws);
   if (!ctx) {
     if (LS.get('session', null) && (state.connecting || !state.library)) {
       app.innerHTML = header('') + '<main><section class="empty"><p class="dim">Cargando…</p></section></main>';
@@ -3658,7 +3647,6 @@ function savePosition(force = false) {
 function finishCurrent() {
   if (!playing) return;
   savePosition(true);
-  const ep = playing.ep;
   if (playing.objectUrl) {
     const u = playing.objectUrl;
     setTimeout(() => URL.revokeObjectURL(u), 1500);
@@ -4595,7 +4583,6 @@ document.addEventListener('click', async (e) => {
     LS.set(pkey('news'), []);
     // "Limpiar" también quita las burbujas de "Nuevo" de los pósters: todo lo que hay queda como ya visto
     if (state.library && state.library.series) saveKnown(Object.fromEntries(state.library.series.map((s) => [s.name, (s.full || s.all).map((e) => e.id)])));
-    lastNew = null;
     app.querySelectorAll('.tile-badge, .ep-new:not(.is-lang)').forEach((b) => { if (/nuev/i.test(b.textContent)) b.remove(); });
     paintDock();
     const box = $('#news'); if (box) box.innerHTML = newsHTML();
