@@ -161,3 +161,18 @@ test('etiqueta de códec: nombre y puntito rojo si este navegador no lo reproduc
   await expect(tags.nth(1)).toHaveClass(/is-bad/);
   expect(k.errors).toEqual([]);
 });
+
+test('seguir aquí lo que quedó a medias en otro dispositivo', async ({ page }, info) => {
+  const { buildFixture, NOW } = await import('./fixture.js');
+  const { ls } = buildFixture();
+  const dor = ls.library.series.find((s) => s.name === 'Dorohedoro').seasons[0].episodes[4];
+  const progress = { ...ls['p.pA.progress'], '@now': { p: dor.path, t: 754, d: 1440, w: false, dev: 'otro', dn: 'iPhone', u: NOW - 20 * 60000 } };
+  const k = await openKai(page, '#/', { extraLS: { 'p.pA.progress': progress } });
+  await expect(page.locator('.resume-card')).toContainText('En tu iPhone, hace 20 min');
+  await expect(page.locator('.resume-card')).toContainText('Dorohedoro · Episodio 5');
+  await expect(page.locator('.resume-card [data-act="resume-here"]')).toContainText('12:34');
+  await shot(page, 'seguir-aqui', info);
+  await page.locator('[data-act="resume-dismiss"]').click();
+  await expect(page.locator('.resume-card')).toHaveCount(0);
+  expect(k.errors).toEqual([]);
+});
