@@ -9,8 +9,10 @@
  *    apunta al que quedó (`mergedInto`), y su progreso se suma al de ese.
  */
 
-import { state, visibleProfiles } from './store.js';
-import { findFolder } from './library.js';
+import { state, visibleProfiles, saveShared } from './store.js';
+import { LS, hue } from '../lib/util.js';
+import { initKnown, announceNew } from './news.js';
+import { findFolder, loadProfileState } from './library.js';
 
 /** @typedef {import('./types.js').Profile} Profile */
 /**
@@ -124,4 +126,48 @@ export function finalProfileId(id) {
     id = p.mergedInto;
   }
   return id;
+}
+
+/* ── crear y elegir ── */
+
+/** Colores de los avatares, en orden: cada perfil nuevo toma el primero que nadie usa. */
+const AVATAR_HUES = [210, 340, 150, 30, 270, 190, 0, 90];
+
+/**
+ * Crea un perfil (queda por sincronizar). El primero se queda con el progreso de antes de que hubiera perfiles.
+ * @param {string} name
+ * @returns {Profile}
+ */
+export function addProfile(name) {
+  const isFirst = !state.shared.profiles.length;
+  const used = new Set(state.shared.profiles.map((/** @type {any} */ p) => p.hue));
+  const p = {
+    id: Math.random().toString(36).slice(2, 10),
+    name,
+    hue: AVATAR_HUES.find((h) => !used.has(h)) ?? hue(name),
+    created: Date.now(),
+    u: Date.now(),
+  };
+  state.shared.profiles.push(p);
+  if (isFirst && !state.shared.legacyBy) state.shared.legacyBy = p.id;
+  saveShared();
+  if (isFirst) {
+    const old = LS.get('progress', null);
+    if (old) {
+      LS.set(`p.${p.id}.progress`, old);
+      LS.set(`p.${p.id}.dirty`, true);
+      LS.del('progress');
+      LS.del('dirty');
+    }
+  }
+  return p;
+}
+
+/** Este dispositivo pasa a usar ese perfil: su progreso, su idioma elegido y sus novedades. @param {Profile} p */
+export function useProfile(p) {
+  state.profile = { id: p.id, name: p.name };
+  LS.set('profile', state.profile);
+  loadProfileState();
+  initKnown();
+  announceNew();
 }

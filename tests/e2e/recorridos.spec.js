@@ -229,3 +229,31 @@ test('Explorar MEGA y Descargados sin conexión no rompen', async ({ page }) => 
   await expect(page.locator('main.downloads')).toBeVisible();
   expect(k.errors).toEqual([]);
 });
+
+test('crear un perfil y entrar con él', async ({ page }) => {
+  const k = await openKai(page, '#/perfiles');
+  await page.locator('[data-act="profile-add"]').click();
+  await page.locator('#profile-new input[name="name"]').fill('Sofi');
+  await page.locator('#profile-new button').click();
+  await expect(page.locator('#tv-greet')).toHaveText(/, Sofi$/);
+  await go(page, '#/perfiles');
+  await expect(page.locator('.profile-name')).toHaveText(['Alex', 'Diego', 'Sofi', 'Agregar']);
+  // con el mismo nombre no se crea otro: entra con el que ya existe
+  await page.locator('[data-act="profile-add"]').click();
+  await page.locator('#profile-new input[name="name"]').fill(' alex ');
+  await page.locator('#profile-new button').click();
+  await expect(page.locator('#tv-greet')).toHaveText(/, Alex$/);
+  expect(k.errors).toEqual([]);
+});
+
+test('entrar a MEGA: sin conexión dice por qué y conserva el correo', async ({ page }) => {
+  const k = await openKai(page, '#/', { extraLS: { session: null } });
+  await expect(page.locator('#login')).toBeVisible();
+  await page.locator('#login input[name="email"]').fill('yo@example.com');
+  await page.locator('#login input[name="password"]').fill('secreta');
+  await page.locator('#login button').click();
+  await expect(page.locator('.form-error')).toBeVisible();
+  await expect(page.locator('#login input[name="email"]')).toHaveValue('yo@example.com');
+  await expect(page.locator('#login input[name="password"]')).toHaveValue('');
+  expect(k.errors.filter((e) => !/Failed to load resource|ERR_FAILED/.test(e))).toEqual([]);
+});

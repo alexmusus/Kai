@@ -1,6 +1,6 @@
 import { mp4Info, mp4Chapters, mp4Formats, pickIntro, OUTRO_RE as OUTRO } from './models/subs.js';
 import { translateToSpanish } from './models/meta-api.js';
-import { $, LS, esc, sleep, fmtTime, fmtSize, hue, plural } from './lib/util.js';
+import { $, LS, esc, sleep, fmtTime, fmtSize, plural } from './lib/util.js';
 import { ICON } from './views/icons.js';
 import { DARK_TONES, TONES, state, index, setIndex, saveSettings, pkey, saveShared, visibleProfiles } from './models/store.js';
 import { C, megaMessage, login, connect, downloadUrl } from './models/mega.js';
@@ -13,6 +13,8 @@ import { nextUnseen, resumeOffer } from './models/progress.js';
 import { viewState } from './views/view-state.js';
 import { startPicking, endPicking, pickAction } from './controllers/picking.js';
 import { isUpdateReady, markUpdateReady, setRegistration, findUpdate } from './models/updates.js';
+import { renderLogin, renderProfiles, avatarHTML } from './views/account.js';
+import { addProfile, useProfile } from './models/profiles.js';
 import { on } from './lib/events.js';
 import { syncShared, syncProgress } from './models/sync.js';
 import { countBytes, noteQuota, quotaUntil, refreshAccountInfo } from './models/quota.js';
@@ -231,7 +233,7 @@ function softRender() {
 
 function render() {
   closeDrawer();
-  if (!LS.get('session', null)) { stopPlayback(); renderLogin(); return; }
+  if (!LS.get('session', null)) { stopPlayback(); renderLogin(loginNote); return; }
   const { view, arg } = route();
   if (!state.profile || !visibleProfiles().some((p) => p.id === state.profile.id) && state.sharedLoaded) {
     if (state.profile && state.sharedLoaded) { state.profile = null; LS.del('profile'); }
@@ -375,93 +377,24 @@ document.addEventListener('keydown', (e) => {
 /* ── entrar ── */
 
 let loginNote = ''; // aviso que se mantiene en la pantalla de entrar aunque se vuelva a dibujar
-function renderLogin(message = loginNote, needCode = false, email = '') {
-  app.innerHTML = `<main class="login">
-    <div class="login-mark" aria-hidden="true"><img class="login-icon" src="icon-192.png" alt=""></div>
-    <h1 class="login-title">Kai</h1>
-    <p class="login-lead">Tus series de MEGA, donde te quedaste, en cualquier pantalla.</p>
-    <form id="login" class="form" autocomplete="on">
-      <label>Correo de MEGA<input name="email" type="email" required autocomplete="username" value="${esc(email)}"></label>
-      <label>Contraseña<input name="password" type="password" required autocomplete="current-password"></label>
-      ${needCode ? '<label>Código de verificación<input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required autocomplete="one-time-code"></label>' : ''}
-      ${message ? `<p class="form-error" role="alert">${esc(message)}</p>` : ''}
-      <button class="btn btn-lamp" type="submit">Entrar</button>
-      <p class="form-note">Tu contraseña va directo a MEGA y no se guarda. En este dispositivo solo queda la sesión.</p>
-    </form>
-  </main>`;
-  $('#login').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const f = new FormData(e.target);
-    const btn = e.target.querySelector('button');
-    btn.disabled = true;
-    btn.textContent = 'Entrando…';
-    try {
-      await login(f.get('email').toString().trim(), f.get('password').toString(), f.get('code') && f.get('code').toString());
-      loginNote = '';
-      refreshLibrary(false);
-      location.hash = '#/';
-      render();
-      sync();
-    } catch (err) {
-      const m = megaMessage(err);
-      if (m === 'MFA') renderLogin('', true, f.get('email').toString());
-      else renderLogin(m, needCode, f.get('email').toString());
-    }
-  });
-}
+on('login', async ({ email, password, code, needCode }) => {
+  try {
+    await login(email, password, code);
+    loginNote = '';
+    refreshLibrary(false);
+    location.hash = '#/';
+    render();
+    sync();
+  } catch (err) {
+    const m = megaMessage(err);
+    if (m === 'MFA') renderLogin('', true, email);
+    else renderLogin(m, needCode, email);
+  }
+});
 
 /* ── perfiles ── */
 
-const AVATAR_HUES = [210, 340, 150, 30, 270, 190, 0, 90];
-
-function avatarHTML(p, cls = '') {
-  const h = p.hue ?? hue(p.name);
-  return `<span class="avatar ${cls}" style="--h:${h}" aria-hidden="true">${esc([...p.name.trim()][0] || '?').toUpperCase()}</span>`;
-}
-
-function renderProfiles(editing = false, adding = false) {
-  const list = visibleProfiles();
-  // solo se ofrece crear perfil cuando Kai pudo confirmar en MEGA cuáles existen
-  const blocked = !state.sharedLoaded;
-  const failed = blocked && (state.sharedError || !navigator.onLine);
-  const waiting = blocked && !failed;
-  const first = !list.length;
-  app.innerHTML = `<main class="profiles">
-    <div class="profiles-inner">
-      <h1 class="profiles-title">${first && !blocked ? 'Crea tu perfil' : '¿Quién está viendo?'}</h1>
-      ${first && !blocked ? '<p class="profiles-lead">Cada perfil guarda su propio progreso y aparece en todos tus dispositivos.</p>' : ''}
-      ${waiting && first ? '<p class="profiles-lead">Buscando perfiles en tu MEGA…</p>' : ''}
-      ${failed ? `<p class="profiles-lead">${navigator.onLine ? 'No pude leer tus perfiles en MEGA.' : 'Conéctate a internet para cargar tus perfiles.'}</p>
-        ${navigator.onLine && state.sharedErrorMsg && state.sharedErrorMsg !== 'MFA' ? `<p class="profiles-why">${esc(state.sharedErrorMsg)}${/límite de transferencia/i.test(state.sharedErrorMsg) ? ' MEGA cuenta ese límite por conexión: con datos móviles u otra red suele funcionar de inmediato.' : ''}</p>` : ''}
-        ${navigator.onLine && list.length ? '<p class="profiles-why">Puedes entrar con tu perfil igual: tu progreso se junta con el de MEGA en cuanto se pueda leer.</p>' : ''}
-        ${navigator.onLine ? '<button class="btn btn-lamp" data-act="profiles-retry">Reintentar</button>' : ''}` : ''}
-      <ul class="profile-grid">
-        ${list.map((p) => `<li><button class="profile-tile ${editing ? 'is-editing' : ''}" data-act="${editing ? 'profile-delete' : 'profile-pick'}" data-id="${esc(p.id)}">
-          ${avatarHTML(p, 'avatar-xl')}<span class="profile-name">${esc(p.name)}</span>${editing ? '<span class="profile-remove">Quitar</span>' : ''}
-        </button></li>`).join('')}
-        ${!editing && !blocked ? `<li>${adding || first ? `<form class="profile-new" id="profile-new">
-            <input name="name" maxlength="20" placeholder="Nombre" required autocomplete="off" aria-label="Nombre del perfil">
-            <button class="btn btn-lamp" type="submit">Crear</button>
-          </form>` : `<button class="profile-tile is-add" data-act="profile-add"><span class="avatar avatar-xl avatar-add" aria-hidden="true">+</span><span class="profile-name">Agregar</span></button>`}</li>` : ''}
-      </ul>
-      ${list.length && !blocked ? `<button class="btn" data-act="${editing ? 'profiles-done' : 'profiles-edit'}">${editing ? 'Listo' : 'Editar perfiles'}</button>` : ''}
-    </div>
-  </main>`;
-  const form = $('#profile-new');
-  if (form) {
-    form.name.focus();
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const name = form.name.value.trim();
-      if (!name) return;
-      const btn = form.querySelector('button');
-      btn.disabled = true;
-      btn.textContent = 'Revisando…';
-      await createProfile(name);
-    });
-  }
-}
-
+on('profile-create', (name) => createProfile(name));
 async function createProfile(name) {
   // antes de crear, vuelve a mirar MEGA por si otro dispositivo ya creó perfiles
   if (navigator.onLine) {
@@ -478,34 +411,18 @@ async function createProfile(name) {
     selectProfile(same.id);
     return;
   }
-  const isFirst = !state.shared.profiles.length;
-  const used = new Set(state.shared.profiles.map((p) => p.hue));
-  const p = { id: Math.random().toString(36).slice(2, 10), name, hue: AVATAR_HUES.find((h) => !used.has(h)) ?? hue(name), created: Date.now(), u: Date.now() };
-  state.shared.profiles.push(p);
-  if (isFirst && !state.shared.legacyBy) state.shared.legacyBy = p.id;
-  saveShared();
-  // el progreso de antes de los perfiles pasa al primero
-  if (isFirst) {
-    const old = LS.get('progress', null);
-    if (old) { LS.set(`p.${p.id}.progress`, old); LS.set(`p.${p.id}.dirty`, true); LS.del('progress'); LS.del('dirty'); }
-  }
-  selectProfile(p.id);
+  selectProfile(addProfile(name).id);
 }
 
 function selectProfile(id) {
   const p = visibleProfiles().find((x) => x.id === id);
   if (!p) return;
   if (state.profile && state.profile.id !== id) { savePosition(true); stopPlayback(); }
-  state.profile = { id: p.id, name: p.name };
-  LS.set('profile', state.profile);
-  loadProfileState();
-  initKnown();
-  announceNew();
+  useProfile(p);
   location.hash = '#/';
   render();
   sync();
 }
-
 /* ── capítulos nuevos ── */
 
 /* ── sinopsis e imágenes ── */
