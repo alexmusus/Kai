@@ -1,8 +1,9 @@
 import { isSubtitleName, mp4Info, mp4Chapters, mp4Formats, pickIntro, OUTRO_RE as OUTRO } from './models/subs.js';
+import { movieHref } from './lib/route.js';
 import { tmdbCheckKey, translateToSpanish, recommendationsFor, airingTop, toDiscover } from './models/meta-api.js';
 import { $, LS, esc, sleep, debounce, fmtTime, fmtSize, hue, plural } from './lib/util.js';
 import { ICON } from './views/icons.js';
-import { hasOwnTitle, sortEpisodes } from './models/naming.js';
+import { sortEpisodes } from './models/naming.js';
 import { DARK_TONES, TONES, profileFile, state, index, setIndex, knownEps, saveSettings, pkey, saveShared, visibleProfiles } from './models/store.js';
 import { C, filesNamed, readJson, visibleChildren, megaMessage, login, connect, downloadUrl } from './models/mega.js';
 import { langsOf, loadProfileState, nodePath, makeEpisode, isPlayable, buildLibrary, buildIndex, learnAudioLang, setLangPref, setLibrary, librarySignature } from './models/library.js';
@@ -31,10 +32,12 @@ import { saveChapterCache, rangeReader, cacheChapters, formatProblem, formatSumm
 import { hydrateThumbs } from './views/thumbs.js';
 import { nextFor } from './models/plans.js';
 import { seriesColor } from './models/fichas.js';
-import { header, movieHref, setTint, posterAny, entryTile, seasonHref, app, resetPosterCache } from './views/components.js';
+import { header, setTint, posterAny, entryTile, app, resetPosterCache } from './views/components.js';
 import { setHero, renderHome } from './views/home.js';
 import { dlButton, episodeRow } from './views/episodes.js';
 import { renderSeries, renderMovie } from './views/series.js';
+import { route } from './lib/route.js';
+import { resolveContext, titleFor } from './models/context.js';
 
 on('quota', paintQuota);
 on('navigate', ({ hash, replace }) => {
@@ -86,44 +89,6 @@ function refreshLibrary(rerender = true) {
 /* ───────────────────────── miniaturas ───────────────────────── */
 
 /* ───────────────────────── capítulos fuera de la biblioteca ───────────────────────── */
-
-/** Todo lo que el reproductor necesita: el capítulo, su lista y a dónde vuelve. */
-function resolveContext(id) {
-  const e = index.byId.get(id);
-  if (e) {
-    const s = state.library.series[e.si];
-    const season = s.seasons[e.ki];
-    // un capítulo en el idioma que no está elegido (desde Descargados, por ejemplo): la lista sigue en su idioma
-    const list = e.ei >= 0 || !season.full ? season.episodes : season.full.filter((x) => !index.twins.has(x.path) || x.lang === e.ep.lang);
-    return {
-      // la lista del reproductor es solo la temporada: al terminarla, Kai se detiene (no pasa sola a la siguiente)
-      ep: e.ep, list, shown: list, title: s.name,
-      sub: isCollection(s) ? '' : s.seasons.length > 1 ? seasonLabel(s, season) : (hasOwnTitle(season) && season.title !== s.name ? season.title : ''),
-      ki: e.ki,
-      back: isCollection(s) ? movieHref(e.si, itemFor(s, e.ep).key) : seasonHref(e.si, s, e.ki), si: e.si,
-    };
-  }
-  const node = state.storage && state.storage.files[id];
-  if (node && node.parent && isPlayable(node)) {
-    const parent = node.parent;
-    const kids = visibleChildren(parent);
-    const list = sortEpisodes(kids.filter(isPlayable).map((f) => index.byId.get(f.nodeId)?.ep || makeEpisode(f, nodePath(parent), kids)));
-    list.forEach((x) => { if (!index.byId.has(x.id)) knownEps.set(x.id, x); });
-    const name = parent === state.storage.root ? 'Mi MEGA' : parent.name;
-    return { ep: list.find((x) => x.id === id), list, shown: list, title: name, sub: '', back: '#/explorar/' + parent.nodeId };
-  }
-  const m = state.dlMeta.get(id);
-  if (m && m.ep) {
-    const list = sortEpisodes([...state.dlMeta.values()].filter((x) => x.ep && x.title === m.title).map((x) => x.ep));
-    return { ep: m.ep, list, shown: list, title: m.title || 'Descargados', sub: '', back: '#/descargas' };
-  }
-  return null;
-}
-
-function titleFor(ep) {
-  const c = resolveContext(ep.id);
-  return c ? c.title : '';
-}
 
 /* ───────────────────────── progreso ───────────────────────── */
 
@@ -228,12 +193,6 @@ async function exportCopy(ep) {
 
 /* ───────────────────────── rutas y vistas ───────────────────────── */
 
-function route() {
-  const h = location.hash.replace(/^#\/?/, '');
-  const [path, query = ''] = h.split('?');
-  const [view, ...rest] = path.split('/');
-  return { view: view || 'home', arg: decodeURIComponent(rest.join('/')), q: new URLSearchParams(query) };
-}
 /* Historial propio de Kai: "volver" salta las entradas que son la misma página (otra pestaña o
  * temporada de la misma serie) hasta llegar a una distinta, en vez de retroceder de a un paso. */
 const navStack = [location.hash || '#/'];
@@ -802,7 +761,6 @@ function paintHomeSearch() {
 /* ── películas: el estante (la carpeta) y la página de cada una ── */
 
 /* ── selección de varios capítulos de una temporada para descargarlos juntos ── */
-
 
 /* Las imágenes aparecen con un fundido solo la primera vez que se cargan. Al redibujar una página (o volver a
  * ella) las que ya estaban cargadas se muestran de una vez: si no, todas parpadeaban en cada cambio. */

@@ -5,6 +5,7 @@
 
 import { resumeOffer } from '../models/progress.js';
 import { app } from './components.js';
+import { movieHref } from '../lib/route.js';
 import { state } from '../models/store.js';
 import { esc, $, fmtLeft, plural, fmtTime } from '../lib/util.js';
 import {
@@ -14,7 +15,6 @@ import {
   factsHTML,
   setTint,
   tileHTML,
-  movieHref,
   seriesPosterHTML,
   moviePosterHTML,
 } from './components.js';

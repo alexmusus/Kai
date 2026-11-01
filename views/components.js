@@ -11,7 +11,9 @@ import { newEpisodes } from '../models/news.js';
 import { prog } from '../models/progress.js';
 import { langsOf } from '../models/library.js';
 import { shelfItems } from '../models/plans.js';
-import { isCollection, movieTitle } from '../models/collections.js';
+import { movieTitle } from '../models/collections.js';
+import { movieHref } from '../lib/route.js';
+import { seasonHref } from '../models/context.js';
 
 /** Donde se dibuja cada página. */
 export const app = $('#app');
@@ -28,8 +30,6 @@ export function header(title, { actions = '', overlay = false } = {}) {
   </header>`;
 }
 
-/** Dirección de la página de una película de la colección. */
-export const movieHref = (si, key) => `#/pelicula/${si}/${encodeURIComponent(key)}`;
 export function collageHTML(urls, cls = '') {
   const u = urls.slice(0, 4);
   return `<span class="collage n${u.length} ${cls}" aria-hidden="true">${u.map((x) => `<img src="${esc(x)}" alt="" loading="lazy" decoding="async">`).join('')}</span>`;
@@ -182,11 +182,6 @@ export function entryTile(e) {
   </a>`;
 }
 
-/** Dirección de una temporada: con varias, cada una tiene su página (#/serie/3/1); con una sola, la serie. */
-export function seasonHref(si, s, ki) {
-  return s && !isCollection(s) && s.seasons.length > 1 ? `#/serie/${si}/${ki}` : `#/serie/${si}`;
-}
-
 export function moviePosterHTML(s, si, { it, m, plan }, fresh) {
   const t = movieTitle(s, it);
   const isNew = it.eps.some((e) => fresh.has(e.id));
@@ -202,3 +197,5 @@ export function moviePosterHTML(s, si, { it, m, plan }, fresh) {
     ${sub ? `<span class="shelf-sub">${esc(sub)}</span>` : ''}
   </a></li>`;
 }
+
+export { seasonHref };
