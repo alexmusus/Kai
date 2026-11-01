@@ -7,6 +7,10 @@ import { DARK_TONES, TONES, profileFile, state, index, setIndex, knownEps, saveS
 import { C, filesNamed, readJson, visibleChildren, megaMessage, login, connect, downloadUrl } from './models/mega.js';
 import { langsOf, loadProfileState, nodePath, makeEpisode, isPlayable, buildLibrary, buildIndex, langPref, learnAudioLang, setLangPref, setLibrary, librarySignature } from './models/library.js';
 
+import * as downloads from './models/downloads.js';
+import { setInUseCheck, removeAllDownloads, refreshSaved, resumePendingDownloads, removeDownload, localBlob, holdWake, canFolder, currentDir, getDir, dirPermission, dirAccess, flushFolder, useFolder, forgetFolder } from './models/downloads.js';
+import { episodeLabel } from './models/collections.js';
+import { nextUnseen } from './models/progress.js';
 import { on } from './lib/events.js';
 import { syncShared, syncProgress } from './models/sync.js';
 import { countBytes, noteQuota, quotaUntil, refreshAccountInfo } from './models/quota.js';
@@ -24,6 +28,12 @@ import { thumbFor } from './models/thumbs.js';
 const app = $('#app');
 
 on('quota', paintQuota);
+on('notice', (text) => toast(text));
+on('download-changed', (id) => { paintEpisode(id); paintDrawerCount(); });
+on('download-done', (ep) => { cacheChapters(ep).catch(() => {}); });
+on('downloads-removed', () => { if (route().view === 'descargas') renderDownloads(); });
+on('folder-moved', () => paintSpace());
+setInUseCheck((id) => !!(playing && playing.ep.id === id));
 on('news', () => paintNewsDot());
 on('tree-changed', () => refreshLibrary());
 on('meta-changed', (views) => { if (views.includes(route().view)) softRender(); });
@@ -40,17 +50,6 @@ loadProfileState();
 
 /* ───────────────────────── nombres → capítulos ───────────────────────── */
 
-function episodeLabel(ep) {
-  const e = index.byId.get(ep.id);
-  const s = e && state.library && state.library.series && state.library.series[e.si];
-  if (isCollection(s)) {
-    const it = itemFor(s, ep);
-    const m = itemMeta(s, it.key);
-    const t = it.title || (m && m.title) || ep.name.replace(/\.[^.]+$/, '');
-    return it.eps.length > 1 ? `${t} · parte ${it.eps.indexOf(ep) + 1}` : t;
-  }
-  return ep.ep != null ? `Episodio ${ep.ep}` : ep.name.replace(/\.[^.]+$/, '');
-}
 
 /* ───────────────────────── IndexedDB ───────────────────────── */
 
@@ -277,326 +276,27 @@ function paintSync() {
 
 /* ───────────────────────── descargas ───────────────────────── */
 
-const CHUNK = 4 * 1024 * 1024;
-const PARALLEL = 3;
-let wakeLock = null;
-
-async function refreshSaved() {
-  const metas = await idb.all('dl').catch(() => []);
-  state.dlMeta = new Map(metas.map((m) => [m.id, m]));
-  state.saved = new Set(metas.filter((m) => m.done).map((m) => m.id));
-  return metas;
-}
-
-async function holdWake() {
-  try {
-    if (!wakeLock && 'wakeLock' in navigator && document.visibilityState === 'visible') {
-      wakeLock = await navigator.wakeLock.request('screen');
-      wakeLock.addEventListener('release', () => { wakeLock = null; });
-    }
-  } catch { /* no soportado */ }
-}
-function releaseWake() {
-  if (!Object.keys(state.dls).length && !state.queue.length && wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
-}
-
-/** Pone un capítulo en la cola; se descarga uno a la vez. */
+/** Pone un capítulo en la cola de descargas (con el nombre de su serie para agruparlo en Descargados). */
 function queueDownload(ep, title) {
-  if (state.dls[ep.id] || state.saved.has(ep.id) || state.queue.some((q) => q.ep.id === ep.id)) return;
-  if (!navigator.onLine) { toast('Necesitas conexión para descargar.'); return; }
-  state.queue.push({ ep, title: title || titleFor(ep) });
-  askFolderIfNeeded();
-  paintEpisode(ep.id);
-  pumpDownloads();
+  downloads.queueDownload(ep, title || titleFor(ep));
 }
-
-let downloading = null;
-async function pumpDownloads() {
-  if (downloading || !state.queue.length) return;
-  const job = state.queue.shift();
-  downloading = runDownload(job.ep, job.title).finally(() => {
-    downloading = null;
-    pumpDownloads();
-  });
-}
-
 function downloadAndWait(ep, title) {
-  queueDownload(ep, title);
-  return new Promise((resolve) => {
-    const check = () => {
-      if (state.saved.has(ep.id) || (!state.dls[ep.id] && !state.queue.some((q) => q.ep.id === ep.id))) resolve();
-      else setTimeout(check, 400);
-    };
-    check();
-  });
+  return downloads.downloadAndWait(ep, title || titleFor(ep));
 }
 
-async function runDownload(ep, title) {
-  const task = { loaded: 0, total: ep.size, ctrl: new AbortController() };
-  state.dls[ep.id] = task;
-  paintEpisode(ep.id);
-  holdWake();
-  try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch { /* nada */ }
-  try {
-    const meta = (await idb.get('dl', ep.id)) || { id: ep.id, done: false, at: Date.now() };
-    Object.assign(meta, { ep, title: title || meta.title || '', size: ep.size, mime: ep.mime, path: ep.path });
-    await idb.put('dl', meta);
-    state.dlMeta.set(ep.id, meta);
-    const have = new Set((await idb.chunkKeys(ep.id)).map((k) => k[1]));
-    const n = Math.ceil(ep.size / CHUNK);
-    const todo = [];
-    for (let i = 0; i < n; i++) if (!have.has(i)) todo.push(i);
-    task.loaded = Math.min(ep.size, (n - todo.length) * CHUNK);
-    const fk = await C.fileKey(ep.key);
-    let url = await downloadUrl(ep.id);
-    let lastPaint = 0;
-
-    const worker = async () => {
-      while (todo.length) {
-        if (task.ctrl.signal.aborted) return;
-        const i = todo.shift();
-        const start = i * CHUNK;
-        const end = Math.min(ep.size, start + CHUNK) - 1;
-        for (let tries = 0; ; tries++) {
-          try {
-            const data = await C.readRange(url, fk, start, end, task.ctrl.signal);
-            await idb.put('chunks', { id: ep.id, i, blob: new Blob([data]) });
-            task.loaded += data.length;
-            countBytes(data.length);
-            break;
-          } catch (err) {
-            if (task.ctrl.signal.aborted) return;
-            if (err.code === 'QUOTA') noteQuota(err.timeLeft || 3600);
-            if (err.code === 'QUOTA' || tries >= 4) throw err;
-            if (err.code === 'HTTP') url = await downloadUrl(ep.id, true);
-            await sleep(800 * (tries + 1));
-          }
-        }
-        if (Date.now() - lastPaint > 250) { lastPaint = Date.now(); paintEpisode(ep.id); }
-      }
-    };
-    await Promise.all(Array.from({ length: PARALLEL }, worker));
-    if (task.ctrl.signal.aborted) return;
-
-    meta.done = true;
-    await idb.put('dl', meta);
-    state.saved.add(ep.id);
-    state.dlMeta.set(ep.id, meta);
-    cacheChapters(ep).catch(() => {});
-    let where = '';
-    if (await getDir()) {
-      try {
-        where = (await moveToFolder(ep.id)) ? ' en tu carpeta' : '';
-        if (!where) toast(`${episodeLabel(ep)} quedó dentro de la app: Kai no tiene permiso para tu carpeta ahora (Ajustes → Permitir acceso).`);
-      } catch {
-        toast(`No se pudo guardar ${episodeLabel(ep)} en tu carpeta; quedó dentro de la app.`);
-      }
-    }
-    if (where || !(await getDir())) toast(`${episodeLabel(ep)} listo para ver sin conexión${where}.`);
-  } catch (err) {
-    if (!task.ctrl.signal.aborted) toast(megaMessage(err));
-  } finally {
-    delete state.dls[ep.id];
-    paintEpisode(ep.id);
-    paintDrawerCount();
-    releaseWake();
-  }
-}
-
-async function removeDownload(id, quiet = false) {
-  const t = state.dls[id];
-  if (t) t.ctrl.abort();
-  state.queue = state.queue.filter((q) => q.ep.id !== id);
-  const meta = state.dlMeta.get(id) || (await idb.get('dl', id).catch(() => null));
-  if (meta && meta.where === 'folder' && meta.rel) {
-    // sin permiso ahora: se borra la próxima vez que Kai pueda entrar a la carpeta
-    if (!(await deleteFromFolder(meta.rel, meta.dirKey))) LS.set('folderTrash', [...LS.get('folderTrash', []), { rel: meta.rel, dirKey: meta.dirKey }]);
-  }
-  await idb.dropChunks(id).catch(() => {});
-  await idb.del('dl', id).catch(() => {});
-  state.saved.delete(id);
-  state.dlMeta.delete(id);
-  delete state.dls[id];
-  paintEpisode(id);
-  paintDrawerCount();
-  if (!quiet) toast('Quitado del dispositivo.');
-  if (route().view === 'descargas') renderDownloads();
-}
-
-async function resumePendingDownloads() {
-  const metas = await refreshSaved();
-  if (!navigator.onLine) return;
-  for (const m of metas) {
-    if (m.done) continue;
-    const ep = (index.byId.get(m.id) || {}).ep || m.ep;
-    if (ep) queueDownload(ep, m.title); else removeDownload(m.id, true);
-  }
-}
-
-const playType = (ep) => (ep.mime === 'video/x-matroska' ? 'video/webm' : ep.mime);
-
-/** El capítulo descargado: de la carpeta elegida o de la app. Lanza NOFOLDER / NOFILE si está en una carpeta que no se puede abrir. */
-async function localBlob(ep, ask = false) {
-  if (!state.saved.has(ep.id)) return null;
-  const meta = state.dlMeta.get(ep.id) || (await idb.get('dl', ep.id).catch(() => null));
-  if (meta && meta.where === 'folder') {
-    const dir = await dirAccess(meta.dirKey, ask);
-    if (!dir) throw new Error('NOFOLDER');
-    try {
-      const { file } = await fileAt(dir, meta.rel, false);
-      const f = await file.getFile();
-      return f.slice(0, f.size, playType(ep)); // sin copiar: solo le pone el tipo
-    } catch { throw new Error('NOFILE'); }
-  }
-  const chunks = await idb.chunks(ep.id);
-  if (!chunks.length) return null;
-  chunks.sort((a, b) => a.i - b.i);
-  return new Blob(chunks.map((c) => c.blob), { type: playType(ep) });
-}
-
-/* ── carpeta de descargas ──
- * Chrome y Edge (computadora y Android) dejan que la página escriba en una carpeta que tú eliges.
- * Cada capítulo se baja primero a la app (así se puede reanudar) y al terminar se pasa a la
- * carpeta como un MP4 normal (Serie/Temporada/archivo.mp4); la copia de la app se borra.
- * Safari (Mac y iPhone) y Firefox no lo permiten: ahí se puede guardar una copia aparte. */
-const canFolder = typeof window.showDirectoryPicker === 'function';
-// El acceso a cada carpeta elegida se guarda en 'subcache' (para no cambiar la versión de la base)
-// con una clave propia; las descargas solo anotan esa clave. La carpeta actual va en localStorage.
-const handleCache = new Map();
-let dirHandle = null; // carpeta actual ya leída (para mostrar su nombre sin esperar)
-
-async function loadHandle(key) {
-  if (!key || !canFolder) return null;
-  if (!handleCache.has(key)) handleCache.set(key, (await idb.get('subcache', key).catch(() => null)) || null);
-  return handleCache.get(key);
-}
-async function getDir() {
-  dirHandle = await loadHandle(LS.get('dirKey', ''));
-  return dirHandle;
-}
-async function dirPermission(d) {
-  try { return await d.queryPermission({ mode: 'readwrite' }); } catch { return 'denied'; }
-}
-/** La carpeta lista para usar, o null. Con `ask` pide permiso (solo funciona justo después de un toque). */
-async function dirAccess(d, ask = false) {
-  if (typeof d === 'string') d = await loadHandle(d);
-  d = d || (await getDir());
-  if (!d) return null;
-  if ((await dirPermission(d)) === 'granted') return d;
-  if (!ask) return null;
-  try { return (await d.requestPermission({ mode: 'readwrite' })) === 'granted' ? d : null; } catch { return null; }
-}
-/** Si hay carpeta sin permiso y el usuario acaba de tocar algo, aprovecha para pedirlo. */
-function askFolderIfNeeded() {
-  if (!canFolder || !(navigator.userActivation && navigator.userActivation.isActive)) return;
-  getDir().then(async (d) => {
-    if (d && (await dirPermission(d)) === 'prompt' && (await dirAccess(d, true))) flushFolder();
-  });
-}
-
-const safeName = (s) => String(s || '').replace(/[\\/:*?"<>|\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').trim().replace(/[. ]+$/, '') || 'Kai';
-/** Ruta dentro de la carpeta: la misma de MEGA sin la carpeta de series, p. ej. Fate/1. Fate UBW/472_0_SUB.mp4 */
-function folderRel(ep, title) {
-  let p = String(ep.path || ep.name);
-  const root = String(state.settings.root || '').replace(/^\/+|\/+$/g, '');
-  if (root && p.toLowerCase().startsWith(root.toLowerCase() + '/')) p = p.slice(root.length + 1);
-  const parts = p.split('/').filter(Boolean);
-  if (parts.length < 2) parts.unshift(title || 'Kai');
-  return parts.map(safeName);
-}
-async function fileAt(dir, rel, create) {
-  let d = dir;
-  const dirs = [d];
-  for (const part of rel.slice(0, -1)) { d = await d.getDirectoryHandle(part, { create }); dirs.push(d); }
-  return { dirs, file: await d.getFileHandle(rel[rel.length - 1], { create }) };
-}
-
-/** Pasa un capítulo ya descargado en la app a la carpeta. */
-async function moveToFolder(id) {
-  const meta = await idb.get('dl', id);
-  if (!meta || !meta.done || meta.where === 'folder' || !meta.ep) return false;
-  const dir = await dirAccess(null);
-  if (!dir) return false;
-  const ep = meta.ep;
-  const rel = folderRel(ep, meta.title);
-  const { file } = await fileAt(dir, rel, true);
-  const w = await file.createWritable();
-  try {
-    const n = Math.ceil(ep.size / CHUNK);
-    for (let i = 0; i < n; i++) {
-      const c = await idb.get('chunks', [id, i]);
-      if (!c) throw new Error('Falta una parte del capítulo');
-      await w.write(c.blob);
-    }
-    await w.close();
-  } catch (err) {
-    try { await w.abort(); } catch { /* nada */ }
-    throw err;
-  }
-  Object.assign(meta, { where: 'folder', rel, dirKey: LS.get('dirKey', '') });
-  await idb.put('dl', meta);
-  state.dlMeta.set(id, meta);
-  await idb.dropChunks(id).catch(() => {});
-  return true;
-}
-
-let flushing = null;
-/** Mueve a la carpeta lo que quedó en la app y borra lo que estaba pendiente de borrar. */
-function flushFolder() {
-  if (flushing) return flushing;
-  flushing = (async () => {
-    if (!(await dirAccess(null))) return 0;
-    let moved = 0;
-    for (const m of await idb.all('dl').catch(() => [])) {
-      if (!m.done || m.where === 'folder' || (playing && playing.ep.id === m.id)) continue;
-      try { if (await moveToFolder(m.id)) moved++; } catch { /* queda en la app */ }
-    }
-    const trash = LS.get('folderTrash', []);
-    const left = [];
-    for (const t of trash) { if (!(await deleteFromFolder(t.rel, t.dirKey))) left.push(t); }
-    LS.set('folderTrash', left);
-    if (moved) { toast(`${plural(moved, 'capítulo pasó', 'capítulos pasaron')} a tu carpeta.`); paintSpace(); }
-    return moved;
-  })().finally(() => { flushing = null; });
-  return flushing;
-}
-
-/** Borra un archivo de la carpeta y las carpetas de serie y temporada si quedan vacías. */
-async function deleteFromFolder(rel, d) {
-  const dir = await dirAccess(d);
-  if (!dir) return false;
-  try {
-    const { dirs } = await fileAt(dir, rel, false);
-    await dirs[dirs.length - 1].removeEntry(rel[rel.length - 1]);
-    for (let i = dirs.length - 1; i > 0; i--) {
-      let empty = true;
-      for await (const _ of dirs[i].keys()) { empty = false; break; } // eslint-disable-line no-unused-vars
-      if (!empty) break;
-      await dirs[i - 1].removeEntry(rel[i - 1]);
-    }
-  } catch (err) {
-    if (err && err.name !== 'NotFoundError') return false;
-  }
-  return true;
-}
-
+/** Elegir la carpeta de descargas (Chrome y Edge): el selector del navegador y el permiso. */
 async function pickFolder() {
   let d;
   try { d = await window.showDirectoryPicker({ id: 'kai-descargas', mode: 'readwrite', startIn: 'videos' }); } catch { return; } // canceló
   if (!(await dirAccess(d, true))) { toast('Kai necesita permiso para guardar en esa carpeta.'); return; }
-  const key = 'kai:carpeta:' + Date.now().toString(36);
-  await idb.put('subcache', d, key);
-  handleCache.set(key, d);
-  LS.set('dirKey', key);
-  dirHandle = d;
+  await useFolder(d);
   toast(`Las descargas se guardarán en «${d.name}».`);
   if (route().view === 'ajustes') renderSettings();
   flushFolder();
 }
-async function dropFolder() {
+function dropFolder() {
   if (!confirm('Las descargas nuevas se guardarán dentro de la app. Lo que ya está en la carpeta se queda ahí y Kai lo sigue usando.')) return;
-  LS.del('dirKey'); // el acceso guardado se queda: lo usan las descargas que ya están en esa carpeta
-  dirHandle = null;
+  forgetFolder();
   if (route().view === 'ajustes') renderSettings();
 }
 
@@ -614,10 +314,6 @@ async function exportCopy(ep) {
   setTimeout(() => URL.revokeObjectURL(url), 120000);
 }
 
-function nextUnseen(ep, list, n) {
-  const i = list.findIndex((x) => x.id === ep.id);
-  return list.slice(i + 1).filter((x) => !(prog(x) || {}).w).slice(0, n);
-}
 
 /* ───────────────────────── rutas y vistas ───────────────────────── */
 
@@ -2218,7 +1914,7 @@ function downloadsWhereHTML(perm = '') {
       <p class="settings-value">Dentro de la app</p>
       <p class="dim">Este navegador no deja que una página guarde en una carpeta (Chrome y Edge en computadora sí lo permiten). Si quieres el archivo aparte, toca ⋯ en un capítulo descargado y elige «Guardar copia en el dispositivo».</p>`;
   }
-  const d = dirHandle;
+  const d = currentDir();
   if (!d) {
     return `<p class="settings-label">Descargas</p>
       <p class="settings-value">Dentro de la app</p>
@@ -3720,13 +3416,7 @@ document.addEventListener('click', async (e) => {
     toast(state.syncState === 'error' ? 'No se pudo sincronizar. Revisa la conexión.' : 'Progreso sincronizado.');
   } else if (act === 'clear-dl') {
     if (!confirm('¿Quitar todos los capítulos descargados de este dispositivo?')) return;
-    Object.values(state.dls).forEach((t) => t.ctrl.abort());
-    state.queue = [];
-    for (const m of await idb.all('dl').catch(() => [])) {
-      if (m.where === 'folder' && m.rel && !(await deleteFromFolder(m.rel, m.dirKey))) LS.set('folderTrash', [...LS.get('folderTrash', []), { rel: m.rel, dirKey: m.dirKey }]);
-    }
-    await idb.clear('chunks'); await idb.clear('dl');
-    state.saved.clear(); state.dlMeta.clear();
+    await removeAllDownloads();
     toast('Descargas quitadas.');
     render();
   } else if (act === 'logout') {

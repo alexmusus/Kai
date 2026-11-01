@@ -178,3 +178,15 @@ export function continueList() {
   }
   return out.sort((a, b) => b.u - a.u);
 }
+
+/**
+ * Los próximos `n` capítulos sin ver después de `ep` en la lista (para "descargar los 3 siguientes").
+ * @param {Episode} ep @param {Episode[]} list @param {number} n
+ */
+export function nextUnseen(ep, list, n) {
+  const i = list.findIndex((x) => x.id === ep.id);
+  return list
+    .slice(i + 1)
+    .filter((x) => !(prog(x) || {}).w)
+    .slice(0, n);
+}

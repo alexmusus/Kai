@@ -105,3 +105,19 @@ export function movieTitle(s, it) {
     );
   return it.title || (m && m.title) || it.query || fileName;
 }
+
+/**
+ * Nombre de un capítulo en avisos y tarjetas: "Episodio 5", o el título de la película ("Your Name · parte 2").
+ * @param {Episode} ep
+ */
+export function episodeLabel(ep) {
+  const e = index.byId.get(ep.id);
+  const s = e && state.library && state.library.series && state.library.series[e.si];
+  const it = s && isCollection(s) ? itemFor(s, ep) : null;
+  if (s && it) {
+    const m = itemMeta(s, it.key);
+    const t = it.title || (m && m.title) || ep.name.replace(/\.[^.]+$/, '');
+    return it.eps.length > 1 ? `${t} · parte ${it.eps.indexOf(ep) + 1}` : t;
+  }
+  return ep.ep != null ? `Episodio ${ep.ep}` : ep.name.replace(/\.[^.]+$/, '');
+}
