@@ -1,43 +1,48 @@
-import { isSubtitleName, mp4Info, mp4Chapters, mp4Formats, pickIntro, OUTRO_RE as OUTRO } from './models/subs.js';
-import { movieHref } from './lib/route.js';
-import { tmdbCheckKey, translateToSpanish, recommendationsFor, airingTop, toDiscover } from './models/meta-api.js';
-import { $, LS, esc, sleep, debounce, fmtTime, fmtSize, hue, plural } from './lib/util.js';
+import { mp4Info, mp4Chapters, mp4Formats, pickIntro, OUTRO_RE as OUTRO } from './models/subs.js';
+import { translateToSpanish } from './models/meta-api.js';
+import { $, LS, esc, sleep, fmtTime, fmtSize, hue, plural } from './lib/util.js';
 import { ICON } from './views/icons.js';
-import { sortEpisodes } from './models/naming.js';
-import { DARK_TONES, TONES, profileFile, state, index, setIndex, knownEps, saveSettings, pkey, saveShared, visibleProfiles } from './models/store.js';
-import { C, filesNamed, readJson, visibleChildren, megaMessage, login, connect, downloadUrl } from './models/mega.js';
-import { langsOf, loadProfileState, nodePath, makeEpisode, isPlayable, buildLibrary, buildIndex, learnAudioLang, setLangPref, setLibrary, librarySignature } from './models/library.js';
+import { DARK_TONES, TONES, state, index, setIndex, saveSettings, pkey, saveShared, visibleProfiles } from './models/store.js';
+import { C, megaMessage, login, connect, downloadUrl } from './models/mega.js';
+import { loadProfileState, nodePath, buildLibrary, buildIndex, learnAudioLang, setLangPref, setLibrary, librarySignature } from './models/library.js';
 
 import * as downloads from './models/downloads.js';
-import { setInUseCheck, removeAllDownloads, refreshSaved, resumePendingDownloads, removeDownload, localBlob, holdWake, canFolder, currentDir, getDir, dirPermission, dirAccess, flushFolder, useFolder, forgetFolder } from './models/downloads.js';
+import { setInUseCheck, removeAllDownloads, refreshSaved, resumePendingDownloads, removeDownload, localBlob, holdWake, getDir, dirAccess, flushFolder, useFolder, forgetFolder } from './models/downloads.js';
 import { episodeLabel } from './models/collections.js';
 import { nextUnseen, resumeOffer } from './models/progress.js';
 import { viewState } from './views/view-state.js';
 import { startPicking, endPicking, pickAction } from './controllers/picking.js';
+import { isUpdateReady, markUpdateReady, setRegistration, findUpdate } from './models/updates.js';
 import { on } from './lib/events.js';
 import { syncShared, syncProgress } from './models/sync.js';
 import { countBytes, noteQuota, quotaUntil, refreshAccountInfo } from './models/quota.js';
 import { quotaText, paintQuota } from './views/quota.js';
-import { isCine, isCollection, collectionItems, itemMetaKey, itemFor, movieTitle, itemMeta } from './models/collections.js';
-import { prog, setProgress, markNow, isLater, mergeProgress } from './models/progress.js';
+import { isCollection, collectionItems, itemMetaKey, itemFor, movieTitle } from './models/collections.js';
+import { prog, setProgress, markNow, isLater } from './models/progress.js';
 import { setLaterFlag } from './models/progress.js';
 import { profilesFromBackup, normName } from './models/profiles.js';
-import { seasonLabel, saveMeta, seasonMeta, metaFor, tmdbKey } from './models/fichas.js';
-import { ensureMeta, saveSyn, translateMissing, syncSynopses, syncFichas, resetFichas } from './models/fichas-sync.js';
+import { seasonLabel, saveMeta } from './models/fichas.js';
+import { setTmdbKey, ensureMeta, saveSyn, translateMissing, syncSynopses, syncFichas, resetFichas } from './models/fichas-sync.js';
 import { idb } from './models/idb.js';
-import { saveKnown, initKnown, newEpisodes, markSeriesSeen, newsList, hasUnreadNews, announceNew } from './models/news.js';
+import { saveKnown, initKnown, newEpisodes, markSeriesSeen, hasUnreadNews, announceNew } from './models/news.js';
 import { epById } from './models/library.js';
 import { thumbFor } from './models/thumbs.js';
 import { saveChapterCache, rangeReader, cacheChapters, formatProblem, formatSummary, rememberCodec } from './models/media.js';
 import { hydrateThumbs } from './views/thumbs.js';
 import { nextFor } from './models/plans.js';
 import { seriesColor } from './models/fichas.js';
-import { header, setTint, posterAny, entryTile, app, resetPosterCache } from './views/components.js';
+import { header, setTint, app } from './views/components.js';
 import { setHero, renderHome } from './views/home.js';
 import { dlButton, episodeRow } from './views/episodes.js';
 import { renderSeries, renderMovie } from './views/series.js';
 import { route } from './lib/route.js';
 import { resolveContext, titleFor } from './models/context.js';
+import { paintSync, paintDrawerCount, paintNewsDot } from './views/dock.js';
+import { renderCatalog, openHomeSearch, closeHomeSearch } from './views/catalog.js';
+import { renderExplorer } from './views/explorer.js';
+import { renderDownloads } from './views/downloads.js';
+import { newsHTML, paintSeenByAll, renderSettings, paintCineKey, paintDownloadsWhere, paintSpace } from './views/settings.js';
+import { renderDiscover, openDiscoverSheet, closeSheet } from './views/discover.js';
 
 on('quota', paintQuota);
 on('navigate', ({ hash, replace }) => {
@@ -136,19 +141,6 @@ async function doSync() {
     console.warn('sync', err);
   }
   paintSync();
-}
-
-/** El estado de sincronización vive en el botón flotante: ruedita azul mientras sincroniza, puntito verde si está al día. */
-const SYNC_LABEL = { offline: 'sin conexión', syncing: 'sincronizando', pending: 'por sincronizar', ok: 'al día' };
-function paintSync() {
-  const d = $('#dock');
-  if (!d) return;
-  const offline = !navigator.onLine;
-  const pending = state.dirty || state.syncState === 'error';
-  const st = offline ? 'offline' : state.syncState === 'syncing' ? 'syncing' : pending ? 'pending' : 'ok';
-  d.dataset.sync = st;
-  const btn = d.querySelector('.dock-btn');
-  if (btn && btn.dataset.name) btn.setAttribute('aria-label', `Menú (${btn.dataset.name}), ${SYNC_LABEL[st]}${hasUnreadNews() ? ', hay novedades' : ''}`);
 }
 
 /* ───────────────────────── descargas ───────────────────────── */
@@ -361,10 +353,6 @@ if (UP_ENABLED) {
 
 // nombres antiguos que aún usan otras partes
 const closeDrawer = closeDock;
-function paintDrawerCount() {
-  const el = $('#dock-count');
-  if (el) el.textContent = state.saved.size || '';
-}
 // Con el menú abierto, tocar fuera solo lo cierra: ese toque no abre un capítulo, ni reproduce, ni sigue un enlace.
 let dockSwallow = 0; // hasta cuándo se ignora el clic de ese toque
 document.addEventListener('pointerdown', (e) => {
@@ -520,211 +508,12 @@ function selectProfile(id) {
 
 /* ── capítulos nuevos ── */
 
-function paintNewsDot() {
-  const btn = dock && dock.querySelector('.dock-btn');
-  if (btn) btn.classList.toggle('has-news', hasUnreadNews());
-}
-function newsHTML() {
-  const lib = state.library && state.library.v === 2 ? state.library : null;
-  const items = newsList();
-  const ago = (t) => {
-    const m = Math.round((Date.now() - t) / 60000);
-    return m < 60 ? `hace ${Math.max(1, m)} min` : m < 1440 ? `hace ${Math.round(m / 60)} h` : `hace ${Math.round(m / 1440)} d`;
-  };
-  const rows = items.map((x) => {
-    const si = lib ? lib.series.findIndex((s) => s.name === x.name) : -1;
-    const what = `${x.n === 1 ? 'un capítulo nuevo' : `${x.n} capítulos nuevos`}`;
-    const label = `<strong>${esc(x.name)}</strong>: ${what} <span class="dim">· ${ago(x.at)}</span>`;
-    return `<li>${si >= 0 ? `<a href="#/serie/${si}">${label}</a>` : label}</li>`;
-  });
-  return `<p class="settings-label">Novedades</p>
-    ${rows.length ? `<ul class="news-list">${rows.join('')}</ul><button class="btn btn-quiet" data-act="news-clear">Limpiar</button>`
-      : '<p class="dim">Aquí aparece lo que se agregue a tu MEGA. Por ahora no hay nada nuevo.</p>'}
-    ${!rows.length && lib && lib.series.some((s) => newEpisodes(s).length) ? '<button class="btn btn-quiet" data-act="news-clear">Quitar las burbujas de "nuevo"</button>' : ''}`;
-}
-
 /* ── sinopsis e imágenes ── */
 
 /* ── portada estilo TV ── */
 
-/* ── Ajustes: lo que ya vieron todos los perfiles (solo informa; no borra nada) ── */
-async function paintSeenByAll(btn) {
-  const box = $('#seen-all-list');
-  if (!box) return;
-  const profiles = visibleProfiles().filter((p) => !p.mergedInto);
-  if (profiles.length < 2) { box.innerHTML = '<p class="dim">Solo hay un perfil: aquí aparecerá lo que hayan visto todos cuando haya más.</p>'; return; }
-  if (!state.storage || !state.library || state.library.v !== 2) { box.innerHTML = '<p class="dim">Necesitas conexión con MEGA para revisar.</p>'; return; }
-  btn.disabled = true;
-  box.innerHTML = '<p class="dim">Revisando el progreso de cada perfil…</p>';
-  try {
-    const home = state.storage.root;
-    const all = [];
-    for (const p of profiles) {
-      if (state.profile && p.id === state.profile.id) { all.push(state.progress); continue; }
-      let items = {};
-      for (const n of filesNamed(home, profileFile(p.id))) {
-        const data = await readJson(n); // si no se puede leer, falla todo: nunca se supone "no visto"
-        if (data && data.items) items = mergeProgress(items, data.items);
-      }
-      all.push(items);
-    }
-    const rows = [];
-    let bytes = 0;
-    for (const sr of state.library.series) {
-      const done = sr.all.filter((ep) => all.every((pr) => (pr[ep.path] || {}).w));
-      if (!done.length) continue;
-      const size = done.reduce((t, ep) => t + (ep.size || 0), 0);
-      bytes += size;
-      const what = isCollection(sr) ? done.map(episodeLabel).join(', ') : done.length === sr.all.length ? 'todos los capítulos' : done.map((ep) => ep.ep != null ? ep.ep : episodeLabel(ep)).join(', ');
-      rows.push(`<li><strong>${esc(sr.name)}</strong>: ${esc(what)} <span class="dim">(${fmtSize(size)})</span></li>`);
-    }
-    box.innerHTML = rows.length
-      ? `<ul class="seen-all">${rows.join('')}</ul><p class="dim">En total ${fmtSize(bytes)} que ya vieron ${profiles.map((p) => p.name).join(', ')}.</p>`
-      : `<p class="dim">Todavía no hay capítulos que hayan terminado todos (${esc(profiles.map((p) => p.name).join(', '))}).</p>`;
-  } catch (err) {
-    box.innerHTML = `<p class="dim">${esc(megaMessage(err.cause || err))}</p>`;
-  } finally {
-    btn.disabled = false;
-  }
-}
-
 /* ── catálogo: todo lo que hay, con buscador y filtros ── */
 
-const norm = (t) => String(t ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-
-/** Series y, de las colecciones, cada película por separado (cada una con sus etiquetas de AniList). */
-function catalogEntries() {
-  const lib = state.library;
-  if (!lib || lib.v !== 2) return [];
-  const out = [];
-  lib.series.forEach((s, si) => {
-    if (isCollection(s)) {
-      for (const it of collectionItems(s)) {
-        const m = itemMeta(s, it.key);
-        const title = it.title || (m && m.title) || it.eps[0].name.replace(/\.[^.]+$/, '');
-        out.push({
-          si, title: movieTitle(s, it), m, img: m && (m.banner || m.cover), year: m && m.year, genres: (m && m.genres) || [], format: 'Película',
-          added: Math.max(0, ...it.eps.map((e) => e.ts || 0)), href: movieHref(si, it.key), movie: it.key, cine: isCine(s), langs: langsOf(it.eps),
-          words: norm([title, m && m.title, m && m.romaji, m && m.native, s.name].join(' ')),
-        });
-      }
-    } else {
-      const m = metaFor(s);
-      out.push({
-        si, title: s.name, m, img: m && (m.banner || m.cover), year: m && m.year, genres: (m && m.genres) || [],
-        format: (m && m.format) || 'Serie', added: s.added || 0, count: s.all.length, langs: langsOf(s.all),
-        words: norm([s.name, m && m.title, m && m.romaji, m && m.native, ...s.seasons.map((se) => se.title)].join(' ')),
-      });
-    }
-  });
-  return out;
-}
-function filterEntries(list, { q = '', g = '', y = '', f = '', l = '' }) {
-  const terms = norm(q).split(/\s+/).filter(Boolean);
-  return list.filter((e) => terms.every((t) => e.words.includes(t))
-    && (!g || e.genres.includes(g)) && (!y || String(e.year) === String(y)) && (!f || e.format === f) && (!l || (e.langs || []).includes(l)));
-}
-function sortEntries(list, o) {
-  const az = (a, b) => a.title.localeCompare(b.title, 'es', { numeric: true });
-  if (o === 'recent') return list.sort((a, b) => (b.added || 0) - (a.added || 0) || az(a, b));
-  if (o === 'year') return list.sort((a, b) => (b.year || 0) - (a.year || 0) || az(a, b));
-  return list.sort(az); // por defecto, A–Z (v37)
-}
-
-/* Dos catálogos, Series y Películas (?t=series | ?t=peliculas). Al buscar o filtrar por una etiqueta,
- * se busca en todo: series y películas juntas. */
-const CAT_TITLES = { series: 'Series', peliculas: 'Películas' };
-const isFiltering = (st) => !!(st.q || st.g || st.y || st.f || st.l);
-function catalogBase(t, st) {
-  const all = catalogEntries().filter((e) => !e.cine || st.q); // Cine no se mezcla: solo aparece al buscar
-  if (!CAT_TITLES[t] || isFiltering(st)) return all;
-  return all.filter((e) => (t === 'peliculas') === !!e.movie);
-}
-function renderCatalog() {
-  const q = route().q;
-  const t = CAT_TITLES[q.get('t')] ? q.get('t') : '';
-  const all = catalogEntries();
-  const count = (key) => {
-    const m = new Map();
-    for (const e of all) for (const v of [].concat(e[key] || [])) if (v) m.set(String(v), (m.get(String(v)) || 0) + 1);
-    return m;
-  };
-  const genres = [...count('genres').entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'es')).map(([v, n]) => [v, `${v} (${n})`]);
-  const years = [...count('year').keys()].sort((a, b) => b - a).map((v) => [v, v]);
-  const formats = [...count('format').keys()].sort().map((v) => [v, v]);
-  const select = (name, label, opts, all = true) => {
-    const cur = q.get(name) || '';
-    const known = !cur || opts.some(([v]) => v === cur);
-    return `<label class="cat-select"><span>${label}</span><select name="${name}">
-      ${all ? `<option value="">Todos</option>` : ''}${opts.map(([v, l]) => `<option value="${esc(v)}" ${v === cur ? 'selected' : ''}>${esc(l)}</option>`).join('')}
-      ${known ? '' : `<option value="${esc(cur)}" selected>${esc(cur)}</option>`}</select></label>`;
-  };
-  app.innerHTML = header(CAT_TITLES[t] || 'Catálogo') + `<main class="catalog" data-t="${t}">
-    <form class="cat-search" id="cat-form" role="search">
-      <span class="search-icon">${ICON.search}</span>
-      <input id="cat-q" name="q" type="search" placeholder="Buscar series y películas" value="${esc(q.get('q') || '')}" autocomplete="off" enterkeyhint="search" aria-label="Buscar">
-    </form>
-    <div class="cat-filters" id="cat-filters">
-      ${select('g', 'Género', genres)}${select('y', 'Año', years)}${select('f', 'Tipo', formats)}
-      ${all.some((e) => e.langs && e.langs.length) ? select('l', 'Idioma', [['sub', 'Subtitulado'], ['dob', 'Doblado']]) : ''}
-      ${select('o', 'Orden', [['az', 'A–Z'], ['recent', 'Recientes'], ['year', 'Año']], false)}
-      <button class="link-btn cat-clear" type="button" data-act="cat-clear" hidden>Quitar filtros</button>
-    </div>
-    <p class="dim cat-count" id="cat-count" aria-live="polite"></p>
-    <div id="cat-results"></div>
-  </main>`;
-  const form = $('#cat-form');
-  form.addEventListener('submit', (e) => { e.preventDefault(); $('#cat-q').blur(); });
-  $('#cat-q').addEventListener('input', debounce(paintCatalog, 120));
-  $('#cat-filters').addEventListener('change', paintCatalog);
-  paintCatalog();
-  if (q.get('buscar') === '1') $('#cat-q').focus();
-}
-function catalogState() {
-  const val = (n) => { const el = app.querySelector(`#cat-filters [name="${n}"]`); return el ? el.value : ''; };
-  return { q: ($('#cat-q') || {}).value || '', g: val('g'), y: val('y'), f: val('f'), l: val('l'), o: val('o') || 'az' };
-}
-function paintCatalog() {
-  const box = $('#cat-results');
-  if (!box) return;
-  const st = catalogState();
-  const t = (app.querySelector('.catalog') || {}).dataset?.t || '';
-  const list = sortEntries(filterEntries(catalogBase(t, st), st), st.o);
-  // series y películas, como pósters
-  const posters = true;
-  // si al teclear sigue saliendo lo mismo, no se vuelven a dibujar todos los mosaicos
-  const sig = (posters ? 'p' : 't') + list.map((e) => e.href || e.si).join('|') + '#' + list.map((e) => e.img || '').join('').length;
-  if (box.dataset.sig !== sig) {
-    resetPosterCache();
-    box.innerHTML = posters ? `<ul class="shelf" role="list">${list.map(posterAny).join('')}</ul>` : `<div class="tiles is-grid" role="list">${list.map(entryTile).join('')}</div>`;
-    box.dataset.sig = sig;
-    if (posters) hydrateThumbs(box);
-  }
-  $('#cat-count').textContent = list.length ? plural(list.length, 'título', 'títulos') : (state.library ? 'Nada coincide con la búsqueda o los filtros.' : 'Cargando la biblioteca…');
-  app.querySelector('[data-act="cat-clear"]').hidden = !(st.g || st.y || st.f || st.l || st.q);
-  // la dirección refleja la búsqueda (para volver atrás o compartirla), sin redibujar la página
-  const params = new URLSearchParams();
-  if (t) params.set('t', t);
-  for (const k of ['q', 'g', 'y', 'f', 'l']) if (st[k]) params.set(k, st[k]);
-  if (st.o !== 'az') params.set('o', st.o);
-  const h = '#/catalogo' + (params.toString() ? '?' + params : '');
-  if (location.hash !== h) history.replaceState(null, '', h);
-}
-
-/* búsqueda rápida desde el inicio */
-function openHomeSearch() {
-  const bar = $('#home-search');
-  if (!bar) return;
-  bar.hidden = false;
-  app.querySelector('[data-act="home-search"]').setAttribute('aria-expanded', 'true');
-  const input = $('#home-q');
-  input.focus();
-  input.oninput = debounce(paintHomeSearch, 120);
-  input.onkeydown = (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); go('#/catalogo?' + new URLSearchParams({ q: input.value })); }
-    else if (e.key === 'Escape') closeHomeSearch();
-  };
-}
 // tocar o hacer clic en cualquier otra parte cierra el buscador (sus resultados y la lupa no cuentan)
 document.addEventListener('pointerdown', (e) => {
   const bar = $('#home-search');
@@ -732,29 +521,6 @@ document.addEventListener('pointerdown', (e) => {
   if (e.target.closest('#home-search, #home-results, [data-act="home-search"]')) return;
   closeHomeSearch();
 });
-function closeHomeSearch() {
-  const bar = $('#home-search');
-  if (!bar) return;
-  bar.hidden = true;
-  $('#home-q').value = '';
-  app.querySelector('[data-act="home-search"]').setAttribute('aria-expanded', 'false');
-  paintHomeSearch();
-}
-function paintHomeSearch() {
-  const box = $('#home-results');
-  const tv = app.querySelector('.tv.is-home');
-  if (!box || !tv) return;
-  const qv = ($('#home-q') || {}).value || '';
-  const on = !!qv.trim();
-  tv.classList.toggle('is-searching', on);
-  box.hidden = !on;
-  if (!on) { box.innerHTML = ''; return; }
-  const list = sortEntries(filterEntries(catalogEntries(), { q: qv }), 'az');
-  box.innerHTML = `<div class="tv-row-head"><h3 class="tv-row-title">${list.length ? plural(list.length, 'resultado', 'resultados') : 'Sin resultados'}</h3>
-      <a class="tv-more" href="#/catalogo?${new URLSearchParams({ q: qv })}">${ICON.grid}<span>Buscar en el catálogo</span></a></div>
-    <ul class="shelf is-row" role="list">${list.slice(0, 24).map(posterAny).join('')}</ul>`;
-  resetPosterCache();
-}
 
 /* ── serie ── */
 
@@ -791,256 +557,9 @@ function paintEpisode(id) {
 
 /* ── explorar MEGA ── */
 
-function renderExplorer(arg) {
-  const st = state.storage;
-  if (!st) {
-    app.innerHTML = header('Explorar') + `<main><section class="empty">
-      <p class="dim">${navigator.onLine ? 'Conectando con MEGA…' : 'Explorar necesita conexión. Lo que descargaste está en Descargados.'}</p>
-      ${navigator.onLine ? '' : '<a class="btn" href="#/descargas">Ver descargados</a>'}</section></main>`;
-    return;
-  }
-  let node = (arg && st.files[arg]) || st.root;
-  if (!node.directory) node = node.parent || st.root;
-  const crumbs = [];
-  for (let n = node; n; n = n.parent) crumbs.unshift(n);
-  const kids = visibleChildren(node).filter((c) => !c.name.startsWith('.'));
-  const folders = kids.filter((c) => c.directory).sort((a, b) => a.name.localeCompare(b.name, 'es', { numeric: true }));
-  const here = nodePath(node);
-  const videos = sortEpisodes(kids.filter(isPlayable).map((f) => index.byId.get(f.nodeId)?.ep || makeEpisode(f, here, kids)));
-  videos.forEach((v) => { if (!index.byId.has(v.id)) knownEps.set(v.id, v); });
-  const others = kids.filter((c) => !c.directory && !isPlayable(c)).sort((a, b) => a.name.localeCompare(b.name, 'es', { numeric: true }));
-  const isRoot = node === st.root;
-  const isLibrary = state.library && state.library.rootId === node.nodeId;
-
-  app.innerHTML = header('Explorar') + `<main class="explorer">
-    <nav class="crumbs" aria-label="Ubicación">${crumbs.map((n, i) => i === crumbs.length - 1
-      ? `<span aria-current="page">${esc(n === st.root ? 'Mi MEGA' : n.name)}</span>`
-      : `<a href="#/explorar/${encodeURIComponent(n.nodeId)}">${esc(n === st.root ? 'Mi MEGA' : n.name)}</a>`).join('<span class="crumb-sep" aria-hidden="true">/</span>')}</nav>
-    ${!isRoot ? `<div class="explorer-actions">${isLibrary
-      ? '<p class="dim">Esta es tu carpeta de series.</p>'
-      : `<button class="btn" data-act="set-root" data-id="${esc(node.nodeId)}">Usar como carpeta de series</button>`}</div>` : ''}
-    ${!kids.length ? '<p class="empty dim">Carpeta vacía.</p>' : ''}
-    ${folders.length ? `<ul class="files">${folders.map((f) => {
-      const n = visibleChildren(f).filter((c) => !c.name.startsWith('.')).length;
-      return `<li><a class="file-row" href="#/explorar/${encodeURIComponent(f.nodeId)}">
-        <span class="file-icon">${ICON.folder}</span>
-        <span class="file-text"><span class="file-name">${esc(f.name)}</span><span class="file-meta">${plural(n, 'elemento', 'elementos')}</span></span>
-      </a></li>`;
-    }).join('')}</ul>` : ''}
-    ${videos.length ? `<ol class="episodes">${videos.map((ep) => episodeRow(ep)).join('')}</ol>` : ''}
-    ${others.length ? `<ul class="files is-dim">${others.map((f) => `<li class="file-row">
-        <span class="file-icon">${ICON.file}</span>
-        <span class="file-text"><span class="file-name">${esc(f.name)}</span><span class="file-meta">${isSubtitleName(f.name) ? 'Subtítulos, ' : ''}${fmtSize(f.size || 0)}</span></span>
-      </li>`).join('')}</ul>` : ''}
-  </main>`;
-}
-
 /* ── descargados ── */
 
-async function renderDownloads() {
-  if (!app.querySelector('main.downloads')) app.innerHTML = header('Descargados') + '<main class="downloads"></main>';
-  const metas = [...(await refreshSaved()).values()].filter((m) => m.ep || index.byId.get(m.id));
-  if (route().view !== 'descargas') return;
-  for (const m of metas) if (!m.ep) m.ep = index.byId.get(m.id).ep;
-  metas.forEach((m) => { if (!index.byId.has(m.id)) knownEps.set(m.id, m.ep); });
-  const groups = new Map();
-  for (const m of metas) {
-    const t = m.title || titleFor(m.ep) || 'Otros';
-    if (!groups.has(t)) groups.set(t, []);
-    groups.get(t).push(m.ep);
-  }
-  const total = metas.filter((m) => m.done).reduce((a, m) => a + (m.size || 0), 0);
-  const folderN = metas.filter((m) => m.done && m.where === 'folder').length;
-  const dir = await getDir();
-  const perm = dir ? await dirPermission(dir) : '';
-  let free = '';
-  try {
-    const est = await navigator.storage.estimate();
-    if (est.quota) free = `, quedan ${fmtSize(Math.max(0, est.quota - est.usage))} disponibles`;
-  } catch { /* nada */ }
-  if (route().view !== 'descargas') return;
-  app.innerHTML = header('Descargados') + `<main class="downloads">
-    ${metas.length ? `<p class="dim downloads-sum">${plural(state.saved.size, 'capítulo', 'capítulos')} en este dispositivo, ${fmtSize(total)}${folderN ? ` (${folderN === state.saved.size ? 'todos' : folderN} en tu carpeta${dir ? ` «${esc(dir.name)}»` : ''})` : ''}${free}.</p>` : ''}
-    ${dir && perm === 'prompt' ? '<p class="downloads-sum"><button class="btn btn-lamp" data-act="dir-grant">Permitir acceso a tu carpeta de descargas</button></p>' : ''}
-    ${!metas.length ? `<section class="empty"><p>No hay capítulos descargados.</p>
-      <p class="dim">Toca la flecha junto a un capítulo para verlo sin conexión.</p></section>` : ''}
-    ${[...groups.entries()].sort((a, b) => a[0].localeCompare(b[0], 'es')).map(([t, eps]) => `<section class="block">
-      <h3 class="group-title">${esc(t)}</h3>
-      <ol class="episodes">${sortEpisodes(eps).map((ep) => episodeRow(ep)).join('')}</ol>
-    </section>`).join('')}
-    ${metas.length ? '<button class="btn btn-quiet" data-act="clear-dl">Quitar todas las descargas</button>' : ''}
-  </main>`;
-  paintSync();
-  hydrateThumbs(app);
-}
-
 /* ── ajustes ── */
-
-function renderSettings() {
-  const s = state.settings;
-  const unread = hasUnreadNews();
-  LS.set(pkey('newsUnread'), false);
-  paintNewsDot();
-  app.innerHTML = header('Ajustes') + `<main class="settings">
-    <section class="settings-group is-first ${unread ? 'has-news' : ''}" id="news">${newsHTML()}</section>
-    <section class="settings-group">
-      <p class="settings-label">Apariencia</p>
-      <div class="segmented" role="group" aria-label="Tema">${[['auto', 'Automático'], ['light', 'Claro'], ['dark', 'Oscuro']].map(([v, l]) => `<button class="seg ${s.theme === v ? 'is-on' : ''}" data-act="set-theme" data-v="${v}" aria-pressed="${s.theme === v}">${l}</button>`).join('')}</div>
-      <p class="settings-label">Tono del modo claro</p>
-      <div class="segmented" role="group" aria-label="Tono del modo claro">${Object.entries(TONES).map(([v, o]) => `<button class="seg ${(s.tone || 'blanco') === v ? 'is-on' : ''}" data-act="set-tone" data-v="${v}" aria-pressed="${(s.tone || 'blanco') === v}">${o.label}</button>`).join('')}</div>
-      <p class="settings-label">Tono del modo oscuro</p>
-      <div class="segmented" role="group" aria-label="Tono del modo oscuro">${Object.entries(DARK_TONES).map(([v, o]) => `<button class="seg ${(s.darkTone || 'negro') === v ? 'is-on' : ''}" data-act="set-dark-tone" data-v="${v}" aria-pressed="${(s.darkTone || 'negro') === v}">${o.label}</button>`).join('')}</div>
-      <p class="dim settings-hint">El tono claro se usa con el tema Claro y el oscuro con el tema Oscuro; en Automático, cada uno según la hora del sistema.</p>
-    </section>
-    <section class="settings-group" id="cine-key">${cineKeyHTML()}</section>
-    <section class="settings-group">
-      <p class="settings-label">Carpeta de series</p>
-      <p class="settings-value">${esc(s.root)}</p>
-      <a class="btn" href="#/explorar${state.library && state.library.rootId ? '/' + encodeURIComponent(state.library.rootId) : ''}">Cambiar carpeta</a>
-    </section>
-    <form id="settings" class="form settings-group">
-      <label class="switch"><input type="checkbox" name="autoplay" ${s.autoplay ? 'checked' : ''}><span>Reproducir el siguiente capítulo solo</span></label>
-      <label class="switch"><input type="checkbox" name="autoSkip" ${s.autoSkip ? 'checked' : ''}><span>Saltar intros solo cuando Kai sepa dónde están</span></label>
-      <label class="switch"><input type="checkbox" name="cat" ${s.cat !== false ? 'checked' : ''}><span>Kai, el gatito, en el inicio</span></label>
-      <label class="switch"><input type="checkbox" name="prefetchNext" ${s.prefetchNext !== false ? 'checked' : ''}><span>Preparar el siguiente capítulo para que empiece sin espera (usa unos 3 MB de MEGA)</span></label>
-    </form>
-    <section class="settings-group" id="dl-where">${downloadsWhereHTML()}</section>
-    <section class="settings-group" id="seen-all">
-      <p class="settings-label">Visto por todos</p>
-      <p class="dim">Capítulos que ya terminaron todos los perfiles. Es solo un aviso, por si quieres liberar espacio en MEGA; Kai no borra nada.</p>
-      <div id="seen-all-list"></div>
-      <button class="btn" data-act="seen-all">${ICON.refresh}<span>Revisar</span></button>
-    </section>
-    <section class="settings-group">
-      <p class="dim" id="space">Calculando espacio…</p>
-      <p class="dim">${esc(quotaText(true))}</p>
-      <div class="btn-row">
-        <button class="btn" data-act="sync-now">Sincronizar ahora</button>
-        <a class="btn" href="#/descargas">Ver descargados</a>
-      </div>
-    </section>
-    <section class="settings-group">
-      <p class="settings-label">Versión</p>
-      <p class="settings-value" id="app-version">…</p>
-      <button class="btn" data-act="check-update" id="check-update">${ICON.refresh}<span>${updateReady ? 'Actualizar ahora' : 'Buscar actualización'}</span></button>
-    </section>
-    <section class="settings-group">
-      <p class="dim">Sesión de MEGA: ${esc((LS.get('session', {}).options || {}).email || '')}</p>
-      <p class="dim">Datos de Kai en este navegador: ${(() => {
-        const kb = (n) => (n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.round(n / 1024) + ' KB');
-        const sizes = [];
-        try { for (const k of Object.keys(localStorage)) if (k.startsWith('kai.')) sizes.push([k.slice(4), (localStorage.getItem(k) || '').length]); } catch { /* nada */ }
-        const lib = LS.get('library', null);
-        const libInfo = lib && lib.series ? ` · biblioteca guardada: ${lib.series.length} carpetas` : ' · sin biblioteca guardada';
-        return kb(sizes.reduce((a, b) => a + b[1], 0)) + ' (' + sizes.sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, n]) => `${esc(k)} ${kb(n)}`).join(', ') + ')' + libInfo;
-      })()}${LS.full ? ' · <strong>sin espacio: algo no se pudo guardar</strong>' : LS.freed ? ' · se liberó espacio' : ''}</p>
-      <button class="btn btn-quiet" data-act="logout">Cerrar sesión en este dispositivo</button>
-    </section>
-  </main>`;
-  $('#settings').addEventListener('change', (e) => {
-    const f = e.currentTarget;
-    s.autoplay = f.autoplay.checked;
-    s.autoSkip = f.autoSkip.checked;
-    s.prefetchNext = f.prefetchNext.checked;
-    s.cat = f.cat.checked;
-    saveSettings();
-  });
-  paintSpace();
-  paintDownloadsWhere();
-  bindCineKey();
-  swVersion().then((v) => { const el = $('#app-version'); if (el) el.textContent = v ? v.replace('kai-v', 'Kai ') : 'Sin instalar'; });
-}
-
-/** Ajustes → Cine: la clave de TMDB, guardada en tu MEGA (no en el código) para que todos tus dispositivos la usen. */
-function cineKeyHTML(note = '') {
-  const key = tmdbKey();
-  const lib = state.library;
-  const cine = lib && lib.series && lib.series.find(isCine);
-  return `<p class="settings-label">Cine</p>
-    <p class="dim">Películas que no son anime, en la carpeta <strong>${esc(state.settings.root)}/Cine</strong>, una subcarpeta por película (por ejemplo «El gigante de hierro (1999)»). No salen en el inicio: se abren con el botón Cine al final. Sus pósters y sinopsis vienen de TMDB.</p>
-    ${key ? `<p class="settings-value">Clave de TMDB guardada (…${esc(key.slice(-4))})${cine ? '' : ' · todavía no hay carpeta Cine'}</p>
-      <div class="btn-row"><button class="btn btn-quiet" data-act="tmdb-del">Quitar la clave</button></div>`
-    : `<form class="form tmdb-form" id="tmdb-form" autocomplete="off">
-        <label>Clave de la API de TMDB<input id="tmdb-key" name="k" type="password" spellcheck="false" autocapitalize="off" placeholder="Pega aquí tu clave"></label>
-        <button class="btn" type="submit">Guardar</button>
-      </form>`}
-    ${note ? `<p class="dim" role="status">${esc(note)}</p>` : ''}`;
-}
-function paintCineKey(note) { const el = $('#cine-key'); if (el) { el.innerHTML = cineKeyHTML(note); bindCineKey(); } }
-function bindCineKey() {
-  const f = $('#tmdb-form');
-  if (!f) return;
-  f.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const v = f.k.value.trim();
-    if (!v) return;
-    f.querySelector('button').textContent = 'Revisando…';
-    let ok;
-    try { ok = await tmdbCheckKey(v); } catch { paintCineKey('Sin conexión con TMDB. Intenta de nuevo.'); return; }
-    if (!ok) { paintCineKey('TMDB dice que esa clave no es válida. Copia la «Clave de la API» de themoviedb.org → Ajustes → API.'); return; }
-    setTmdbKey(v);
-    paintCineKey('Lista. Kai ya está buscando las fichas de tus películas de Cine.');
-  });
-}
-function setTmdbKey(v) {
-  state.shared.keys = { ...(state.shared.keys || {}), tmdb: { v, u: Date.now() } };
-  saveShared();
-  sync();
-  setTimeout(ensureMeta, 500);
-}
-
-function downloadsWhereHTML(perm = '') {
-  if (!canFolder) {
-    return `<p class="settings-label">Descargas</p>
-      <p class="settings-value">Dentro de la app</p>
-      <p class="dim">Este navegador no deja que una página guarde en una carpeta (Chrome y Edge en computadora sí lo permiten). Si quieres el archivo aparte, toca ⋯ en un capítulo descargado y elige «Guardar copia en el dispositivo».</p>`;
-  }
-  const d = currentDir();
-  if (!d) {
-    return `<p class="settings-label">Descargas</p>
-      <p class="settings-value">Dentro de la app</p>
-      <p class="dim">Puedes elegir una carpeta de este dispositivo: los capítulos quedarán ahí como MP4 normales, ordenados por serie y temporada.</p>
-      <button class="btn" data-act="dir-pick">${ICON.folder}<span>Elegir carpeta</span></button>`;
-  }
-  return `<p class="settings-label">Descargas</p>
-    <p class="settings-value">${ICON.folder} ${esc(d.name)}</p>
-    <p class="dim">Cada capítulo queda como MP4 en <span class="mono">${esc(d.name)}/Serie/Temporada/</span>.${perm === 'prompt' ? ' Kai necesita que le vuelvas a dar permiso para usarla.' : ''}</p>
-    <div class="btn-row">
-      ${perm === 'prompt' ? '<button class="btn btn-lamp" data-act="dir-grant">Permitir acceso</button>' : ''}
-      <button class="btn" data-act="dir-pick">Cambiar carpeta</button>
-      <button class="btn" data-act="dir-off">Guardar dentro de la app</button>
-    </div>`;
-}
-async function paintDownloadsWhere() {
-  const d = await getDir();
-  const perm = d ? await dirPermission(d) : '';
-  const el = $('#dl-where');
-  if (el) el.innerHTML = downloadsWhereHTML(perm);
-}
-
-async function paintSpace() {
-  const el = $('#space');
-  if (!el) return;
-  const metas = await refreshSaved();
-  const sum = (list) => list.reduce((a, m) => a + (m.size || 0), 0);
-  const inApp = metas.filter((m) => m.done && m.where !== 'folder');
-  const inFolder = metas.filter((m) => m.done && m.where === 'folder');
-  const parts = [];
-  if (inApp.length) parts.push(`${plural(inApp.length, 'capítulo', 'capítulos')} dentro de la app (${fmtSize(sum(inApp))})`);
-  if (inFolder.length) parts.push(`${plural(inFolder.length, 'capítulo', 'capítulos')} en tu carpeta (${fmtSize(sum(inFolder))})`);
-  let extra = '';
-  try {
-    const est = await navigator.storage.estimate();
-    if (est.quota) extra = ` Espacio disponible para la app: ${fmtSize(Math.max(0, est.quota - est.usage))}.`;
-  } catch { /* nada */ }
-  try {
-    let kept = await navigator.storage.persisted();
-    if (!kept) kept = await navigator.storage.persist();
-    extra += kept ? ' El sistema guarda las descargas de forma permanente.'
-      : ' El sistema podría borrar las descargas si se queda sin espacio.';
-  } catch { /* no soportado */ }
-  if ($('#space')) $('#space').textContent = `${parts.length ? parts.join(' y ') + '.' : 'Ningún capítulo descargado.'}${extra}`;
-}
 
 /* ── hoja de opciones de un capítulo ── */
 
@@ -1087,155 +606,6 @@ function openSheet(ep) {
     else if (act === 'export') exportCopy(ep);
     else if (act === 'later-movie') setLater(series, movie.key, !isLater(series, movie.key));
   };
-}
-/* ── Descubrir: "Porque viste…" y "En emisión" ──
- * Con AniList: recomendaciones de las series que tienes en MEGA (las que ya viste pesan más) y lo que está
- * saliendo ahora con buena nota. Lo que ya tienes sale a color y lleva a su página; lo que no, en blanco y negro. */
-const ANIMEAV1_SEARCH = (t) => 'https://animeav1.com/catalogo?search=' + encodeURIComponent(t);
-// sube cuando cambia qué se muestra en Descubrir, para no enseñar una lista guardada con lo de antes
-const DISCOVER_V = 2;
-const discoverFresh = (d) => !!(d && d.v === DISCOVER_V && d.items && d.items.length);
-const DISCOVER = {
-  porque: { title: 'Porque viste…', ttl: 24 * 3600000 },
-  emision: { title: 'En emisión', ttl: 6 * 3600000 },
-};
-/** Lo que tienes en MEGA, por id de AniList → a dónde lleva en Kai. */
-function ownedIds() {
-  const out = new Map();
-  const lib = state.library;
-  if (!lib || lib.v !== 2) return out;
-  lib.series.forEach((s, si) => {
-    if (isCine(s)) return;
-    if (isCollection(s)) { for (const it of collectionItems(s)) { const m = itemMeta(s, it.key); if (m && m.id) out.set(m.id, movieHref(si, it.key)); } }
-    else {
-      const m = metaFor(s); if (m && m.id) out.set(m.id, '#/serie/' + si);
-      for (const se of s.seasons) { const sm = seasonMeta(s, se); if (sm && sm.id) out.set(sm.id, '#/serie/' + si); }
-    }
-  });
-  return out;
-}
-let discoverJob = null;
-async function loadDiscover(kind, force = false) {
-  const all = LS.get('discover', {}) || {};
-  const cur = all[kind];
-  if (!force && discoverFresh(cur) && Date.now() - cur.at < DISCOVER[kind].ttl) return cur;
-  if (discoverJob) return discoverJob;
-  discoverJob = (async () => {
-    let items = [];
-    if (kind === 'emision') {
-      items = (await airingTop()).map(toDiscover);
-    } else {
-      // tus series de MEGA (sin repetir la misma ficha); las que ya empezaste a ver cuentan doble
-      const lib = state.library;
-      const src = new Map();
-      if (lib && lib.v === 2) for (const s of lib.series) {
-        if (isCollection(s)) continue;
-        const m = metaFor(s);
-        if (!m || !m.id) continue;
-        const watched = s.all.some((e) => { const p = prog(e); return p && (p.w || p.t > 60); });
-        src.set(m.id, { name: s.name, w: watched ? 2 : 1 });
-      }
-      const recs = await recommendationsFor([...src.keys()].slice(0, 40));
-      const score = new Map();
-      for (const [id, list] of Object.entries(recs)) {
-        const from = src.get(Number(id));
-        list.forEach(({ rating, media }, rank) => {
-          if (src.has(media.id)) return; // no recomendar una serie que es la misma fuente
-          const r = score.get(media.id) || { m: media, pts: 0, from: [] };
-          r.pts += from.w * (1 + Math.log10(1 + Math.max(0, rating))) * (1 - rank * 0.05);
-          r.from.push({ name: from.name, pts: from.w * (1 + Math.log10(1 + Math.max(0, rating))) });
-          score.set(media.id, r);
-        });
-      }
-      items = [...score.values()].sort((a, b) => b.pts - a.pts).slice(0, 30).map((r) => ({
-        ...toDiscover(r.m), because: r.from.sort((a, b) => b.pts - a.pts).slice(0, 2).map((x) => x.name),
-      }));
-    }
-    const out = { v: DISCOVER_V, at: Date.now(), items };
-    const store = LS.get('discover', {}) || {};
-    store[kind] = out;
-    LS.set('discover', store);
-    setTimeout(translateMissing, 1000);
-    return out;
-  })().finally(() => { discoverJob = null; });
-  return discoverJob;
-}
-function airingIn(at) {
-  const h = Math.round((at - Date.now()) / 3600000);
-  if (h <= 0) return 'sale hoy';
-  if (h < 24) return `en ${h} h`;
-  const d = Math.round(h / 24);
-  return d === 1 ? 'mañana' : `en ${d} días`;
-}
-function discoverPosterHTML(x, owned, kind) {
-  const href = owned.get(x.id);
-  const sub = kind === 'emision'
-    ? [x.next ? `Ep. ${x.next.ep} ${airingIn(x.next.at)}` : '', x.score ? `★ ${x.score}` : ''].filter(Boolean).join(' · ')
-    : (x.because && x.because.length ? `Porque viste ${x.because.join(' y ')}` : (x.score ? `★ ${x.score}` : ''));
-  const inner = `<span class="shelf-poster">
-      ${x.cover ? `<img src="${esc(x.cover)}" alt="" loading="lazy" decoding="async">` : `<span class="is-fallback"><span class="cover-glyph">${esc([...(x.title || '·').trim()][0])}</span></span>`}
-      ${href ? '<span class="tile-badge">En Kai</span>' : ''}
-    </span>
-    <span class="shelf-title">${esc(x.title)}</span>
-    ${sub ? `<span class="shelf-sub">${esc(sub)}</span>` : ''}`;
-  return href
-    ? `<li><a class="shelf-item" href="${href}" style="--h:${hue(x.title)}">${inner}</a></li>`
-    : `<li><button class="shelf-item is-gray" data-act="discover-open" data-id="${x.id}" style="--h:${hue(x.title)}">${inner}</button></li>`;
-}
-async function renderDiscover(kind) {
-  if (!DISCOVER[kind]) kind = 'porque';
-  const other = kind === 'porque' ? 'emision' : 'porque';
-  app.innerHTML = header(DISCOVER[kind].title) + `<main class="shelf-main discover" data-kind="${kind}">
-    <p class="dim shelf-count" id="disc-note">${kind === 'porque' ? 'Recomendaciones de AniList según lo que tienes en MEGA.' : 'Lo que está saliendo ahora y tiene buena nota en AniList.'}</p>
-    <div id="disc-list"><p class="dim">Buscando en AniList…</p></div>
-    <p class="discover-foot"><a class="tv-more" href="#/descubrir/${other}">${ICON.grid}<span>${DISCOVER[other].title}</span></a></p>
-  </main>`;
-  const paint = (d) => {
-    const box = $('#disc-list');
-    if (!box || route().view !== 'descubrir') return;
-    const owned = ownedIds();
-    if (!d.items.length) { box.innerHTML = `<p class="dim">${kind === 'porque' ? 'Todavía no hay recomendaciones: agrega series a MEGA y espera a que Kai encuentre sus fichas.' : 'AniList no devolvió nada ahora.'}</p>`; return; }
-    box.innerHTML = `<ul class="shelf" role="list">${d.items.map((x) => discoverPosterHTML(x, owned, kind)).join('')}</ul>`;
-  };
-  const cached = (LS.get('discover', {}) || {})[kind];
-  if (discoverFresh(cached)) paint(cached);
-  try { paint(await loadDiscover(kind)); } catch (err) {
-    const box = $('#disc-list');
-    if (box && !discoverFresh(cached)) box.innerHTML = `<p class="dim">No se pudo consultar AniList (${esc(err.message || 'sin conexión')}). Intenta en un momento.</p>`;
-  }
-}
-function openDiscoverSheet(id) {
-  const all = LS.get('discover', {}) || {};
-  const x = Object.values(all).flatMap((d) => (d && d.items) || []).find((y) => y.id === id);
-  if (!x) return;
-  const syn = (state.syn[x.id] && state.syn[x.id].es) || x.synopsis || '';
-  const short = syn.length > 420 ? syn.slice(0, 400).replace(/\s+\S*$/, '') + '…' : syn;
-  const facts = [x.year, x.format, x.episodes ? plural(x.episodes, 'capítulo', 'capítulos') : '', x.score ? `★ ${x.score}` : ''].filter(Boolean).join(' · ');
-  const sheet = $('#sheet');
-  sheet.innerHTML = `<div class="sheet-back" data-act="close"></div>
-    <div class="sheet-panel discover-sheet" role="dialog" aria-modal="true" aria-label="${esc(x.title)}">
-      <div class="discover-head">
-        ${x.cover ? `<img class="discover-cover" src="${esc(x.cover)}" alt="">` : ''}
-        <div><p class="sheet-title">${esc(x.title)}</p>
-          <p class="sheet-sub">${esc(facts)}</p>
-          ${x.genres.length ? `<p class="sheet-sub">${esc(x.genres.slice(0, 4).join(', '))}</p>` : ''}
-          ${x.next ? `<p class="sheet-sub">Capítulo ${x.next.ep} ${airingIn(x.next.at)}</p>` : ''}</div>
-      </div>
-      ${short ? `<p class="discover-syn">${esc(short)}</p>` : ''}
-      <a class="sheet-btn" href="${ANIMEAV1_SEARCH(x.romaji || x.title)}" target="_blank" rel="noopener">Buscar en animeav1</a>
-      <a class="sheet-btn" href="https://anilist.co/anime/${x.id}" target="_blank" rel="noopener">Ver en AniList</a>
-      <button class="sheet-btn is-quiet" data-act="close">Cerrar</button>
-    </div>`;
-  sheet.hidden = false;
-  requestAnimationFrame(() => sheet.classList.add('is-open'));
-  sheet.onclick = (e) => { if (e.target.closest('[data-act="close"]') || e.target.closest('a.sheet-btn')) closeSheet(); };
-}
-
-function closeSheet() {
-  const sheet = $('#sheet');
-  if (sheet.hidden) return;
-  sheet.classList.remove('is-open');
-  setTimeout(() => { sheet.hidden = true; sheet.innerHTML = ''; }, 180);
 }
 
 /* ───────────────────────── página de reproducción ───────────────────────── */
@@ -2499,21 +1869,9 @@ window.addEventListener('pagehide', () => savePosition(true));
 /* ── actualizaciones ──
  * El service worker se instala solo cuando cambia; al activarse toma el control de la página
  * (controllerchange). Ahí Kai avisa que hay versión nueva y basta con recargar. */
-let swReg = null;
-let updateReady = false;
 let hadController = 'serviceWorker' in navigator && !!navigator.serviceWorker.controller;
-function swVersion() {
-  const sw = navigator.serviceWorker && navigator.serviceWorker.controller;
-  if (!sw) return Promise.resolve('');
-  return new Promise((res) => {
-    const done = (e) => { if (e.data && e.data.type === 'version') { navigator.serviceWorker.removeEventListener('message', done); res(e.data.version); } };
-    navigator.serviceWorker.addEventListener('message', done);
-    sw.postMessage({ type: 'version' });
-    setTimeout(() => res(''), 2000);
-  });
-}
 function showUpdateNotice() {
-  updateReady = true;
+  markUpdateReady();
   const btn = $('#check-update');
   if (btn) btn.querySelector('span').textContent = 'Actualizar ahora';
   if ($('#update-notice')) return;
@@ -2529,21 +1887,12 @@ function applyUpdate() {
   location.reload();
 }
 async function checkUpdate() {
-  if (updateReady) { applyUpdate(); return; }
+  if (isUpdateReady()) { applyUpdate(); return; }
   const btn = $('#check-update');
   if (btn) { btn.disabled = true; btn.querySelector('span').textContent = 'Buscando…'; }
-  let found = false;
-  try {
-    if (!swReg && navigator.serviceWorker) swReg = await navigator.serviceWorker.getRegistration();
-    if (swReg) {
-      await swReg.update();
-      found = !!(swReg.installing || swReg.waiting);
-      // si hay una nueva, se instala y toma el control en unos segundos
-      for (let i = 0; i < 40 && found && !updateReady; i++) await sleep(250);
-    }
-  } catch { /* sin conexión */ }
-  if (btn) { btn.disabled = false; btn.querySelector('span').textContent = updateReady ? 'Actualizar ahora' : 'Buscar actualización'; }
-  if (!updateReady) toast(navigator.onLine ? (found ? 'Descargando la versión nueva…' : 'Ya tienes la última versión.') : 'Necesitas conexión para buscar actualizaciones.');
+  const found = await findUpdate();
+  if (btn) { btn.disabled = false; btn.querySelector('span').textContent = isUpdateReady() ? 'Actualizar ahora' : 'Buscar actualización'; }
+  if (!isUpdateReady()) toast(navigator.onLine ? (found ? 'Descargando la versión nueva…' : 'Ya tienes la última versión.') : 'Necesitas conexión para buscar actualizaciones.');
 }
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -2556,7 +1905,7 @@ async function boot() {
   applyTheme();
   paintQuota();
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js').then((r) => { swReg = r; }).catch((e) => console.warn('sw', e));
+    navigator.serviceWorker.register('sw.js').then((r) => { setRegistration(r); }).catch((e) => console.warn('sw', e));
   }
   await refreshSaved().catch(() => {});
   render();

@@ -200,3 +200,32 @@ test('Seleccionar capítulos de una temporada', async ({ page }, info) => {
   await expect(page).toHaveURL(/#\/play\//); // fuera del modo, tocar abre el capítulo
   expect(k.errors).toEqual([]);
 });
+
+test('Descubrir: lo que ya tienes lleva a su página, lo demás abre su ficha', async ({ page }, info) => {
+  const { NOW } = await import('./fixture.js');
+  const item = (id, title, extra = {}) => ({ id, title, romaji: title, synopsis: `Sinopsis de ${title}.`, cover: '', color: '', genres: ['Acción'], score: 81, year: 2024, format: 'Serie', episodes: 12, next: null, ...extra });
+  const discover = {
+    emision: { v: 2, at: NOW, items: [item(105228, 'Dorohedoro'), item(999, 'Algo nuevo', { next: { ep: 5, at: NOW + 2 * 86400000 } })] },
+    porque: { v: 2, at: NOW, items: [item(998, 'Otra cosa', { because: ['Dorohedoro'] })] },
+  };
+  const k = await openKai(page, '#/', { extraLS: { discover } });
+  await go(page, '#/descubrir/emision');
+  await expect(page.locator('#disc-list .shelf-item')).toHaveCount(2);
+  await expect(page.locator('#disc-list a.shelf-item')).toHaveAttribute('href', `#/serie/${k.si('Dorohedoro')}`);
+  await expect(page.locator('#disc-list')).toContainText('Ep. 5');
+  await shot(page, 'descubrir', info);
+  await page.locator('[data-act="discover-open"]').click();
+  await expect(page.locator('#sheet')).toContainText('Algo nuevo');
+  await page.keyboard.press('Escape');
+  await go(page, '#/descubrir/porque');
+  await expect(page.locator('#disc-list')).toContainText('Porque viste Dorohedoro');
+  expect(k.errors).toEqual([]);
+});
+
+test('Explorar MEGA y Descargados sin conexión no rompen', async ({ page }) => {
+  const k = await openKai(page, '#/');
+  await go(page, '#/explorar');
+  await go(page, '#/descargas');
+  await expect(page.locator('main.downloads')).toBeVisible();
+  expect(k.errors).toEqual([]);
+});

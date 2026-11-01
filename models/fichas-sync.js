@@ -11,7 +11,7 @@
 
 import { isBareSpecial, hasOwnTitle, SPECIAL_RE, seasonOrdinal, isSpecialSeason } from './naming.js';
 import { isCollection, collectionItems, itemMetaKey, isCine } from './collections.js';
-import { state, SYN_FILE, FICHAS_FILE } from './store.js';
+import { state, SYN_FILE, FICHAS_FILE, saveShared } from './store.js';
 import {
   scoresByIds,
   tmdbFindMovie,
@@ -412,4 +412,12 @@ export function mergeSyn(a, b) {
   const out = { ...a };
   for (const [k, v] of Object.entries(b || {})) if (v && v.es && (!out[k] || (v.u || 0) > (out[k].u || 0))) out[k] = v;
   return out;
+}
+
+/** Guarda la clave de TMDB (Ajustes → Cine) en lo compartido de MEGA y empieza a buscar las fichas de Cine. @param {string} v */
+export function setTmdbKey(v) {
+  state.shared.keys = { ...(state.shared.keys || {}), tmdb: { v, u: Date.now() } };
+  saveShared();
+  emit('sync-needed');
+  setTimeout(ensureMeta, 500);
 }

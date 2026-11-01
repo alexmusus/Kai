@@ -85,3 +85,9 @@ export function announceNew() {
   LS.del(pkey('newsCount'));
   emit('news');
 }
+
+/** Se miraron las novedades (Ajustes): se quita el puntito. */
+export function markNewsRead() {
+  LS.set(pkey('newsUnread'), false);
+  emit('news');
+}
