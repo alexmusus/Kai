@@ -44,7 +44,8 @@ import { renderCatalog, openHomeSearch, closeHomeSearch } from './views/catalog.
 import { renderExplorer } from './views/explorer.js';
 import { renderDownloads } from './views/downloads.js';
 import { newsHTML, paintSeenByAll, renderSettings, paintCineKey, paintDownloadsWhere, paintSpace } from './views/settings.js';
-import { renderDiscover, openDiscoverSheet, closeSheet } from './views/discover.js';
+import { renderDiscover, openDiscoverSheet } from './views/discover.js';
+import { showSheet, closeSheet } from './views/sheet.js';
 
 on('quota', paintQuota);
 on('navigate', ({ hash, replace }) => {
@@ -481,7 +482,6 @@ function paintEpisode(id) {
 /* ── hoja de opciones de un capítulo ── */
 
 function openSheet(ep) {
-  const sheet = $('#sheet');
   const p = prog(ep);
   const saved = state.saved.has(ep.id);
   const busy = !!state.dls[ep.id] || state.queue.some((q) => q.ep.id === ep.id);
@@ -490,7 +490,7 @@ function openSheet(ep) {
   const ie = index.byId.get(ep.id);
   const series = ie ? state.library.series[ie.si] : null;
   const movie = series ? itemFor(series, ep) : null; // solo las películas de la colección
-  sheet.innerHTML = `<div class="sheet-back" data-act="close"></div>
+  const sheet = showSheet(`<div class="sheet-back" data-act="close"></div>
     <div class="sheet-panel" role="dialog" aria-modal="true" aria-label="${esc(episodeLabel(ep))}">
       <p class="sheet-title">${esc(episodeLabel(ep))}</p>
       <p class="sheet-sub">${esc(ep.name)}, ${fmtSize(ep.size)}</p>
@@ -501,11 +501,7 @@ function openSheet(ep) {
       ${saved && (state.dlMeta.get(ep.id) || {}).where !== 'folder' ? '<button class="sheet-btn" data-act="export">Guardar copia en el dispositivo</button>' : ''}
       ${movie ? `<button class="sheet-btn" data-act="later-movie">${isLater(series, movie.key) ? 'Quitar de Más tarde' : 'Ver más tarde'}</button>` : ''}
       <button class="sheet-btn is-quiet" data-act="close">Cerrar</button>
-    </div>`;
-  sheet.hidden = false;
-  requestAnimationFrame(() => sheet.classList.add('is-open'));
-  sheet.querySelector('.sheet-btn').focus();
-  sheet.onclick = async (e) => {
+    </div>`, async (e) => {
     const el = e.target.closest('[data-act]');
     if (!el) return;
     const act = el.dataset.act;
@@ -522,7 +518,8 @@ function openSheet(ep) {
     else if (act === 'unsave') removeDownload(ep.id);
     else if (act === 'export') exportCopy(ep);
     else if (act === 'later-movie') setLater(series, movie.key, !isLater(series, movie.key));
-  };
+  });
+  sheet.querySelector('.sheet-btn').focus();
 }
 
 /* ───────────────────────── página de reproducción ───────────────────────── */

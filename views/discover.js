@@ -2,6 +2,7 @@
  * views/discover.js — las páginas de Descubrir y la hoja con la ficha de cada recomendación.
  */
 
+import { showSheet, closeSheet } from './sheet.js';
 import { state } from '../models/store.js';
 import { route } from '../lib/route.js';
 import { LS, esc, hue, $, plural } from '../lib/util.js';
@@ -88,8 +89,7 @@ export function openDiscoverSheet(id) {
   ]
     .filter(Boolean)
     .join(' · ');
-  const sheet = $('#sheet');
-  sheet.innerHTML = `<div class="sheet-back" data-act="close"></div>
+  const html = `<div class="sheet-back" data-act="close"></div>
     <div class="sheet-panel discover-sheet" role="dialog" aria-modal="true" aria-label="${esc(x.title)}">
       <div class="discover-head">
         ${x.cover ? `<img class="discover-cover" src="${esc(x.cover)}" alt="">` : ''}
@@ -103,19 +103,7 @@ export function openDiscoverSheet(id) {
       <a class="sheet-btn" href="https://anilist.co/anime/${x.id}" target="_blank" rel="noopener">Ver en AniList</a>
       <button class="sheet-btn is-quiet" data-act="close">Cerrar</button>
     </div>`;
-  sheet.hidden = false;
-  requestAnimationFrame(() => sheet.classList.add('is-open'));
-  sheet.onclick = (e) => {
+  showSheet(html, (e) => {
     if (e.target.closest('[data-act="close"]') || e.target.closest('a.sheet-btn')) closeSheet();
-  };
-}
-
-export function closeSheet() {
-  const sheet = $('#sheet');
-  if (sheet.hidden) return;
-  sheet.classList.remove('is-open');
-  setTimeout(() => {
-    sheet.hidden = true;
-    sheet.innerHTML = '';
-  }, 180);
+  });
 }

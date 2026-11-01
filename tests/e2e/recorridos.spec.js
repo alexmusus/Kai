@@ -257,3 +257,22 @@ test('entrar a MEGA: sin conexión dice por qué y conserva el correo', async ({
   await expect(page.locator('#login input[name="password"]')).toHaveValue('');
   expect(k.errors.filter((e) => !/Failed to load resource|ERR_FAILED/.test(e))).toEqual([]);
 });
+
+test('hoja de opciones de un capítulo: marcar como visto y deshacer', async ({ page }) => {
+  const k = await openKai(page, '#/');
+  await go(page, '#/serie/' + k.si('Dorohedoro'));
+  const ep1 = page.locator('#season-eps .ep').nth(0);
+  await expect(ep1.locator('.ep-sub')).toHaveText('Sin ver');
+  await ep1.locator('[data-act="more"]').click();
+  await expect(page.locator('#sheet .sheet-title')).toHaveText('Episodio 1');
+  await page.locator('#sheet [data-act="toggle-seen"]').click();
+  await expect(ep1.locator('.ep-sub')).toContainText('Visto');
+  await ep1.locator('[data-act="more"]').click();
+  await expect(page.locator('#sheet [data-act="toggle-seen"]')).toHaveText('Marcar como no visto');
+  await page.locator('#sheet [data-act="toggle-seen"]').click();
+  await expect(ep1.locator('.ep-sub')).toHaveText('A continuación'); // lo último que tocaste pasa a ser lo siguiente
+  await ep1.locator('[data-act="more"]').click();
+  await page.locator('#sheet [data-act="close"].sheet-btn').click();
+  await expect(page.locator('#sheet')).toBeHidden();
+  expect(k.errors).toEqual([]);
+});
