@@ -1,14 +1,19 @@
-import { Storage } from './vendor/mega.js';
 import { isSubtitleName, mp4Info, mp4Chapters, mp4Formats, mp4QuickFormats, pickIntro, OUTRO_RE as OUTRO } from './subs.js';
 import { animeById, toMeta, findForSeries, findMovie, findTitle, findSeason, seasonNumOf, sideStoriesOf, scoresByIds, tmdbFindMovie, tmdbCheckKey, translateToSpanish, canTranslate, recommendationsFor, airingTop, toDiscover } from './meta.js';
 import { $, LS, esc, sleep, debounce, fmtTime, fmtLeft, fmtSize, hue, plural } from './lib/util.js';
 import { ICON } from './views/icons.js';
 import { stripLang, langText, SPECIAL_RE, hasOwnTitle, isSpecialSeason, seasonOrdinal, seasonTab, MAIN_FORMATS, afterSeriesName, isBareSpecial, specialWord, baseName, sortEpisodes } from './models/naming.js';
 import { DARK_TONES, TONES, FICHAS_FILE, SYN_FILE, SHARED_FILE, profileFile, LEGACY_PROGRESS, state, index, setIndex, knownEps, saveSettings, pkey, saveProgressLocal, saveShared, visibleProfiles } from './models/store.js';
-import { C, settleTree, urlCache, goneNodes } from './models/mega.js';
-import { langsOf, loadProfileState, nodePath, findFolder, makeEpisode, isPlayable, visibleChildren, buildLibrary, buildIndex, langPref, learnAudioLang, setLangPref, setLibrary, librarySignature, migrateProgressKeys } from './models/library.js';
+import { C, filesNamed, readJson, writeJson, visibleChildren, megaMessage, login, connect, downloadUrl } from './models/mega.js';
+import { langsOf, loadProfileState, nodePath, findFolder, makeEpisode, isPlayable, buildLibrary, buildIndex, langPref, learnAudioLang, setLangPref, setLibrary, librarySignature, migrateProgressKeys } from './models/library.js';
 
+import { on } from './lib/events.js';
+import { countBytes, noteQuota, quotaUntil, refreshAccountInfo } from './models/quota.js';
+import { quotaText, paintQuota } from './views/quota.js';
 const app = $('#app');
+
+on('quota', paintQuota);
+on('tree-changed', () => refreshLibrary());
 
 /* ───────────────────────── utilidades ───────────────────────── */
 
@@ -131,72 +136,6 @@ const idb = (() => {
 
 /* ───────────────────────── MEGA ───────────────────────── */
 
-function megaMessage(err) {
-  if (err && err.code === 'QUOTA') {
-    noteQuota(err.timeLeft || 0);
-    const q = LS.get('quota', null);
-    const m = q && q.until > Date.now() ? Math.ceil((q.until - Date.now()) / 60000) : 0;
-    return 'Llegaste al límite de transferencia gratuita de MEGA.' + (m ? ` Se renueva en ${m >= 60 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${m} min`}.` : ' Se renueva solo en unas horas.');
-  }
-  const msg = String((err && err.message) || err);
-  if (/ENOENT|invalid credentials/i.test(msg)) return 'Correo o contraseña incorrectos.';
-  if (/EMFAREQUIRED/.test(msg)) return 'MFA';
-  if (/ESID/.test(msg)) return 'Tu sesión de MEGA venció. Vuelve a entrar.';
-  if (/EBLOCKED/.test(msg)) return 'MEGA bloqueó esta cuenta. Revísala en mega.nz.';
-  if (/ERATELIMIT|EAGAIN|ETEMPUNAVAIL/.test(msg)) return 'MEGA está ocupado. Intenta de nuevo en unos segundos.';
-  if (/EOVERQUOTA|Bandwidth|QUOTA|509/.test(msg)) return 'Llegaste al límite de transferencia gratuita de MEGA. Se renueva solo en unas horas.';
-  if (/Failed to fetch|NetworkError|Load failed|network/i.test(msg)) return 'No hay conexión con MEGA.';
-  return 'Algo falló con MEGA: ' + msg;
-}
-
-async function login(email, password, code) {
-  const opts = { email, password, keepalive: true, autoload: true };
-  if (code) opts.secondFactorCode = code;
-  const st = new Storage(opts);
-  await st.ready;
-  const json = st.toJSON();
-  delete json.options.password;
-  delete json.options.secondFactorCode;
-  LS.set('session', json);
-  loginNote = '';
-  state.storage = st;
-  watchStorage(st);
-}
-
-async function connect() {
-  const sess = LS.get('session', null);
-  if (!sess || state.connecting) return false;
-  state.connecting = true;
-  try {
-    // una sesión incompleta (vieja o dañada) no se puede restaurar: se pide entrar de nuevo.
-    // Solo se borra la sesión; el progreso y los perfiles siguen en MEGA.
-    if (!sess.key || !sess.sid || !sess.options) throw new Error('ESID');
-    let st;
-    try { st = Storage.fromJSON(JSON.parse(JSON.stringify(sess))); } catch { throw new Error('ESID'); }
-    await st.reload(true);
-    await settleTree(st);
-    st.status = 'ready';
-    if (state.storage && state.storage !== st) {
-      try { state.storage.api.close(); } catch { /* nada */ }
-    }
-    state.storage = st;
-    watchStorage(st);
-    return true;
-  } finally {
-    state.connecting = false;
-  }
-}
-
-let libraryTimer;
-function watchStorage(st) {
-  const later = (f) => {
-    if (f && f.name && f.name.startsWith('.kai-')) return;
-    clearTimeout(libraryTimer);
-    libraryTimer = setTimeout(() => refreshLibrary(), 1500);
-  };
-  ['add', 'delete', 'move', 'update'].forEach((ev) => st.on(ev, later));
-}
-
 function refreshLibrary(rerender = true) {
   if (!state.storage) return;
   const before = librarySignature(state.library);
@@ -213,27 +152,6 @@ function refreshLibrary(rerender = true) {
   }
   const changed = librarySignature(state.library) !== before || hadError !== !!state.error;
   if (rerender && changed) softRender();
-}
-
-async function downloadUrl(id, fresh = false) {
-  const c = urlCache.get(id);
-  if (!fresh && c && Date.now() - c.at < 20 * 60 * 1000) return c.url;
-  if (!state.storage) await connect();
-  if (!state.storage) throw new Error('Sin sesión');
-  const r = await state.storage.api.request({ a: 'g', g: 1, ssl: 2, n: id });
-  if (r.tl > 0) noteQuota(r.tl);
-  if (typeof r.g !== 'string' || !r.g.startsWith('http')) throw new Error('EOVERQUOTA');
-  urlCache.set(id, { url: r.g, at: Date.now() });
-  return r.g;
-}
-
-async function readNodeText(node) {
-  const url = await downloadUrl(node.id, true);
-  const fk = await C.fileKey(node.key);
-  if (!node.size) return '';
-  const bytes = await C.readRange(url, fk, 0, node.size - 1);
-  const utf8 = new TextDecoder().decode(bytes);
-  return utf8.includes('�') ? new TextDecoder('windows-1252').decode(bytes) : utf8;
 }
 
 /* ───────────────────────── miniaturas ───────────────────────── */
@@ -594,24 +512,6 @@ function mergeShared(a, b) {
   };
 }
 
-const filesNamed = (folder, name) => visibleChildren(folder).filter((c) => !c.directory && c.name === name);
-/** Lee un JSON de MEGA. Si no se puede leer, lanza error (nunca se confunde con "vacío"). Si está dañado, devuelve null. */
-async function readJson(n) {
-  let text;
-  // un fallo pasajero de MEGA se reintenta un par de veces; si sigue fallando, NUNCA se trata como vacío
-  for (let tries = 0; ; tries++) {
-    try {
-      text = await readNodeText({ id: n.nodeId, key: C.bytesToB64u(new Uint8Array(n.key)), size: n.size });
-      break;
-    } catch (err) {
-      if (tries < 2 && navigator.onLine && !(err && err.code === 'QUOTA')) { await sleep(1200 * (tries + 1)); continue; }
-      const e = new Error('No se pudo leer ' + n.name + ': ' + (err && err.message));
-      e.cause = err;
-      throw e;
-    }
-  }
-  try { return JSON.parse(text); } catch { return null; }
-}
 
 const normName = (n) => String(n || '').trim().toLocaleLowerCase('es');
 
@@ -640,16 +540,6 @@ function finalProfileId(id) {
     id = p.mergedInto;
   }
   return id;
-}
-async function writeJson(folder, name, obj, replaced) {
-  const buf = new TextEncoder().encode(JSON.stringify(obj));
-  const fresh = await folder.upload({ name, size: buf.length }, buf).complete;
-  for (const n of replaced) {
-    if (n === fresh) continue;
-    goneNodes.add(n.nodeId);
-    await n.delete(true).catch(() => {});
-  }
-  return fresh;
 }
 
 async function doSync() {
@@ -1331,6 +1221,7 @@ function renderLogin(message = loginNote, needCode = false, email = '') {
     btn.textContent = 'Entrando…';
     try {
       await login(f.get('email').toString().trim(), f.get('password').toString(), f.get('code') && f.get('code').toString());
+      loginNote = '';
       refreshLibrary(false);
       location.hash = '#/';
       render();
@@ -4076,50 +3967,6 @@ function setLights(off) {
 
 /* ── cuota de MEGA ── */
 
-function xferLog() { return LS.get('xfer', []).filter((x) => Date.now() - x[0] < 6 * 3600 * 1000); }
-function countBytes(n) {
-  if (!n) return;
-  const log = xferLog();
-  const minute = Math.floor(Date.now() / 60000) * 60000;
-  const last = log[log.length - 1];
-  if (last && last[0] === minute) last[1] += n; else log.push([minute, n]);
-  LS.set('xfer', log);
-  paintQuota();
-}
-function noteQuota(seconds) {
-  if (!seconds || seconds <= 0) return;
-  LS.set('quota', { until: Date.now() + seconds * 1000 });
-  paintQuota();
-}
-function quotaText(long = false) {
-  const q = LS.get('quota', null);
-  if (q && q.until > Date.now()) {
-    const m = Math.ceil((q.until - Date.now()) / 60000);
-    const when = m >= 60 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${m} min`;
-    return `Límite de MEGA alcanzado. Se renueva en ${when}.`;
-  }
-  const pro = LS.get('pro', null);
-  if (pro) return `Transferencia de MEGA: ${fmtSize(pro.used)} de ${fmtSize(pro.total)}.`;
-  const used = xferLog().reduce((a, x) => a + x[1], 0);
-  if (!used) return long ? 'Kai no ha usado transferencia de MEGA en las últimas 6 horas.' : '';
-  return long
-    ? `Kai usó ${fmtSize(used)} de transferencia de MEGA en las últimas 6 horas. MEGA gratis no publica un límite fijo; si se acaba, se renueva solo.`
-    : `MEGA: ${fmtSize(used)} en 6 h`;
-}
-function paintQuota() {
-  const el = $('#drawer-quota');
-  if (el) el.textContent = quotaText();
-  const q = LS.get('quota', null);
-  document.body.classList.toggle('quota-hit', !!(q && q.until > Date.now()));
-}
-async function refreshAccountInfo() {
-  try {
-    const r = await state.storage.api.request({ a: 'uq', xfer: 1, pro: 1 });
-    if (r && r.utype > 0 && r.mxfer) LS.set('pro', { used: r.caxfer || 0, total: r.mxfer });
-    else LS.del('pro');
-    paintQuota();
-  } catch { /* nada */ }
-}
 let lastStreamError = '';
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('message', (e) => {
@@ -4146,7 +3993,7 @@ function maybePrefetchNext() {
   playing.prefetched = true;
   const n = neighbor(1);
   const sw = navigator.serviceWorker && navigator.serviceWorker.controller;
-  if (!n || !sw || state.saved.has(n.id) || (LS.get('quota', null) || {}).until > Date.now()) return;
+  if (!n || !sw || state.saved.has(n.id) || quotaUntil() > 0) return;
   downloadUrl(n.id).then((u) => sw.postMessage({ type: 'prefetch', u, k: n.key, s: n.size, i: n.id, blocks: 3 })).catch(() => {});
 }
 video.addEventListener('progress', paintControls);

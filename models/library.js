@@ -8,7 +8,7 @@ import { index, state, pkey, setIndex, saveProgressLocal } from './store.js';
 import { LS } from '../lib/util.js';
 import { baseName, episodeNumber, MIME, isVideoName, sortEpisodes, seasonInfo, langOf, twinKey } from './naming.js';
 import { isSubtitleName } from '../subs.js';
-import { goneNodes, C } from './mega.js';
+import { C, isGone, visibleChildren } from './mega.js';
 
 /** @typedef {import('./types.js').Library} Library */
 /** @typedef {import('./types.js').LibraryIndex} LibraryIndex */
@@ -64,14 +64,10 @@ export function findFolder(storage, path) {
   return node;
 }
 
-/** Lo que Kai borró ya no se muestra, aunque MEGA aún no lo haya confirmado. */
-const isGone = (/** @type {MegaNode} */ n) => goneNodes.has(n.nodeId);
 const keyOf = (/** @type {MegaNode} */ n) => C.bytesToB64u(new Uint8Array(/** @type {ArrayLike<number>} */ (n.key)));
 
 /** @param {MegaNode} c */
 export const isPlayable = (c) => !c.directory && !!c.name && isVideoName(c.name) && !!c.key && !isGone(c);
-/** @param {MegaNode} n */
-export const visibleChildren = (n) => (n.children || []).filter((c) => c.name && !isGone(c));
 
 /**
  * Capítulo a partir de un nodo de MEGA, con los subtítulos sueltos que se llaman igual ("x.mp4" → "x.srt", "x.es.srt").
