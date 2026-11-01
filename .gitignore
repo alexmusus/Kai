@@ -10,3 +10,7 @@ node_modules/
 # Editores
 .vscode/
 .idea/
+
+# Pruebas
+test-results/
+playwright-report/
