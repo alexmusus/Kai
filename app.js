@@ -1,5 +1,5 @@
-import { isSubtitleName, mp4Info, mp4Chapters, mp4Formats, mp4QuickFormats, pickIntro, OUTRO_RE as OUTRO } from './subs.js';
-import { animeById, toMeta, findForSeries, findMovie, findTitle, findSeason, seasonNumOf, sideStoriesOf, scoresByIds, tmdbFindMovie, tmdbCheckKey, translateToSpanish, canTranslate, recommendationsFor, airingTop, toDiscover } from './meta.js';
+import { isSubtitleName, mp4Info, mp4Chapters, mp4Formats, mp4QuickFormats, pickIntro, OUTRO_RE as OUTRO } from './models/subs.js';
+import { animeById, toMeta, findForSeries, findMovie, findTitle, findSeason, seasonNumOf, sideStoriesOf, scoresByIds, tmdbFindMovie, tmdbCheckKey, translateToSpanish, canTranslate, recommendationsFor, airingTop, toDiscover } from './models/meta-api.js';
 import { $, LS, esc, sleep, debounce, fmtTime, fmtLeft, fmtSize, hue, plural } from './lib/util.js';
 import { ICON } from './views/icons.js';
 import { langText, SPECIAL_RE, hasOwnTitle, isSpecialSeason, seasonOrdinal, seasonTab, MAIN_FORMATS, afterSeriesName, isBareSpecial, specialWord, sortEpisodes } from './models/naming.js';

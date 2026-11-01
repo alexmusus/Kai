@@ -32,6 +32,8 @@ decide. ESLint lo revisa (`no-restricted-imports`).
 | `profiles.js` | perfiles y lo compartido, duplicados, respaldo |
 | `sync.js` | juntar con MEGA y dejar una sola copia |
 | `quota.js` | transferencia de MEGA (avisa `quota`) |
+| `subs.js` | subtítulos y capítulos dentro del MP4, leídos por rangos; archivos .srt/.vtt/.ass |
+| `meta-api.js` | AniList y TMDB: buscar fichas, notas, recomendaciones; traducir sinopsis |
 
 Fuera de las capas:
 
@@ -39,7 +41,6 @@ Fuera de las capas:
 |---|---|
 | `core.js` | Descifrado de MEGA. Script clásico: lo comparten la página y el service worker. |
 | `sw.js` | Service worker: funciona sin conexión y sirve el video descifrado por rangos (`/__stream`). |
-| `subs.js`, `meta.js` | Subtítulos/capítulos del MP4 y AniList/TMDB. Pasarán a `models/`. |
 | `vendor/mega.js` | megajs empaquetado. No se edita a mano. |
 
 ## Estado

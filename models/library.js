@@ -7,7 +7,7 @@
 import { index, state, pkey, setIndex, saveProgressLocal } from './store.js';
 import { LS } from '../lib/util.js';
 import { baseName, episodeNumber, MIME, isVideoName, sortEpisodes, seasonInfo, langOf, twinKey } from './naming.js';
-import { isSubtitleName } from '../subs.js';
+import { isSubtitleName } from './subs.js';
 import { C, isGone, visibleChildren } from './mega.js';
 
 /** @typedef {import('./types.js').Library} Library */

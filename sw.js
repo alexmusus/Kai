@@ -8,7 +8,7 @@ importScripts('core.js');
 
 const VERSION = 'kai-v40';
 const SHELL = [
-  './', 'styles.css', 'app.js', 'subs.js', 'meta.js', 'core.js',
+  './', 'styles.css', 'app.js', 'core.js', 'models/subs.js', 'models/meta-api.js',
   'lib/util.js', 'lib/events.js', 'models/naming.js', 'models/store.js', 'models/mega.js', 'models/library.js',
   'models/quota.js', 'models/collections.js', 'models/progress.js', 'models/profiles.js', 'models/sync.js', 'views/icons.js', 'views/quota.js',
   'vendor/mega.js', 'manifest.webmanifest', 'icon-32.png', 'icon-180.png', 'icon-192.png', 'icon-512.png',
