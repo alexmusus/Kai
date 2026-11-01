@@ -19,6 +19,8 @@ import { isMainSeason, seasonLabel, seasonFullName, saveMeta, isFranchise, seaso
 import { ensureMeta, saveSyn, translateMissing, syncSynopses, syncFichas, resetFichas } from './models/fichas-sync.js';
 import { idb } from './models/idb.js';
 import { saveKnown, initKnown, newEpisodes, markSeriesSeen, newsList, hasUnreadNews, announceNew } from './models/news.js';
+import { epById } from './models/library.js';
+import { thumbFor } from './models/thumbs.js';
 const app = $('#app');
 
 on('quota', paintQuota);
@@ -73,58 +75,6 @@ function refreshLibrary(rerender = true) {
 }
 
 /* ───────────────────────── miniaturas ───────────────────────── */
-
-const thumbUrls = new Map();
-const thumbQueue = [];
-let thumbActive = 0;
-
-function thumbFor(ep) {
-  if (!ep || !ep.fa) return Promise.resolve(null);
-  if (thumbUrls.has(ep.id)) return thumbUrls.get(ep.id);
-  const p = new Promise((resolve) => {
-    thumbQueue.push(async () => {
-      try {
-        let blob = await idb.get('thumbs', ep.id).catch(() => null);
-        if (!blob && state.storage && navigator.onLine) {
-          blob = await fetchThumb(ep);
-          if (blob) idb.put('thumbs', blob, ep.id).catch(() => {});
-        }
-        resolve(blob ? URL.createObjectURL(blob) : null);
-      } catch {
-        resolve(null);
-      }
-    });
-    pumpThumbs();
-  });
-  thumbUrls.set(ep.id, p);
-  p.then((u) => { if (!u) thumbUrls.delete(ep.id); });
-  return p;
-}
-
-function pumpThumbs() {
-  while (thumbActive < 3 && thumbQueue.length) {
-    const job = thumbQueue.shift();
-    thumbActive++;
-    job().finally(() => { thumbActive--; pumpThumbs(); });
-  }
-}
-
-async function fetchThumb(ep) {
-  const attrs = ep.fa.split('/').map((s) => /(\d+):(\d+)\*([\w-]+)/.exec(s)).filter(Boolean)
-    .map((m) => ({ type: Number(m[2]), h: m[3] }));
-  const pick = attrs.find((a) => a.type === 1) || attrs.find((a) => a.type === 0);
-  if (!pick) return null;
-  const r = await state.storage.api.request({ a: 'ufa', fah: pick.h, ssl: 2, r: 1 });
-  if (!r || !r.p) return null;
-  const res = await fetch(r.p + '/' + pick.type, { method: 'POST', body: C.b64uToBytes(pick.h) });
-  if (!res.ok) return null;
-  const buf = new Uint8Array(await res.arrayBuffer());
-  if (buf.length < 12) return null;
-  const len = new DataView(buf.buffer, buf.byteOffset + 8, 4).getUint32(0, true);
-  const fk = await C.fileKey(ep.key);
-  const dec = await C.cbcDecryptNoPad(fk, buf.subarray(12, 12 + len));
-  return new Blob([dec], { type: 'image/jpeg' });
-}
 
 const thumbObserver = 'IntersectionObserver' in window ? new IntersectionObserver((entries) => {
   for (const e of entries) {
@@ -215,14 +165,6 @@ async function readCodec(ep) {
 }
 
 /* ───────────────────────── capítulos fuera de la biblioteca ───────────────────────── */
-
-function epById(id) {
-  const e = index.byId.get(id);
-  if (e) return e.ep;
-  if (knownEps.has(id)) return knownEps.get(id);
-  const m = state.dlMeta.get(id);
-  return m && m.ep ? m.ep : null;
-}
 
 /** Todo lo que el reproductor necesita: el capítulo, su lista y a dónde vuelve. */
 function resolveContext(id) {

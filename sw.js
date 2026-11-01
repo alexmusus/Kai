@@ -10,7 +10,7 @@ const VERSION = 'kai-v41';
 const SHELL = [
   './', 'styles.css', 'app.js', 'core.js', 'models/subs.js', 'models/meta-api.js',
   'lib/util.js', 'lib/events.js', 'models/naming.js', 'models/store.js', 'models/mega.js', 'models/library.js',
-  'models/quota.js', 'models/collections.js', 'models/progress.js', 'models/profiles.js', 'models/sync.js', 'models/fichas.js', 'models/fichas-sync.js', 'models/idb.js', 'models/news.js', 'views/icons.js', 'views/quota.js',
+  'models/quota.js', 'models/collections.js', 'models/progress.js', 'models/profiles.js', 'models/sync.js', 'models/fichas.js', 'models/fichas-sync.js', 'models/idb.js', 'models/news.js', 'models/thumbs.js', 'views/icons.js', 'views/quota.js',
   'vendor/mega.js', 'manifest.webmanifest', 'icon-32.png', 'icon-180.png', 'icon-192.png', 'icon-512.png',
   'gato/sentado.webp', 'gato/sentado-cierra.webp', 'gato/echado.webp',
 ];

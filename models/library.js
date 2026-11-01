@@ -4,7 +4,7 @@
  * el índice de capítulos, el idioma elegido (Sub/Doblado) y el progreso que sigue a las carpetas renombradas.
  */
 
-import { index, state, pkey, setIndex, saveProgressLocal } from './store.js';
+import { index, state, pkey, setIndex, saveProgressLocal, knownEps } from './store.js';
 import { LS } from '../lib/util.js';
 import { baseName, episodeNumber, MIME, isVideoName, sortEpisodes, seasonInfo, langOf, twinKey } from './naming.js';
 import { isSubtitleName } from './subs.js';
@@ -386,4 +386,17 @@ export function loadProfileState() {
   } catch {
     /* una biblioteca guardada dañada: se rearma al conectar con MEGA */
   }
+}
+
+/**
+ * Un capítulo por su id de MEGA: de la biblioteca, de lo visto al explorar MEGA, o de lo descargado.
+ * @param {string} id
+ * @returns {Episode | null}
+ */
+export function epById(id) {
+  const e = index.byId.get(id);
+  if (e) return e.ep;
+  if (knownEps.has(id)) return knownEps.get(id);
+  const m = state.dlMeta.get(id);
+  return m && m.ep ? m.ep : null;
 }
