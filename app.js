@@ -1,8 +1,8 @@
 import { isSubtitleName, mp4Info, mp4Chapters, mp4Formats, mp4QuickFormats, pickIntro, OUTRO_RE as OUTRO } from './subs.js';
 import { animeById, toMeta, findForSeries, findMovie, findTitle, findSeason, seasonNumOf, sideStoriesOf, scoresByIds, tmdbFindMovie, tmdbCheckKey, translateToSpanish, canTranslate, recommendationsFor, airingTop, toDiscover } from './meta.js';
-import { $, LS, esc, sleep, debounce, fmtTime, fmtLeft, fmtSize, hue, plural } from './lib/util.js';
+import { $, LS, esc, stable, sleep, debounce, fmtTime, fmtLeft, fmtSize, hue, plural } from './lib/util.js';
 import { ICON } from './views/icons.js';
-import { stripLang, langText, SPECIAL_RE, hasOwnTitle, isSpecialSeason, seasonOrdinal, seasonTab, MAIN_FORMATS, afterSeriesName, isBareSpecial, specialWord, baseName, sortEpisodes } from './models/naming.js';
+import { langText, SPECIAL_RE, hasOwnTitle, isSpecialSeason, seasonOrdinal, seasonTab, MAIN_FORMATS, afterSeriesName, isBareSpecial, specialWord, sortEpisodes } from './models/naming.js';
 import { DARK_TONES, TONES, FICHAS_FILE, SYN_FILE, SHARED_FILE, profileFile, LEGACY_PROGRESS, state, index, setIndex, knownEps, saveSettings, pkey, saveProgressLocal, saveShared, visibleProfiles } from './models/store.js';
 import { C, filesNamed, readJson, writeJson, visibleChildren, megaMessage, login, connect, downloadUrl } from './models/mega.js';
 import { langsOf, loadProfileState, nodePath, findFolder, makeEpisode, isPlayable, buildLibrary, buildIndex, langPref, learnAudioLang, setLangPref, setLibrary, librarySignature, migrateProgressKeys } from './models/library.js';
@@ -10,6 +10,10 @@ import { langsOf, loadProfileState, nodePath, findFolder, makeEpisode, isPlayabl
 import { on } from './lib/events.js';
 import { countBytes, noteQuota, quotaUntil, refreshAccountInfo } from './models/quota.js';
 import { quotaText, paintQuota } from './views/quota.js';
+import { isCine, isCollection, collectionItems, itemMetaKey, itemFor, movieTitle, itemMeta } from './models/collections.js';
+import { prog, setProgress, DEVICE, markNow, isLater, laterList, continueList, mergeProgress } from './models/progress.js';
+import { setLaterFlag } from './models/progress.js';
+import { backupProfiles, profilesFromBackup, mergeShared, normName, dedupeProfiles, finalProfileId } from './models/profiles.js';
 const app = $('#app');
 
 on('quota', paintQuota);
@@ -346,54 +350,6 @@ function titleFor(ep) {
 
 /* ───────────────────────── progreso ───────────────────────── */
 
-/** Lo visto de un capítulo. Si está en los dos idiomas, cuenta lo de ambos: el minuto del más reciente y,
- *  si cualquiera de los dos se terminó, queda visto. */
-function prog(ep) {
-  const own = state.progress[ep.path];
-  const tw = index.twins && index.twins.get(ep.path);
-  if (!tw) return own;
-  let best = own;
-  let w = !!(own && own.w);
-  for (const path of tw) {
-    const q = state.progress[path];
-    if (!q) continue;
-    if (q.w) w = true;
-    if (!best || (q.u || 0) > (best.u || 0)) best = q;
-  }
-  return best && best.w !== w ? { ...best, w } : best;
-}
-
-function setProgress(ep, t, d, watched) {
-  const cur = state.progress[ep.path] || {};
-  const w = watched ?? (cur.w || (d > 0 && t / d > 0.92));
-  state.progress[ep.path] = { t: Math.round(t * 10) / 10, d: Math.round(d || cur.d || 0), w: !!w, u: Date.now() };
-  state.dirty = true;
-  saveProgressLocal();
-}
-
-/* ── este dispositivo: para "Seguir en otro dispositivo" ── */
-const DEVICE = (() => {
-  let d = LS.get('device', null);
-  if (!d) { d = Math.random().toString(36).slice(2, 10); LS.set('device', d); }
-  return d;
-})();
-function deviceName() {
-  const ua = navigator.userAgent;
-  if (/iPad/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) return 'iPad';
-  if (/iPhone/.test(ua)) return 'iPhone';
-  if (/Android/.test(ua)) return /Mobile/.test(ua) ? 'teléfono Android' : 'tablet Android';
-  if (/Windows/.test(ua)) return 'PC';
-  if (/Macintosh/.test(ua)) return 'Mac';
-  return 'otro dispositivo';
-}
-
-/* Entradas especiales dentro del progreso de cada perfil (se sincronizan y fusionan igual, por `u`):
- *  "@now"               qué se está viendo, en qué segundo y en qué dispositivo
- *  "@later/<serie>"      la serie está en "Más tarde"; "@later/<serie>/<película>" para una película */
-function markNow(ep, t, d) {
-  const p = prog(ep) || {};
-  state.progress['@now'] = { p: ep.path, t: Math.round(t), d: Math.round(d || 0), w: !!p.w, dev: DEVICE, dn: deviceName(), u: Date.now() };
-}
 /** Lo que quedó viendo este perfil en otro dispositivo hace poco, si conviene ofrecer seguir aquí. */
 function resumeOffer() {
   const n = state.progress['@now'];
@@ -406,81 +362,11 @@ function resumeOffer() {
   return { ep: e.ep, s: state.library.series[e.si], n };
 }
 
-const laterKey = (s, itemKey = '') => `@later/${s.name}${itemKey ? '/' + itemKey : ''}`;
-const isLater = (s, itemKey = '') => !!(state.progress[laterKey(s, itemKey)] || {}).on;
 function setLater(s, itemKey, on) {
-  state.progress[laterKey(s, itemKey)] = { on: !!on, u: Date.now() };
-  state.dirty = true;
-  saveProgressLocal();
+  setLaterFlag(s, itemKey, on);
   toast(on ? 'Agregado a Más tarde.' : 'Quitado de Más tarde.');
   softRender();
   sync();
-}
-/** Lo marcado para más tarde que sigue en MEGA y sin terminar, lo más reciente primero. */
-function laterList() {
-  const lib = state.library;
-  if (!lib || lib.v !== 2) return [];
-  const out = [];
-  lib.series.forEach((s, si) => {
-    const coll = isCollection(s);
-    const items = coll ? collectionItems(s) : [null];
-    for (const it of items) {
-      const v = state.progress[laterKey(s, it ? it.key : '')];
-      if (!v || !v.on) continue;
-      const eps = it ? it.eps : s.all;
-      if (eps.length && eps.every((e) => (prog(e) || {}).w)) continue; // ya lo vio todo
-      out.push({ s, si, it, u: v.u });
-    }
-  });
-  return out.sort((a, b) => b.u - a.u);
-}
-
-function continueList() {
-  if (!state.library || state.library.v !== 2) return [];
-  const out = [];
-  state.library.series.forEach((s) => {
-    let best = null;
-    for (const ep of s.all) {
-      const p = prog(ep);
-      if (p && (!best || p.u > best.p.u)) best = { ep, p };
-    }
-    if (!best) return;
-    let ep = best.ep;
-    let p = best.p;
-    if (p.w) {
-      const i = s.all.indexOf(ep);
-      ep = s.all.slice(i + 1).find((x) => !(prog(x) || {}).w);
-      if (!ep) return;
-      p = prog(ep) || null;
-    }
-    out.push({ series: s, ep, p, u: best.p.u });
-  });
-  return out.sort((a, b) => b.u - a.u);
-}
-
-function mergeProgress(a, b) {
-  const out = { ...a };
-  for (const [k, v] of Object.entries(b || {})) {
-    if (!v || typeof v.u !== 'number') continue;
-    if (!out[k] || v.u > out[k].u) out[k] = v;
-  }
-  return out;
-}
-
-/* Respaldo de los perfiles en los atributos de la carpeta de la biblioteca: llegan con la lista de
- * archivos de MEGA, sin descargar nada, así que se pueden ver aunque la cuota esté agotada. */
-const BACKUP_ATTR = 'kaip';
-async function backupProfiles() {
-  const folder = state.storage && findFolder(state.storage, state.settings.root);
-  if (!folder || typeof folder.setAttributes !== 'function') return;
-  const want = visibleProfiles().filter((p) => !p.mergedInto).map((p) => ({ i: p.id, n: p.name, h: p.hue, c: p.created || 0, u: p.u || 0 }));
-  if (!want.length || JSON.stringify((folder.attributes || {})[BACKUP_ATTR]) === JSON.stringify(want)) return;
-  try { await folder.setAttributes({ [BACKUP_ATTR]: want }); } catch (err) { console.warn('respaldo de perfiles', err); }
-}
-function profilesFromBackup() {
-  const folder = state.storage && findFolder(state.storage, state.settings.root);
-  const b = folder && folder.attributes && folder.attributes[BACKUP_ATTR];
-  return Array.isArray(b) ? b.filter((x) => x && x.i && x.n).map((x) => ({ id: x.i, name: x.n, hue: x.h, created: x.c, u: x.u })) : [];
 }
 
 let syncing = null;
@@ -488,58 +374,6 @@ function sync() {
   if (syncing) return syncing;
   syncing = doSync().finally(() => { syncing = null; });
   return syncing;
-}
-
-function stable(v) {
-  if (Array.isArray(v)) return '[' + v.map(stable).join(',') + ']';
-  if (v && typeof v === 'object') return '{' + Object.keys(v).sort().map((k) => JSON.stringify(k) + ':' + stable(v[k])).join(',') + '}';
-  return JSON.stringify(v);
-}
-
-function mergeShared(a, b) {
-  const byU = (x, y) => {
-    const out = { ...x };
-    for (const [k, v] of Object.entries(y || {})) if (v && (!out[k] || (v.u || 0) > (out[k].u || 0))) out[k] = v;
-    return out;
-  };
-  const profiles = byU(Object.fromEntries((a.profiles || []).map((p) => [p.id, p])), Object.fromEntries((b.profiles || []).map((p) => [p.id, p])));
-  return {
-    profiles: Object.values(profiles).sort((x, y) => (x.created || 0) - (y.created || 0)),
-    intros: byU(a.intros, b.intros),
-    picks: byU(a.picks, b.picks),
-    keys: byU(a.keys, b.keys), // claves de servicios (TMDB para Cine): { tmdb: { v, u } }
-    legacyBy: a.legacyBy || b.legacyBy || null,
-  };
-}
-
-
-const normName = (n) => String(n || '').trim().toLocaleLowerCase('es');
-
-/** Perfiles con el mismo nombre se juntan en el más antiguo. */
-function dedupeProfiles() {
-  const keep = new Map();
-  let changed = false;
-  for (const p of state.shared.profiles) {
-    if (p.deleted) continue;
-    const k = normName(p.name);
-    const first = keep.get(k);
-    if (!first) { keep.set(k, p); continue; }
-    p.deleted = true;
-    p.mergedInto = first.id;
-    p.u = Date.now();
-    if (state.shared.legacyBy === p.id) state.shared.legacyBy = first.id;
-    changed = true;
-  }
-  return changed;
-}
-
-function finalProfileId(id) {
-  for (let i = 0; i < 8; i++) {
-    const p = state.shared.profiles.find((x) => x.id === id);
-    if (!p || !p.mergedInto) return id;
-    id = p.mergedInto;
-  }
-  return id;
 }
 
 async function doSync() {
@@ -1749,60 +1583,13 @@ function mergeSyn(a, b) {
   return out;
 }
 
-/* ── colecciones: una carpeta "Películas" no es una serie ──
- * Cada película (subcarpeta, o archivo si están sueltos) se busca por separado en AniList,
- * y la carpeta se muestra con un mosaico de sus pósters y un texto propio. */
-// "Películas" puede venir con la tilde en cualquier codificación (macOS la guarda separada), o sin tilde
-const COLLECTION_RE = /^(peliculas?|movies?|films?|filmes)\b/i;
-/* Cine: películas que no son anime (p. ej. "El gigante de hierro"). Carpeta "Cine" (u "Otras películas") dentro de Anime:
- * funciona como Películas (estante y página de cada una) pero no sale en el inicio ni en los catálogos, solo con su
- * botón al final del inicio y al buscar. Sus fichas vienen de TMDB (con la clave que se pone en Ajustes). */
-const CINE_RE = /^(cine|otras peliculas)\b/i;
-const plainName = (s) => String((s && s.name) || '').trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-const isCine = (s) => !!s && CINE_RE.test(plainName(s));
-const isCollection = (s) => !!s && (COLLECTION_RE.test(plainName(s)) || isCine(s));
 const tmdbKey = () => (state.shared.keys && state.shared.keys.tmdb && state.shared.keys.tmdb.v) || '';
-function cleanFileTitle(name) {
-  const t = String(name).replace(/\.[^.]+$/, '').replace(/[[(][^\])]*[\])]/g, ' ').replace(/[_.]+/g, ' ')
-    .replace(/\b(1080p|720p|480p|2160p|4k|x26[45]|hevc|aac|sub|subs|subtitulado|vose|dub|dob|doblado|lat|latino|castellano|esp|spa|bd|bdrip|web|webrip)\b/gi, ' ')
-    .replace(/\s+/g, ' ').trim();
-  return /\p{L}{3}/u.test(t) ? t : '';
-}
-/** Clave de una película suelta: el nombre del archivo sin el idioma ("Howl_DOB.mp4" y "Howl_SUB.mp4" son la misma). */
-const movieKey = (ep) => (ep.lang ? stripLang(baseName(ep.name)) : baseName(ep.name));
-/** Las películas de una colección: { key, title, query, eps } */
-function collectionItems(s) {
-  const out = [];
-  for (const se of s.seasons) {
-    if (se.name) out.push({ key: se.name, title: se.title || se.name, query: se.title || se.name, eps: se.episodes });
-    else for (const ep of se.episodes) out.push({ key: movieKey(ep), title: '', query: cleanFileTitle(ep.name), eps: [ep] });
-  }
-  return out;
-}
-const itemMetaKey = (s, key) => `${s.name}/${key}`; // un nombre de carpeta nunca lleva "/"
-function itemFor(s, ep) {
-  const e = index.byId.get(ep.id);
-  if (!e || !isCollection(s)) return null;
-  const se = s.seasons[e.ki];
-  return se && se.name ? { key: se.name, title: se.title || se.name, eps: se.episodes } : { key: movieKey(ep), title: '', eps: [ep] };
-}
 function movieImage(s, it) {
   const m = itemMeta(s, it.key);
   return (m && (m.banner || m.cover)) || '';
 }
 /** Dirección de la página de una película de la colección. */
 const movieHref = (si, key) => `#/pelicula/${si}/${encodeURIComponent(key)}`;
-/** Nombre que se muestra de una película: el de su carpeta, o el de AniList si es un archivo suelto. */
-function movieTitle(s, it) {
-  const m = itemMeta(s, it.key);
-  // Cine: el título en español de TMDB, o el nombre de la carpeta sin el año ("El gigante de hierro (1999)")
-  if (isCine(s)) return (m && m.title) || (it.title || it.query || '').replace(/\s*[([]\s*(?:19|20)\d{2}\s*[)\]]\s*$/, '') || it.eps[0].name.replace(/\.[^.]+$/, '');
-  return it.title || (m && m.title) || it.query || it.eps[0].name.replace(/\.[^.]+$/, '');
-}
-function itemMeta(s, key) {
-  const m = state.meta[itemMetaKey(s, key)];
-  return m && !m.none ? m : null;
-}
 /** Lo que se muestra de una serie: lo de AniList, o para una colección, lo armado con sus películas. */
 function displayMeta(s) {
   // una colección nunca usa la ficha de la carpeta (aunque haya quedado guardada de antes): se arma con sus películas

@@ -77,7 +77,11 @@
  * @property {number} [t] segundo donde se quedó
  * @property {number} [d] duración
  * @property {number} u   cuándo cambió (ms): en las fusiones gana el más reciente
- * @property {number} [w] 1 = visto
+ * @property {boolean} [on] solo en "@later/…": está en Más tarde
+ * @property {boolean} [w] visto
+ * @property {string} [p]   solo en "@now": ruta del capítulo que se está viendo
+ * @property {string} [dev] solo en "@now": id del dispositivo
+ * @property {string} [dn]  solo en "@now": nombre del dispositivo ("iPhone")
  */
 
 /** @typedef {Record<string, Progress>} ProgressMap */
