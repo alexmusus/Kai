@@ -31,7 +31,8 @@ async function gql(query, variables, tries = 0) {
     if (tries < 2) return gql(query, variables, tries + 1);
     throw new Error('AniList pidió esperar un momento.');
   }
-  if (r.headers.has('x-ratelimit-remaining') && left <= 1) rlUntil = Math.max(rlUntil, (reset > Date.now() ? reset : Date.now() + 60000) + 500);
+  if (r.headers.has('x-ratelimit-remaining') && left <= 1)
+    rlUntil = Math.max(rlUntil, (reset > Date.now() ? reset : Date.now() + 60000) + 500);
   if (!r.ok) throw new Error('AniList respondió ' + r.status);
   const j = await r.json();
   if (j.errors && !j.data) throw new Error(j.errors[0] && j.errors[0].message);
@@ -43,8 +44,10 @@ const searchMemo = new Map();
 export function searchAnime(q, perPage = 8) {
   const k = `${perPage}|${q.toLowerCase()}`;
   if (!searchMemo.has(k)) {
-    const p = gql(`query ($q: String, $n: Int) { Page(perPage: $n) { media(search: $q, type: ANIME, sort: SEARCH_MATCH) { ${FIELDS} } } }`, { q, n: perPage })
-      .then((data) => (data && data.Page && data.Page.media) || []);
+    const p = gql(
+      `query ($q: String, $n: Int) { Page(perPage: $n) { media(search: $q, type: ANIME, sort: SEARCH_MATCH) { ${FIELDS} } } }`,
+      { q, n: perPage },
+    ).then((data) => (data && data.Page && data.Page.media) || []);
     p.catch(() => searchMemo.delete(k));
     searchMemo.set(k, p);
   }
@@ -56,8 +59,14 @@ export async function scoresByIds(ids) {
   const out = {};
   for (let i = 0; i < ids.length; i += 40) {
     const chunk = ids.slice(i, i + 40);
-    const data = await gql(`query { ${chunk.map((id, k) => `a${k}: Media(id: ${Number(id)}, type: ANIME) { id averageScore }`).join(' ')} }`, {});
-    chunk.forEach((id, k) => { const m = data && data[`a${k}`]; if (m) out[id] = m.averageScore || null; });
+    const data = await gql(
+      `query { ${chunk.map((id, k) => `a${k}: Media(id: ${Number(id)}, type: ANIME) { id averageScore }`).join(' ')} }`,
+      {},
+    );
+    chunk.forEach((id, k) => {
+      const m = data && data[`a${k}`];
+      if (m) out[id] = m.averageScore || null;
+    });
   }
   return out;
 }
@@ -68,12 +77,35 @@ export async function animeById(id) {
 }
 
 const GENRES = {
-  Action: 'Acción', Adventure: 'Aventura', Comedy: 'Comedia', Drama: 'Drama', Ecchi: 'Ecchi', Fantasy: 'Fantasía',
-  Horror: 'Terror', 'Mahou Shoujo': 'Chicas mágicas', Mecha: 'Mecha', Music: 'Música', Mystery: 'Misterio',
-  Psychological: 'Psicológico', Romance: 'Romance', 'Sci-Fi': 'Ciencia ficción', 'Slice of Life': 'Vida cotidiana',
-  Sports: 'Deportes', Supernatural: 'Sobrenatural', Thriller: 'Suspenso', Hentai: 'Hentai',
+  Action: 'Acción',
+  Adventure: 'Aventura',
+  Comedy: 'Comedia',
+  Drama: 'Drama',
+  Ecchi: 'Ecchi',
+  Fantasy: 'Fantasía',
+  Horror: 'Terror',
+  'Mahou Shoujo': 'Chicas mágicas',
+  Mecha: 'Mecha',
+  Music: 'Música',
+  Mystery: 'Misterio',
+  Psychological: 'Psicológico',
+  Romance: 'Romance',
+  'Sci-Fi': 'Ciencia ficción',
+  'Slice of Life': 'Vida cotidiana',
+  Sports: 'Deportes',
+  Supernatural: 'Sobrenatural',
+  Thriller: 'Suspenso',
+  Hentai: 'Hentai',
 };
-const FORMATS = { TV: 'Serie', TV_SHORT: 'Serie corta', MOVIE: 'Película', SPECIAL: 'Especial', OVA: 'OVA', ONA: 'ONA', MUSIC: 'Video musical' };
+const FORMATS = {
+  TV: 'Serie',
+  TV_SHORT: 'Serie corta',
+  MOVIE: 'Película',
+  SPECIAL: 'Especial',
+  OVA: 'OVA',
+  ONA: 'ONA',
+  MUSIC: 'Video musical',
+};
 
 function cleanText(s) {
   if (!s) return '';
@@ -111,15 +143,23 @@ export function toMeta(m) {
  * o el nombre se parece lo suficiente a alguno (p. ej. "Mi Heroe Academia" ≈ "My Hero Academia"). */
 export function relatedTo(folder, m) {
   const titles = [...Object.values(m.title || {}), ...(m.synonyms || [])].map(squash).filter(Boolean);
-  const words = String(folder).split(/[^\p{L}\p{N}]+/u).map(squash).filter((w) => w.length >= 4);
+  const words = String(folder)
+    .split(/[^\p{L}\p{N}]+/u)
+    .map(squash)
+    .filter((w) => w.length >= 4);
   if (words.some((w) => titles.some((t) => t.includes(w)))) return true;
   return titleScore(folder, m) >= 0.6;
 }
 /** Busca probando varios textos (serie + temporada, temporada, serie). De cada búsqueda solo acepta un
  * resultado que tenga que ver con el nombre de la carpeta: mejor sin imagen que con la de otro anime. */
 /** Quita "Sub", "Doblado", "Latino"… de un nombre antes de buscarlo ("Shrek (Latino)" → "Shrek"). */
-const LANG_WORDS = /[\s_\-.]*[([]?\b(sub(?:titulad[oa])?|vose|dob(?:lad[oa])?|dub(?:bed)?|latino|castellano|espa[nñ]ol)\b[)\]]?/gi;
-export const noLang = (name) => String(name || '').replace(LANG_WORDS, ' ').replace(/\s+/g, ' ').trim() || String(name || '');
+const LANG_WORDS =
+  /[\s_\-.]*[([]?\b(sub(?:titulad[oa])?|vose|dob(?:lad[oa])?|dub(?:bed)?|latino|castellano|espa[nñ]ol)\b[)\]]?/gi;
+export const noLang = (name) =>
+  String(name || '')
+    .replace(LANG_WORDS, ' ')
+    .replace(/\s+/g, ' ')
+    .trim() || String(name || '');
 
 export async function findForSeries(names, folder = names[names.length - 1]) {
   names = names.map(noLang);
@@ -137,13 +177,19 @@ export async function findForSeries(names, folder = names[names.length - 1]) {
  * AniList busca palabra por palabra, así que "Kimi No Nawa" no encuentra "Kimi no Na wa." y
  * "Joze to Tora…" no encuentra "Josee to Tora…". Se prueban variantes del nombre y cada resultado
  * se compara letra a letra sin espacios ni signos, con margen para una o dos letras distintas. */
-const squash = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^0-9a-z぀-ヿ一-鿿]+/g, '');
+const squash = (s) =>
+  String(s || '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^0-9a-z぀-ヿ一-鿿]+/g, '');
 function editDistance(a, b) {
   if (a === b) return 0;
   let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
   for (let i = 1; i <= a.length; i++) {
     const cur = [i];
-    for (let j = 1; j <= b.length; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    for (let j = 1; j <= b.length; j++)
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
     prev = cur;
   }
   return prev[b.length];
@@ -152,7 +198,10 @@ function editDistance(a, b) {
 export async function findSeason(series, n) {
   const ord = { 2: '2nd', 3: '3rd' }[n] || `${n}th`;
   const roman = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'][n] || '';
-  const strong = new RegExp(`(season\\s*${n}\\b|${ord}\\s+season|\\b${n}(st|nd|rd|th)?\\s*(期|シーズン)${roman ? `|\\s${roman}$` : ''})`, 'i');
+  const strong = new RegExp(
+    `(season\\s*${n}\\b|${ord}\\s+season|\\b${n}(st|nd|rd|th)?\\s*(期|シーズン)${roman ? `|\\s${roman}$` : ''})`,
+    'i',
+  );
   const weak = new RegExp(`(\\b${n}\\b|\\b${ord}\\b${roman ? `|\\b${roman}\\b` : ''})`, 'i');
   const says = (m, re) => [...Object.values(m.title || {}), ...(m.synonyms || [])].some((t) => t && re.test(t));
   // AniList no siempre encuentra "Serie Season 2" (su título dice "Serie 2nd Season"): se prueba de varias formas
@@ -162,12 +211,17 @@ export async function findSeason(series, n) {
     if (list.some((m) => says(m, strong))) break;
   }
   // primero el que dice "Season N" (así "Season 3 Part 2" no gana cuando se busca la 2)
-  return list.find((m) => says(m, strong)) || list.find((m) => says(m, weak) && !/part\s*\d|parte\s*\d/i.test(m.title.english || m.title.romaji || '')) || null;
+  return (
+    list.find((m) => says(m, strong)) ||
+    list.find((m) => says(m, weak) && !/part\s*\d|parte\s*\d/i.test(m.title.english || m.title.romaji || '')) ||
+    null
+  );
 }
 
 /** Qué tanto se parece un resultado al nombre buscado (0 a 1). `kind` da una pequeña ventaja al formato esperado. */
 /** Número de temporada que dice un nombre: "2nd Season", "Season 2", "Temporada 2", "… II". */
-const SEASON_NUM_RE = /(?:\b(\d{1,2})(?:st|nd|rd|th)\s+season\b|\bseason\s*(\d{1,2})\b|\btemporada\s*(\d{1,2})\b|\s(II|III|IV|V|VI)\s*$)/i;
+const SEASON_NUM_RE =
+  /(?:\b(\d{1,2})(?:st|nd|rd|th)\s+season\b|\bseason\s*(\d{1,2})\b|\btemporada\s*(\d{1,2})\b|\s(II|III|IV|V|VI)\s*$)/i;
 export function seasonNumOf(text) {
   const m = SEASON_NUM_RE.exec(String(text || ''));
   if (!m) return null;
@@ -181,11 +235,21 @@ export function titleScore(name, m, kind = 'movie') {
   // "Serie 1st Season": la primera temporada en AniList casi nunca dice "1st Season"; se compara también sin eso
   const qn = seasonNumOf(name);
   const q1 = qn === 1 ? squash(String(name).replace(SEASON_NUM_RE, ' ')) : '';
-  const words = String(name).split(/[^\p{L}\p{N}]+/u).map(squash).filter((w) => w.length >= 3);
+  const words = String(name)
+    .split(/[^\p{L}\p{N}]+/u)
+    .map(squash)
+    .filter((w) => w.length >= 3);
   let best = 0;
   // "Kaguya-sama wa Kokurasetai" = "Kaguya-sama wa Kokurasetai: Tensaitachi no…" (lo que sigue es un subtítulo, tras ":" o " -")
   const lowName = String(name).toLowerCase().replace(/\s+/g, ' ').trim();
-  if (lowName.length >= 6 && raw.some((t) => { const lt = String(t).toLowerCase().replace(/\s+/g, ' '); return lt.startsWith(lowName) && /^\s*[:\-–(~]/.test(lt.slice(lowName.length)); })) best = 0.85;
+  if (
+    lowName.length >= 6 &&
+    raw.some((t) => {
+      const lt = String(t).toLowerCase().replace(/\s+/g, ' ');
+      return lt.startsWith(lowName) && /^\s*[:\-–(~]/.test(lt.slice(lowName.length));
+    })
+  )
+    best = 0.85;
   // la temporada se compara escrita igual en ambos lados ("Temporada 2" = "2nd Season" = "Season 2" → "season2")
   const canon = (text) => squash(String(text).replace(SEASON_NUM_RE, (x) => ` season${seasonNumOf(x)} `));
   for (const r of raw) {
@@ -199,17 +263,26 @@ export function titleScore(name, m, kind = 'movie') {
     // mismo comienzo largo y final distinto ("Re Zero… Hyouketsu no Kizuna" no es "Re Zero… Memory Snow")
     let p = 0;
     while (p < q.length && p < t.length && q[p] === t[p]) p++;
-    const rq = q.slice(p), rt = t.slice(p);
-    const distinct = p >= 10 && rq.length >= 3 && rt.length >= 3 && 1 - editDistance(rq, rt) / Math.max(rq.length, rt.length) < 0.5;
+    const rq = q.slice(p),
+      rt = t.slice(p);
+    const distinct =
+      p >= 10 && rq.length >= 3 && rt.length >= 3 && 1 - editDistance(rq, rt) / Math.max(rq.length, rt.length) < 0.5;
     // otra temporada ("2nd Season" cuando se busca la 1.ª o la 3.ª) no vale
     const otherSeason = qn != null && (tn ?? 1) !== qn;
     const cap = distinct || otherSeason ? 0.6 : 1;
     best = Math.max(best, Math.min(sc, cap));
     // "Kimi no Na wa" dentro de "Kimi no Na wa. (2016)" o al revés también vale
     // (solo si lo que sobra es poco: "Yahari… Machigatteiru." no es "Yahari… Machigatteiru. Zoku OVA")
-    if (cap === 1 && q.length >= 6 && (t.startsWith(q) || q.startsWith(t)) && Math.abs(t.length - q.length) <= Math.max(6, Math.min(q.length, t.length) * 0.15)) best = Math.max(best, 0.85);
+    if (
+      cap === 1 &&
+      q.length >= 6 &&
+      (t.startsWith(q) || q.startsWith(t)) &&
+      Math.abs(t.length - q.length) <= Math.max(6, Math.min(q.length, t.length) * 0.15)
+    )
+      best = Math.max(best, 0.85);
     // "Heaven's Feel I presage flower" dentro de "Fate/stay night Movie: Heaven's Feel - I. presage flower"
-    if (cap === 1 && words.length >= 2 && words.every((w) => t.includes(w)) && t.length <= q.length * 1.6) best = Math.max(best, 0.8);
+    if (cap === 1 && words.length >= 2 && words.every((w) => t.includes(w)) && t.length <= q.length * 1.6)
+      best = Math.max(best, 0.8);
   }
   const want = { movie: ['MOVIE'], tv: ['TV', 'TV_SHORT', 'ONA'], ova: ['OVA', 'SPECIAL', 'ONA'] }[kind] || [];
   return best + (want.includes(m.format) ? 0.04 : 0);
@@ -221,21 +294,30 @@ function movieQueries(name) {
   const out = [w.join(' ')];
   // "Serie - Subtítulo": el subtítulo solo suele bastar ("Hyouketsu no Kizuna"), y la serie con el subtítulo
   const dash = String(name).split(/\s+[-–]\s+/);
-  if (dash.length === 2 && dash[1].replace(/\s/g, '').length >= 5) out.push(dash[1], `${dash[0].split(/\s+/).slice(0, 2).join(' ')} ${dash[1]}`);
+  if (dash.length === 2 && dash[1].replace(/\s/g, '').length >= 5)
+    out.push(dash[1], `${dash[0].split(/\s+/).slice(0, 2).join(' ')} ${dash[1]}`);
   // "Serie 1st Season": también sin eso; "Serie Temporada 2": como lo escribe AniList ("Serie 2nd Season", "Serie Season 2")
   const sn = seasonNumOf(name);
   const bare = String(name).replace(SEASON_NUM_RE, ' ').replace(/\s+/g, ' ').trim();
   if (sn === 1) out.push(bare);
   else if (sn > 1) out.push(`${bare} ${{ 2: '2nd', 3: '3rd' }[sn] || sn + 'th'} Season`, `${bare} Season ${sn}`);
   // nombres largos: también las primeras 3–5 palabras, que suelen bastar (y sirven si más adelante hay algo escrito distinto)
-  if (w.length > 6) out.push(w.slice(0, w.length - 1).join(' '), w.slice(0, 5).join(' '), w.slice(0, 4).join(' '), w.slice(0, 3).join(' '));
+  if (w.length > 6)
+    out.push(
+      w.slice(0, w.length - 1).join(' '),
+      w.slice(0, 5).join(' '),
+      w.slice(0, 4).join(' '),
+      w.slice(0, 3).join(' '),
+    );
   for (let n = w.length - 1; n >= 2; n--) out.push(w.slice(0, n).join(' '));
   for (let i = 0; i + 1 < w.length; i++) out.push(w[i] + ' ' + w[i + 1]);
   for (let k = 1; k <= w.length - 2; k++) out.push(w.slice(k).join(' '));
   return [...new Set(out)].filter((q) => q.replace(/\s/g, '').length >= 5).slice(0, 7);
 }
 /** Busca una película por el nombre de su archivo. Devuelve el resultado de AniList o null. */
-export function findMovie(name, pause = () => Promise.resolve()) { return findTitle(name, 'movie', pause); }
+export function findMovie(name, pause = () => Promise.resolve()) {
+  return findTitle(name, 'movie', pause);
+}
 /** Busca por un nombre exacto (temporada, OVA o película). `kind`: 'movie', 'tv' u 'ova', según lo que dice la carpeta. */
 export async function findTitle(name, kind = 'tv', pause = () => Promise.resolve()) {
   name = noLang(name);
@@ -257,7 +339,10 @@ export async function findTitle(name, kind = 'tv', pause = () => Promise.resolve
       const sc = titleScore(name, m, kind);
       // empate (p. ej. "Kaguya-sama wa Kokurasetai" calza igual con sus 3 temporadas): gana la más antigua, la original
       const tie = best && Math.abs(sc - bestScore) < 0.02 && (m.seasonYear || 9999) < (best.seasonYear || 9999);
-      if (sc > bestScore + 0.02 || tie || (!best && sc > 0)) { best = m; bestScore = Math.max(sc, bestScore); }
+      if (sc > bestScore + 0.02 || tie || (!best && sc > 0)) {
+        best = m;
+        bestScore = Math.max(sc, bestScore);
+      }
     }
     if (bestScore >= 0.96) break; // casi idéntico y del tipo esperado (si no, se sigue probando: "Serie Zoku" no es "Serie Zoku OVA")
   }
@@ -270,10 +355,21 @@ async function findSideStory(base, pause) {
   const b = await findTitle(base, 'tv', pause);
   if (!b) return null;
   await pause();
-  const data = await gql(`query ($id: Int) { Media(id: $id, type: ANIME) { relations { edges { relationType node { type ${FIELDS} } } } } }`, { id: b.id });
+  const data = await gql(
+    `query ($id: Int) { Media(id: $id, type: ANIME) { relations { edges { relationType node { type ${FIELDS} } } } } }`,
+    { id: b.id },
+  );
   const edges = (data && data.Media && data.Media.relations && data.Media.relations.edges) || [];
-  const list = edges.filter((e) => e.node && e.node.type === 'ANIME' && ['SIDE_STORY', 'SPIN_OFF', 'OTHER'].includes(e.relationType) && ['OVA', 'SPECIAL', 'ONA'].includes(e.node.format))
-    .map((e) => e.node).sort((x, y) => (x.seasonYear || 9999) - (y.seasonYear || 9999));
+  const list = edges
+    .filter(
+      (e) =>
+        e.node &&
+        e.node.type === 'ANIME' &&
+        ['SIDE_STORY', 'SPIN_OFF', 'OTHER'].includes(e.relationType) &&
+        ['OVA', 'SPECIAL', 'ONA'].includes(e.node.format),
+    )
+    .map((e) => e.node)
+    .sort((x, y) => (x.seasonYear || 9999) - (y.seasonYear || 9999));
   return list[0] || null;
 }
 
@@ -282,13 +378,23 @@ async function findSideStory(base, pause) {
 const sideMemo = new Map();
 export function sideStoriesOf(id) {
   if (!sideMemo.has(id)) {
-    const p = gql(`query ($id: Int) { Media(id: $id, type: ANIME) { relations { edges { relationType node { type ${FIELDS} } } } } }`, { id })
-      .then((data) => ((data && data.Media && data.Media.relations && data.Media.relations.edges) || [])
-        .filter((e) => e.node && e.node.type === 'ANIME' && (
-          (['SIDE_STORY', 'SPIN_OFF', 'OTHER', 'SUMMARY'].includes(e.relationType) && ['OVA', 'SPECIAL', 'ONA'].includes(e.node.format))
-          // la OVA de Yahari Kan está como "secuela" de Kan (las series ONA que siguen, como Dorohedoro Season 2, no)
-          || (e.relationType === 'SEQUEL' && ['OVA', 'SPECIAL'].includes(e.node.format))))
-        .map((e) => e.node).sort((x, y) => (x.seasonYear || 9999) - (y.seasonYear || 9999) || x.id - y.id));
+    const p = gql(
+      `query ($id: Int) { Media(id: $id, type: ANIME) { relations { edges { relationType node { type ${FIELDS} } } } } }`,
+      { id },
+    ).then((data) =>
+      ((data && data.Media && data.Media.relations && data.Media.relations.edges) || [])
+        .filter(
+          (e) =>
+            e.node &&
+            e.node.type === 'ANIME' &&
+            ((['SIDE_STORY', 'SPIN_OFF', 'OTHER', 'SUMMARY'].includes(e.relationType) &&
+              ['OVA', 'SPECIAL', 'ONA'].includes(e.node.format)) ||
+              // la OVA de Yahari Kan está como "secuela" de Kan (las series ONA que siguen, como Dorohedoro Season 2, no)
+              (e.relationType === 'SEQUEL' && ['OVA', 'SPECIAL'].includes(e.node.format))),
+        )
+        .map((e) => e.node)
+        .sort((x, y) => (x.seasonYear || 9999) - (y.seasonYear || 9999) || x.id - y.id),
+    );
     p.catch(() => sideMemo.delete(id));
     sideMemo.set(id, p);
   }
@@ -354,8 +460,11 @@ export async function recommendationsFor(ids, pause = () => new Promise((r) => s
     const q = `query { ${chunk.map((id, k) => `a${k}: Media(id: ${Number(id)}, type: ANIME) { id recommendations(sort: RATING_DESC, perPage: 8) { nodes { rating mediaRecommendation { ${DFIELDS} } } } }`).join('\n')} }`;
     const data = await gql(q, {});
     chunk.forEach((id, k) => {
-      const nodes = (data && data[`a${k}`] && data[`a${k}`].recommendations && data[`a${k}`].recommendations.nodes) || [];
-      out[id] = nodes.filter((n) => n && n.mediaRecommendation && !n.mediaRecommendation.isAdult).map((n) => ({ rating: n.rating || 0, media: n.mediaRecommendation }));
+      const nodes =
+        (data && data[`a${k}`] && data[`a${k}`].recommendations && data[`a${k}`].recommendations.nodes) || [];
+      out[id] = nodes
+        .filter((n) => n && n.mediaRecommendation && !n.mediaRecommendation.isAdult)
+        .map((n) => ({ rating: n.rating || 0, media: n.mediaRecommendation }));
     });
     if (i + 8 < ids.length) await pause();
   }
@@ -364,7 +473,10 @@ export async function recommendationsFor(ids, pause = () => new Promise((r) => s
 
 /** Lo que está saliendo ahora y tiene buena puntuación (y suficiente gente que lo sigue, para que la nota sea confiable). */
 export async function airingTop() {
-  const data = await gql(`query { Page(perPage: 36) { media(type: ANIME, status: RELEASING, isAdult: false, sort: SCORE_DESC, averageScore_greater: 74, popularity_greater: 6000, format_in: [TV, TV_SHORT, ONA]) { ${DFIELDS} } } }`, {});
+  const data = await gql(
+    `query { Page(perPage: 36) { media(type: ANIME, status: RELEASING, isAdult: false, sort: SCORE_DESC, averageScore_greater: 74, popularity_greater: 6000, format_in: [TV, TV_SHORT, ONA]) { ${DFIELDS} } } }`,
+    {},
+  );
   // fuera los cortos de un par de minutos por capítulo (como Chiikawa): animeav1 casi nunca los tiene.
   // Si AniList no sabe la duración, la serie se queda.
   return ((data && data.Page && data.Page.media) || []).filter((m) => !(m.duration && m.duration < SHORT_MIN));
@@ -376,31 +488,73 @@ const SHORT_MIN = 8; // minutos por capítulo
 const TMDB = 'https://api.themoviedb.org/3';
 const TMDB_IMG = 'https://image.tmdb.org/t/p/';
 const TMDB_GENRES = {
-  28: 'Acción', 12: 'Aventura', 16: 'Animación', 35: 'Comedia', 80: 'Crimen', 99: 'Documental', 18: 'Drama', 10751: 'Familia',
-  14: 'Fantasía', 36: 'Historia', 27: 'Terror', 10402: 'Música', 9648: 'Misterio', 10749: 'Romance', 878: 'Ciencia ficción',
-  10770: 'Película de TV', 53: 'Suspenso', 10752: 'Bélica', 37: 'Western',
+  28: 'Acción',
+  12: 'Aventura',
+  16: 'Animación',
+  35: 'Comedia',
+  80: 'Crimen',
+  99: 'Documental',
+  18: 'Drama',
+  10751: 'Familia',
+  14: 'Fantasía',
+  36: 'Historia',
+  27: 'Terror',
+  10402: 'Música',
+  9648: 'Misterio',
+  10749: 'Romance',
+  878: 'Ciencia ficción',
+  10770: 'Película de TV',
+  53: 'Suspenso',
+  10752: 'Bélica',
+  37: 'Western',
 };
 async function tmdb(path, params, key) {
   const bearer = key.length > 60; // el token v4 es largo; la clave v3 tiene 32 caracteres
   const q = new URLSearchParams({ ...params, ...(bearer ? {} : { api_key: key }) });
-  const r = await fetch(`${TMDB}${path}?${q}`, bearer ? { headers: { Authorization: `Bearer ${key}`, Accept: 'application/json' } } : undefined);
-  if (r.status === 401) { const e = new Error('La clave de TMDB no es válida.'); e.code = 'KEY'; throw e; }
+  const r = await fetch(
+    `${TMDB}${path}?${q}`,
+    bearer ? { headers: { Authorization: `Bearer ${key}`, Accept: 'application/json' } } : undefined,
+  );
+  if (r.status === 401) {
+    const e = new Error('La clave de TMDB no es válida.');
+    e.code = 'KEY';
+    throw e;
+  }
   if (r.status === 429) throw new Error('TMDB pidió esperar un momento.');
   if (!r.ok) throw new Error('TMDB respondió ' + r.status);
   return r.json();
 }
 /** ¿La clave funciona? (true / false). Si no hay conexión, lanza error. */
 export async function tmdbCheckKey(key) {
-  try { await tmdb('/configuration', {}, key); return true; } catch (err) { if (err.code === 'KEY') return false; throw err; }
+  try {
+    await tmdb('/configuration', {}, key);
+    return true;
+  } catch (err) {
+    if (err.code === 'KEY') return false;
+    throw err;
+  }
 }
 /** Ficha de una película por el nombre de su carpeta: "El gigante de hierro (1999)" busca "El gigante de hierro" del año 1999. */
 export async function tmdbFindMovie(folderName, key) {
   folderName = noLang(folderName);
-  const year = (/[([]\s*((?:19|20)\d{2})\s*[)\]]|\b((?:19|20)\d{2})\s*$/.exec(folderName) || []).slice(1).find(Boolean) || '';
-  const name = folderName.replace(/[([]\s*(?:19|20)\d{2}\s*[)\]]|\b(?:19|20)\d{2}\s*$/g, '').replace(/[._]+/g, ' ').replace(/\s+/g, ' ').trim();
+  const year =
+    (/[([]\s*((?:19|20)\d{2})\s*[)\]]|\b((?:19|20)\d{2})\s*$/.exec(folderName) || []).slice(1).find(Boolean) || '';
+  const name = folderName
+    .replace(/[([]\s*(?:19|20)\d{2}\s*[)\]]|\b(?:19|20)\d{2}\s*$/g, '')
+    .replace(/[._]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
   if (!name) return null;
-  let list = (await tmdb('/search/movie', { query: name, language: 'es-MX', include_adult: 'false', ...(year ? { year } : {}) }, key)).results || [];
-  if (!list.length && year) list = (await tmdb('/search/movie', { query: name, language: 'es-MX', include_adult: 'false' }, key)).results || [];
+  let list =
+    (
+      await tmdb(
+        '/search/movie',
+        { query: name, language: 'es-MX', include_adult: 'false', ...(year ? { year } : {}) },
+        key,
+      )
+    ).results || [];
+  if (!list.length && year)
+    list = (await tmdb('/search/movie', { query: name, language: 'es-MX', include_adult: 'false' }, key)).results || [];
   let best = null;
   let bestScore = 0;
   for (const m of list.slice(0, 10)) {
@@ -408,7 +562,10 @@ export async function tmdbFindMovie(folderName, key) {
     let sc = titleScore(name, fake, '');
     if (year && (m.release_date || '').startsWith(year)) sc += 0.1;
     sc += Math.min(0.05, (m.popularity || 0) / 2000); // entre dos iguales, la conocida
-    if (sc > bestScore) { best = m; bestScore = sc; }
+    if (sc > bestScore) {
+      best = m;
+      bestScore = sc;
+    }
   }
   if (!best || bestScore < 0.7) return null;
   return {
