@@ -1,10 +1,10 @@
 import { isSubtitleName, mp4Info, mp4Chapters, mp4Formats, mp4QuickFormats, pickIntro, OUTRO_RE as OUTRO } from './models/subs.js';
-import { animeById, toMeta, findForSeries, findMovie, findTitle, findSeason, seasonNumOf, sideStoriesOf, scoresByIds, tmdbFindMovie, tmdbCheckKey, translateToSpanish, canTranslate, recommendationsFor, airingTop, toDiscover } from './models/meta-api.js';
+import { tmdbCheckKey, translateToSpanish, canTranslate, recommendationsFor, airingTop, toDiscover } from './models/meta-api.js';
 import { $, LS, esc, sleep, debounce, fmtTime, fmtLeft, fmtSize, hue, plural } from './lib/util.js';
 import { ICON } from './views/icons.js';
-import { langText, SPECIAL_RE, hasOwnTitle, isSpecialSeason, seasonOrdinal, seasonTab, MAIN_FORMATS, afterSeriesName, isBareSpecial, specialWord, sortEpisodes } from './models/naming.js';
-import { DARK_TONES, TONES, FICHAS_FILE, SYN_FILE, profileFile, state, index, setIndex, knownEps, saveSettings, pkey, saveShared, visibleProfiles } from './models/store.js';
-import { C, filesNamed, readJson, writeJson, visibleChildren, megaMessage, login, connect, downloadUrl } from './models/mega.js';
+import { langText, hasOwnTitle, sortEpisodes } from './models/naming.js';
+import { DARK_TONES, TONES, profileFile, state, index, setIndex, knownEps, saveSettings, pkey, saveShared, visibleProfiles } from './models/store.js';
+import { C, filesNamed, readJson, visibleChildren, megaMessage, login, connect, downloadUrl } from './models/mega.js';
 import { langsOf, loadProfileState, nodePath, makeEpisode, isPlayable, buildLibrary, buildIndex, langPref, learnAudioLang, setLangPref, setLibrary, librarySignature } from './models/library.js';
 
 import { on } from './lib/events.js';
@@ -15,10 +15,14 @@ import { isCine, isCollection, collectionItems, itemMetaKey, itemFor, movieTitle
 import { prog, setProgress, DEVICE, markNow, isLater, laterList, continueList, mergeProgress } from './models/progress.js';
 import { setLaterFlag } from './models/progress.js';
 import { profilesFromBackup, normName } from './models/profiles.js';
+import { isMainSeason, seasonLabel, seasonFullName, saveMeta, isFranchise, seasonMeta, metaFor, synopsisOf, hasSpanish, tmdbKey, displayMeta } from './models/fichas.js';
+import { ensureMeta, saveSyn, translateMissing, syncSynopses, syncFichas, resetFichas } from './models/fichas-sync.js';
 const app = $('#app');
 
 on('quota', paintQuota);
 on('tree-changed', () => refreshLibrary());
+on('meta-changed', (views) => { if (views.includes(route().view)) softRender(); });
+on('sync-needed', () => sync());
 
 /* ───────────────────────── utilidades ───────────────────────── */
 
@@ -30,63 +34,6 @@ setIndex(buildIndex(state.library));
 loadProfileState();
 
 /* ───────────────────────── nombres → capítulos ───────────────────────── */
-
-/** La ficha propia de la temporada (sin usar la de la serie). */
-function ownSeasonMeta(s, se) {
-  const m = se && se.name && state.meta[itemMetaKey(s, se.name)];
-  return m && !m.none ? m : null;
-}
-/** ¿Es una temporada (serie) o un especial (OVA, especial, película)? */
-function isMainSeason(s, se) {
-  if (isSpecialSeason(se)) return false;
-  const m = ownSeasonMeta(s, se);
-  return m && m.format ? MAIN_FORMATS.has(m.format) : true;
-}
-/* Nombres de las tarjetas de temporada (v37): manda lo que AniList dice que es cada carpeta, no cómo se llama.
- *  - Serie de TV (o sin ficha y sin "OVA" en el nombre) → "Temporada N", contando solo las temporadas;
- *    el número que dice la carpeta o AniList ("2nd Season") se respeta; "Part 2" o carpetas con el mismo número → "· Parte 2".
- *  - OVA, especial o película → su subtítulo ("Memory Snow"); si no tiene, "OVA" / "Especial" / "Película".
- *  Dentro de la temporada se muestra el nombre completo de AniList. */
-const labelMemo = new WeakMap();
-function seasonLabels(s) {
-  const key = s.seasons.map((se) => { const m = ownSeasonMeta(s, se); return `${se.name}|${m ? m.id + (m.format || '') : ''}`; }).join('/');
-  const hit = labelMemo.get(s);
-  if (hit && hit.key === key) return hit.map;
-  const map = new Map();
-  let prev = 0;
-  for (const se of s.seasons) {
-    const m = ownSeasonMeta(s, se);
-    if (!isMainSeason(s, se)) {
-      // sin la palabra del tipo al final ("… Heavens Feel Película" → "Heavens Feel")
-      const rest = isBareSpecial(s, se) ? '' : afterSeriesName(s, se.title || se.name).replace(/[([][^)\]]*[)\]]/g, ' ').replace(/[\s.\-–:,]*\b(ovas?|oads?|onas?|especial(es)?|specials?|pel[ií]culas?|movies?|films?)\s*\d{0,2}\s*$/i, '').replace(/\s+/g, ' ').trim();
-      map.set(se, rest ? spanishSeason(rest[0].toUpperCase() + rest.slice(1)) : specialWord(se, m));
-      continue;
-    }
-    const texts = [se.title, m && m.romaji, m && m.title].filter(Boolean);
-    let part = null;
-    for (const t of texts) { const p = /\b(?:part|parte|cour)\s*(\d{1,2})\b/i.exec(t); if (p) { part = Number(p[1]); break; } }
-    let n = null;
-    for (const t of texts) { const x = seasonNumOf(t); if (x) { n = x; break; } }
-    const twins = s.seasons.filter((x) => x.num != null && x.num === se.num);
-    if (twins.length > 1 && part == null) part = twins.indexOf(se) + 1;
-    if (n == null) n = part && part > 1 ? Math.max(prev, 1) : prev + 1;
-    prev = Math.max(prev, n);
-    map.set(se, part ? `Temporada ${n} · Parte ${part}` : `Temporada ${n}`);
-  }
-  labelMemo.set(s, { key, map });
-  return map;
-}
-/** Nombre de una temporada en tarjetas, botones y avisos: "Temporada 2", "OVA", "Memory Snow". */
-function seasonLabel(s, se) { return seasonLabels(s).get(se) || seasonTab(s, se); }
-/** Nombre completo para la página de la temporada: el de AniList; si no hay ficha, el de la carpeta. */
-function seasonFullName(s, se) {
-  const m = ownSeasonMeta(s, se) || (seasonLabel(s, se) === 'Temporada 1' && !isFranchise(s) ? metaFor(s) : null);
-  // dos carpetas con la misma ficha (Memory Snow y Hyouketsu no Kizuna son "Re:Zero… OVAs"): el nombre de la carpeta
-  const shared = m && s.seasons.some((x) => x !== se && (ownSeasonMeta(s, x) || {}).id === m.id);
-  if (m && !shared && (m.romaji || m.title)) return m.romaji || m.title;
-  if (hasOwnTitle(se)) return se.title;
-  return `${s.name} · ${seasonLabel(s, se)}`;
-}
 
 function episodeLabel(ep) {
   const e = index.byId.get(ep.id);
@@ -1193,363 +1140,13 @@ function newsHTML() {
 
 /* ── sinopsis e imágenes ── */
 
-// las fichas llegan de a una al buscar en AniList: se juntan y se guardan una sola vez (y al salir, si falta)
-let metaTimer = 0;
-function saveMeta() { clearTimeout(metaTimer); metaTimer = setTimeout(flushMeta, 1500); }
-function flushMetaNow() { clearTimeout(metaTimer); metaTimer = 0; LS.set('meta', state.meta); }
-function flushMeta() { if (metaTimer) { clearTimeout(metaTimer); metaTimer = 0; LS.set('meta', state.meta); } }
-addEventListener('pagehide', flushMeta);
-document.addEventListener('visibilitychange', () => { if (document.hidden) flushMeta(); });
-/* Fichas de AniList:
- *  - Una serie con UNA temporada (o tipo "1. Temporada 1"): se busca con el nombre de la carpeta de la serie.
- *  - Con varias temporadas, cada temporada que tiene nombre propio ("2. Fate Zero", "1.5 Prólogo UBW") se busca
- *    con ese nombre exacto y tiene su propio póster, banner y sinopsis. Las genéricas ("2. Temporada 2") buscan
- *    "Serie Season 2" y solo se aceptan si son de esa serie; si no, usan la ficha de la serie.
- *  - Si la primera temporada tiene nombre propio, la carpeta de la serie es solo el nombre del grupo ("Fate"):
- *    no se busca, y la serie se muestra con la ficha de la temporada que estás viendo (o la primera). */
-const usesSeasonMeta = (s) => !!s && !isCollection(s) && s.seasons.length > 1;
-const isFranchise = (s) => usesSeasonMeta(s) && hasOwnTitle(s.seasons[0]);
-function seasonMeta(s, se) {
-  if (!usesSeasonMeta(s) || !se || !se.name) return null;
-  const m = state.meta[itemMetaKey(s, se.name)];
-  return m && !m.none ? m : null;
-}
-/** La temporada que estás viendo: la del último capítulo que tocaste; si no, la primera. */
-function activeSeason(s) {
-  let best = null;
-  for (const ep of s.all) { const p = prog(ep); if (p && (!best || p.u > best.u)) best = { u: p.u, ep }; }
-  const e = best && index.byId.get(best.ep.id);
-  return s.seasons[e ? e.ki : 0];
-}
-function metaFor(s) {
-  if (isFranchise(s)) return seasonMeta(s, activeSeason(s)) || s.seasons.map((se) => seasonMeta(s, se)).find(Boolean) || null;
-  const m = state.meta[s.name];
-  return m && !m.none ? m : null;
-}
-/** Lo que se busca en AniList para una temporada, o null si usa la ficha de la serie. */
-function seasonQuery(s, se) {
-  if (isBareSpecial(s, se)) return { ovaOf: s.seasons.indexOf(se) };
-  if (hasOwnTitle(se)) {
-    const t = se.title;
-    const kind = /\b(pel[ií]culas?|movies?|films?|gekijouban)\b/i.test(t) ? 'movie' : SPECIAL_RE.test(t) ? 'ova' : 'tv';
-    // "(Película)", "[OVA]"… solo dicen el tipo: no se buscan
-    const name = t.replace(/[([][^)\]]*[)\]]/g, (x) => (SPECIAL_RE.test(x) ? ' ' : x)).replace(/\s+/g, ' ').trim();
-    return { name: name || t, kind };
-  }
-  const n = seasonOrdinal(s, se);
-  return n > 1 && !isSpecialSeason(se) ? { series: s.name, n } : null;
-}
-function searchNames(s) {
-  return [s.name];
-}
 
-let metaRunning = false;
-/** ¿Ya tiene ficha guardada (encontrada o no) todo lo que se busca de esta serie? */
-function hasAllMeta(s) {
-  if (isCollection(s)) return collectionItems(s).every((it) => state.meta[itemMetaKey(s, it.key)]);
-  const seasonsOk = !usesSeasonMeta(s) || s.seasons.every((se) => !seasonQuery(s, se) || state.meta[itemMetaKey(s, se.name)]);
-  return seasonsOk && (isFranchise(s) || !!state.meta[s.name]);
-}
-async function ensureMeta() {
-  if (metaRunning || !navigator.onLine || !state.library || !state.library.series) return;
-  metaRunning = true;
-  let changed = false;
-  try {
-    // antes de buscar nada, lo que otros dispositivos ya encontraron (si MEGA no responde, se busca igual)
-    if (!fichasPulled && state.storage) { try { await syncFichas(state.storage.root, false); } catch (err) { console.warn('fichas', err); fichasPulled = true; } }
-    // 1) las fichas guardadas antes de la v29 no traían la nota: se pide solo la nota, todas juntas (1–2 pedidos),
-    //    en vez de volver a buscar cada serie y película (eso agotaba el límite de AniList y dejaba otras sin ficha)
-    const old = Object.values(state.meta).filter((m) => m && !m.none && typeof m.id === 'number' && m.src !== 'TMDB' && ((m.sv && m.sv < 6) || (m.mv && m.mv < 5)));
-    if (old.length) {
-      try {
-        const sc = await scoresByIds([...new Set(old.map((m) => m.id))]);
-        for (const m of old) {
-          if (m.id in sc) m.score = sc[m.id];
-          if (m.sv) m.sv = 6;
-          if (m.mv) m.mv = 5;
-        }
-        changed = true;
-        saveMeta();
-      } catch (err) { console.warn('anilist notas', err); }
-    }
-    // 2) primero lo que todavía no tiene ficha (p. ej. temporadas recién organizadas), después el resto
-    const order = [...state.library.series].sort((a, b) => Number(hasAllMeta(a)) - Number(hasAllMeta(b)));
-    for (const s of order) {
-      if (isCine(s)) {
-        // Cine: cada película en TMDB (sin clave no se busca nada)
-        const key = tmdbKey();
-        if (!key) continue;
-        for (const it of collectionItems(s)) {
-          const k = itemMetaKey(s, it.key);
-          const c = state.meta[k];
-          const age = Date.now() - ((c && c.at) || 0);
-          if (c && c.tm === 1 && c.key === key.slice(-6) && (c.none ? age < 86400000 : age < 30 * 86400000)) continue;
-          let m = null;
-          try { if (it.query) m = await tmdbFindMovie(it.query, key); } catch (err) { console.warn('tmdb', err); break; }
-          state.meta[k] = m ? { ...m, tm: 1, key: key.slice(-6) } : { none: true, id: 0, tm: 1, key: key.slice(-6), at: Date.now() };
-          changed = true;
-          saveMeta();
-          await sleep(250);
-        }
-        continue;
-      }
-      if (isCollection(s)) {
-        // cada película por separado; la carpeta no se busca
-        let failed = false;
-        for (const it of collectionItems(s)) {
-          const k = itemMetaKey(s, it.key);
-          const c = state.meta[k];
-          const age = Date.now() - ((c && c.at) || 0);
-          // todo automático: lo encontrado se guarda 30 días; lo que no se encontró se vuelve a buscar al día siguiente
-          if (c && c.mv === 5 && (c.none ? age < 86400000 : age < 30 * 86400000)) continue;
-          let m = null;
-          try {
-            if (it.query) m = await findMovie(it.query, () => sleep(400));
-          } catch (err) { console.warn('anilist', err); failed = true; break; }
-          state.meta[k] = m ? { ...toMeta(m), mv: 5 } : { none: true, id: 0, mv: 5, at: Date.now() };
-          changed = true;
-          saveMeta();
-          await sleep(400);
-        }
-        if (failed) break;
-        continue;
-      }
-      if (usesSeasonMeta(s)) {
-        // cada temporada con su ficha (sm: 1); lo encontrado dura 30 días, lo no encontrado se reintenta al día siguiente
-        let failed = false;
-        for (const se of s.seasons) {
-          const q = seasonQuery(s, se);
-          if (!q || q.ovaOf != null) continue; // las OVAs a secas, al final (necesitan la ficha de la temporada de antes)
-          const k = itemMetaKey(s, se.name);
-          const c = state.meta[k];
-          const age = Date.now() - ((c && c.at) || 0);
-          // las que dicen número de temporada o "Serie - Subtítulo" se buscan de nuevo una vez (v36 las encuentra mejor)
-          const need = /\b(season|temporada)\b|\d(st|nd|rd|th)\b|\s[-–]\s/i.test(se.name) ? 2 : 1;
-          if (c && (c.sm || 0) >= need && (c.none ? age < 86400000 : age < 30 * 86400000)) continue;
-          let m = null;
-          try {
-            m = q.name ? await findTitle(q.name, q.kind, () => sleep(400)) : await findSeason(q.series, q.n);
-          } catch (err) { console.warn('anilist', err); failed = true; break; }
-          state.meta[k] = m ? { ...toMeta(m), sm: 2 } : { none: true, id: 0, sm: 2, at: Date.now() };
-          if (m) {
-            const meta = state.meta[k];
-            translateToSpanish(meta.synopsis).then((es) => { if (es) { meta.synopsisEs = es; saveMeta(); if (['home', 'serie'].includes(route().view)) softRender(); } });
-          }
-          changed = true;
-          saveMeta();
-          await sleep(400);
-        }
-        if (failed) break;
-        if (!isFranchise(s)) { // "Fate": la carpeta de la serie no se busca
-          const r = await seriesMetaStep(s);
-          if (r === 'fail') break;
-          if (r) changed = true;
-        }
-        const r2 = await ovaMetaStep(s);
-        if (r2 === 'fail') break;
-        if (r2) changed = true;
-        continue;
-      }
-      const r = await seriesMetaStep(s);
-      if (r === 'fail') break;
-      if (r) changed = true;
-    }
-  } finally {
-    metaRunning = false;
-  }
-  if (changed) { fichasDirty = true; sync(); }
-  if (changed && ['home', 'serie', 'pelicula'].includes(route().view)) softRender();
-  setTimeout(translateMissing, 1500);
-}
-
-/** Ficha de la serie (con el nombre de la carpeta). Devuelve true si cambió, 'fail' si AniList falló. */
-async function seriesMetaStep(s) {
-  const pick = null;
-  {
-      const cur = state.meta[s.name];
-      // sv: 6 = buscada solo con el nombre de la carpeta, con la nota de AniList (las de antes se vuelven a buscar una vez)
-      const stale = !cur || Date.now() - (cur.at || 0) > (cur.none ? 86400000 : 30 * 86400000) || (pick && pick.id !== (cur.id || 0)) || (!cur.none && cur.v !== 2) || (!pick && cur.sv !== 6);
-      if (!stale) return false;
-      try {
-        let m = null;
-        if (pick && pick.id === 0) m = null;
-        else if (pick) m = await animeById(pick.id);
-        else m = await findForSeries(searchNames(s), s.name);
-        state.meta[s.name] = m ? { ...toMeta(m), sv: 6 } : { none: true, id: 0, sv: 6, at: Date.now() };
-        if (m) {
-          const meta = state.meta[s.name];
-          translateToSpanish(meta.synopsis).then((es) => { if (es) { meta.synopsisEs = es; saveMeta(); if (['home', 'serie', 'pelicula'].includes(route().view)) softRender(); } });
-        }
-        saveMeta();
-      } catch (err) {
-        console.warn('anilist', err);
-        return 'fail';
-      }
-      await sleep(400);
-      return true;
-  }
-}
-
-/** OVAs a secas ("OVA", "Serie OVA"): entre las OVAs y especiales de la temporada de antes (o, si no hay, de las otras),
- *  sin repetir la que ya tiene otra carpeta; si alguna tiene los mismos capítulos que la carpeta, esa. */
-async function ovaMetaStep(s) {
-  let changed = false;
-  for (const se of s.seasons) {
-    const q = seasonQuery(s, se);
-    if (!q || q.ovaOf == null) continue;
-    const k = itemMetaKey(s, se.name);
-    const c = state.meta[k];
-    const age = Date.now() - ((c && c.at) || 0);
-    if (c && (c.sm || 0) >= 3 && (c.none ? age < 86400000 : age < 30 * 86400000)) continue;
-    const ki = q.ovaOf;
-    const idOf = (x) => { const m = ownSeasonMeta(s, x) || (seasonLabel(s, x) === 'Temporada 1' && !isFranchise(s) ? metaFor(s) : null); return m && typeof m.id === 'number' && m.id ? m.id : 0; };
-    const bases = [...s.seasons.slice(0, ki).reverse(), ...s.seasons.slice(ki + 1)].filter((x) => isMainSeason(s, x)).map(idOf).filter(Boolean);
-    const used = new Set(s.seasons.filter((x) => x !== se).map((x) => ownSeasonMeta(s, x)).filter(Boolean).map((m) => m.id));
-    let m = null;
-    try {
-      for (const id of [...new Set(bases)]) {
-        const list = (await sideStoriesOf(id)).filter((x) => !used.has(x.id));
-        if (list.length) { m = list.find((x) => x.episodes === se.episodes.length) || list[0]; break; }
-        await sleep(400);
-      }
-    } catch (err) { console.warn('anilist', err); return 'fail'; }
-    state.meta[k] = m ? { ...toMeta(m), sm: 3 } : { none: true, id: 0, sm: 3, at: Date.now() };
-    if (m) {
-      const meta = state.meta[k];
-      translateToSpanish(meta.synopsis).then((es) => { if (es) { meta.synopsisEs = es; saveMeta(); if (['home', 'serie'].includes(route().view)) softRender(); } });
-    }
-    changed = true;
-    saveMeta();
-    await sleep(400);
-  }
-  return changed;
-}
-
-function synopsisOf(m) { return m ? (m.synopsisEs || (m.id && state.syn[m.id] && state.syn[m.id].es) || m.synopsis || '') : ''; }
-const hasSpanish = (m) => !!(m && (m.synopsisEs || (m.id && state.syn[m.id])));
-
-/* ── sinopsis en español compartidas ──
- * Solo Chrome de computadora trae traductor. Donde lo hay, Kai traduce en segundo plano, de una en una, las sinopsis
- * que falten y las guarda en MEGA (.kai-sinopsis.json); los demás dispositivos las leen de ahí ya traducidas. */
-function saveSyn() { LS.set('syn', state.syn); }
-let synRunning = false;
-async function translateMissing() {
-  if (synRunning || !canTranslate()) return;
-  synRunning = true;
-  let added = 0;
-  try {
-    const disc = LS.get('discover', {}) || {};
-    const extra = Object.values(disc).flatMap((d) => (d && d.items) || []);
-    for (const m of [...Object.values(state.meta), ...extra]) {
-      if (!m || m.none || !m.id || m.src === 'TMDB') continue; // lo de TMDB ya viene en español
-      if (state.syn[m.id]) continue;
-      // lo que este navegador ya había traducido antes también se comparte
-      let es = m.synopsisEs || null;
-      if (!es && m.synopsis) {
-        if (document.hidden) break;
-        es = await translateToSpanish(m.synopsis);
-        if (!es) break; // el traductor no está listo (se activa la primera vez con el botón "Traducir")
-        await sleep(250);
-      }
-      if (!es) continue;
-      state.syn[m.id] = { es, u: Date.now() };
-      added++;
-      if (added % 10 === 0) { saveSyn(); state.synDirty = true; }
-    }
-  } finally {
-    synRunning = false;
-    if (added) { saveSyn(); state.synDirty = true; sync(); if (['home', 'serie', 'pelicula'].includes(route().view)) softRender(); }
-  }
-}
-/** Junta las traducciones de MEGA con las de aquí. Si el archivo no se puede leer, no se toca (nunca se pisa). */
-async function syncSynopses(home) {
-  const nodes = filesNamed(home, SYN_FILE);
-  const sig = nodes.map((n) => `${n.nodeId}:${n.size}:${n.timestamp || 0}`).join('|');
-  let remote = {};
-  const known = LS.get('synSig', '');
-  if (sig && sig !== known) {
-    for (const n of nodes) { const d = await readJson(n); if (d && d.items) remote = mergeSyn(remote, d.items); }
-    const before = Object.keys(state.syn).length;
-    state.syn = mergeSyn(state.syn, remote);
-    saveSyn();
-    LS.set('synSig', sig);
-    if (Object.keys(state.syn).length !== before && ['home', 'serie', 'pelicula'].includes(route().view)) softRender();
-  } else if (sig) {
-    remote = null; // sin cambios en MEGA desde la última vez
-  }
-  const needWrite = Object.keys(state.syn).length && (state.synDirty || nodes.length > 1 || (!nodes.length) || (remote && Object.keys(state.syn).some((k) => !remote[k] || state.syn[k].u > remote[k].u)));
-  if (needWrite) {
-    const fresh = await writeJson(home, SYN_FILE, { v: 1, app: 'kai', items: state.syn }, nodes);
-    state.synDirty = false;
-    // la firma del archivo recién subido: así este dispositivo no lo vuelve a descargar
-    if (fresh && fresh.nodeId) LS.set('synSig', `${fresh.nodeId}:${fresh.size}:${fresh.timestamp || 0}`); else LS.del('synSig');
-  }
-}
-/* ── fichas compartidas ──
- * Lo que un dispositivo encuentra en AniList (o TMDB) se guarda en MEGA (.kai-fichas.json): los demás dispositivos
- * y perfiles lo usan sin volver a buscar. Gana la ficha más reciente (marca "at"). Si el archivo no se puede leer,
- * no se toca (nunca se pisa). */
-let fichasDirty = false;
-let fichasPulled = false;
-async function syncFichas(home, write = true) {
-  const nodes = filesNamed(home, FICHAS_FILE);
-  const sig = nodes.map((n) => `${n.nodeId}:${n.size}:${n.timestamp || 0}`).join('|');
-  let remote = null;
-  if (sig && sig !== LS.get('fichasSig', '')) {
-    remote = {};
-    for (const n of nodes) { const d = await readJson(n); if (d && d.items) remote = mergeFichas(remote, d.items); }
-    const before = JSON.stringify(Object.keys(state.meta).map((k) => [k, (state.meta[k] || {}).at]));
-    state.meta = mergeFichas(state.meta, remote);
-    flushMetaNow();
-    LS.set('fichasSig', sig);
-    if (JSON.stringify(Object.keys(state.meta).map((k) => [k, (state.meta[k] || {}).at])) !== before && ['home', 'serie', 'pelicula', 'catalogo'].includes(route().view)) softRender();
-  }
-  fichasPulled = true;
-  if (!write) return;
-  const newer = remote && Object.keys(state.meta).some((k) => state.meta[k] && (!remote[k] || (state.meta[k].at || 0) > (remote[k].at || 0)));
-  if (Object.keys(state.meta).length && (fichasDirty || nodes.length !== 1 || newer)) {
-    fichasDirty = false;
-    const fresh = await writeJson(home, FICHAS_FILE, { v: 1, app: 'kai', items: state.meta }, nodes);
-    if (fresh && fresh.nodeId) LS.set('fichasSig', `${fresh.nodeId}:${fresh.size}:${fresh.timestamp || 0}`); else LS.del('fichasSig');
-  }
-}
-function mergeFichas(a, b) {
-  const out = { ...a };
-  for (const [k, v] of Object.entries(b || {})) if (v && typeof v === 'object' && (!out[k] || (v.at || 0) > (out[k].at || 0))) out[k] = v;
-  return out;
-}
-
-function mergeSyn(a, b) {
-  const out = { ...a };
-  for (const [k, v] of Object.entries(b || {})) if (v && v.es && (!out[k] || (v.u || 0) > (out[k].u || 0))) out[k] = v;
-  return out;
-}
-
-const tmdbKey = () => (state.shared.keys && state.shared.keys.tmdb && state.shared.keys.tmdb.v) || '';
 function movieImage(s, it) {
   const m = itemMeta(s, it.key);
   return (m && (m.banner || m.cover)) || '';
 }
 /** Dirección de la página de una película de la colección. */
 const movieHref = (si, key) => `#/pelicula/${si}/${encodeURIComponent(key)}`;
-/** Lo que se muestra de una serie: lo de AniList, o para una colección, lo armado con sus películas. */
-function displayMeta(s) {
-  // una colección nunca usa la ficha de la carpeta (aunque haya quedado guardada de antes): se arma con sus películas
-  if (!isCollection(s)) return metaFor(s);
-  const items = collectionItems(s).map((it) => ({ ...it, m: itemMeta(s, it.key) }));
-  const named = items.map((it) => {
-    const t = it.title || (it.m && it.m.title) || '';
-    return t ? `${t}${it.m && it.m.year ? ` (${it.m.year})` : ''}` : '';
-  }).filter(Boolean);
-  const list = named.length > 1 ? `${named.slice(0, -1).join(', ')} y ${named[named.length - 1]}` : named[0] || '';
-  const text = `${items.length === 1 ? 'Una película' : `${items.length} películas`}${isCine(s) ? '' : ' de anime'} en tu MEGA${list ? `: ${list}` : ''}.`;
-  return {
-    collection: true, title: '', synopsis: text, synopsisEs: text,
-    collage: items.map((it) => it.m && it.m.cover).filter(Boolean).slice(0, 8),
-    color: (items.find((it) => it.m && it.m.color) || {}).m?.color || '',
-    format: 'Colección', count: items.length, genres: [],
-  };
-}
 function collageHTML(urls, cls = '') {
   const u = urls.slice(0, 4);
   return `<span class="collage n${u.length} ${cls}" aria-hidden="true">${u.map((x) => `<img src="${esc(x)}" alt="" loading="lazy" decoding="async">`).join('')}</span>`;
@@ -2118,11 +1715,6 @@ function langSwitchHTML(s, langs) {
 }
 /** Dirección de una temporada: con varias, cada una tiene su página (#/serie/3/1); con una sola, la serie. */
 function seasonHref(si, s, ki) { return s && !isCollection(s) && s.seasons.length > 1 ? `#/serie/${si}/${ki}` : `#/serie/${si}`; }
-/** "2nd Season", "Season 2 Part 2" → "Temporada 2", "Temporada 2 · Parte 2" (todo en español). */
-function spanishSeason(t) {
-  const m = /^\s*(?:(\d{1,2})(?:st|nd|rd|th)\s+season|season\s*(\d{1,2})|temporada\s*(\d{1,2}))(?:\s*[-–·:,]?\s*(?:part|parte|cour)\s*(\d{1,2}))?\s*$/i.exec(t);
-  return m ? `Temporada ${m[1] || m[2] || m[3]}${m[4] ? ` · Parte ${m[4]}` : ''}` : t;
-}
 
 function renderSeries(arg) {
   const lib = state.library;
@@ -4298,7 +3890,7 @@ document.addEventListener('click', async (e) => {
     try { for (const k of Object.keys(localStorage)) if (k.startsWith('kai.') && k !== 'kai.settings') localStorage.removeItem(k); } catch { /* nada */ }
     for (const s of ['chunks', 'dl', 'thumbs', 'subcache']) await idb.clear(s).catch(() => {});
     state.library = null; setIndex(buildIndex(null)); state.progress = {}; state.saved.clear(); state.dlMeta.clear();
-    state.profile = null; state.shared = { profiles: [], intros: {}, picks: {}, legacyBy: null }; state.sharedLoaded = false; state.meta = {}; fichasPulled = false;
+    state.profile = null; state.shared = { profiles: [], intros: {}, picks: {}, legacyBy: null }; state.sharedLoaded = false; state.meta = {}; resetFichas();
     location.hash = '';
     render();
   }

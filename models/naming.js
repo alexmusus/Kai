@@ -233,3 +233,12 @@ export function specialWord(se, m) {
   if (/\bonas?\b/i.test(t)) return 'ONA';
   return m && m.format && m.format !== 'Serie' ? m.format : 'Especial';
 }
+
+/** "2nd Season", "Season 2 Part 2" → "Temporada 2", "Temporada 2 · Parte 2" (todo en español). */
+export function spanishSeason(t) {
+  const m =
+    /^\s*(?:(\d{1,2})(?:st|nd|rd|th)\s+season|season\s*(\d{1,2})|temporada\s*(\d{1,2}))(?:\s*[-–·:,]?\s*(?:part|parte|cour)\s*(\d{1,2}))?\s*$/i.exec(
+      t,
+    );
+  return m ? `Temporada ${m[1] || m[2] || m[3]}${m[4] ? ` · Parte ${m[4]}` : ''}` : t;
+}
