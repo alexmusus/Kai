@@ -11,6 +11,8 @@ export const viewState = {
   heroUser: false,
   /** @type {{ si: number, ki: number, ids: Set<string> } | null} capítulos elegidos para descargar juntos */
   picking: null,
+  /** aviso que se mantiene en la pantalla de entrar aunque se vuelva a dibujar */
+  loginNote: '',
   /** ¿se está reproduciendo algo? (lo pone el reproductor) */
   isPlaying: () => false,
 };

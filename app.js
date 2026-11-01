@@ -13,15 +13,17 @@ import { nextUnseen, resumeOffer } from './models/progress.js';
 import { viewState } from './views/view-state.js';
 import { startPicking, endPicking, pickAction } from './controllers/picking.js';
 import { isUpdateReady, markUpdateReady, setRegistration, findUpdate } from './models/updates.js';
-import { renderLogin, renderProfiles, avatarHTML } from './views/account.js';
+import { renderLogin, renderProfiles } from './views/account.js';
 import { addProfile, useProfile } from './models/profiles.js';
 import { toast, toastCount } from './views/toast.js';
 import { resolvedTheme, paintThemeColor, applyTheme } from './views/theme.js';
 import './views/images.js';
+import { setPlayer, go, goHome, goBack, render, softRender, onHashChange, setRouteKey } from './controllers/router.js';
+import { dock, paintDock, fillDock, closeDrawer, toggleDock } from './controllers/dock.js';
 import { on } from './lib/events.js';
 import { syncShared, syncProgress } from './models/sync.js';
 import { countBytes, noteQuota, quotaUntil, refreshAccountInfo } from './models/quota.js';
-import { quotaText, paintQuota } from './views/quota.js';
+import { paintQuota } from './views/quota.js';
 import { isCollection, collectionItems, itemMetaKey, itemFor, movieTitle } from './models/collections.js';
 import { prog, setProgress, markNow, isLater } from './models/progress.js';
 import { setLaterFlag } from './models/progress.js';
@@ -29,32 +31,26 @@ import { profilesFromBackup, normName } from './models/profiles.js';
 import { seasonLabel, saveMeta } from './models/fichas.js';
 import { setTmdbKey, ensureMeta, saveSyn, translateMissing, syncSynopses, syncFichas, resetFichas } from './models/fichas-sync.js';
 import { idb } from './models/idb.js';
-import { saveKnown, initKnown, newEpisodes, markSeriesSeen, hasUnreadNews, announceNew } from './models/news.js';
+import { saveKnown, initKnown, newEpisodes, markSeriesSeen, announceNew } from './models/news.js';
 import { epById } from './models/library.js';
 import { thumbFor } from './models/thumbs.js';
 import { saveChapterCache, rangeReader, cacheChapters, formatProblem, formatSummary, rememberCodec } from './models/media.js';
 import { hydrateThumbs } from './views/thumbs.js';
 import { nextFor } from './models/plans.js';
-import { seriesColor } from './models/fichas.js';
-import { header, setTint, app } from './views/components.js';
-import { setHero, renderHome } from './views/home.js';
+import { header, app } from './views/components.js';
+import { setHero } from './views/home.js';
 import { dlButton, episodeRow } from './views/episodes.js';
-import { renderSeries, renderMovie } from './views/series.js';
 import { route } from './lib/route.js';
 import { resolveContext, titleFor } from './models/context.js';
 import { paintSync, paintDrawerCount, paintNewsDot } from './views/dock.js';
-import { renderCatalog, openHomeSearch, closeHomeSearch } from './views/catalog.js';
-import { renderExplorer } from './views/explorer.js';
+import { openHomeSearch, closeHomeSearch } from './views/catalog.js';
 import { renderDownloads } from './views/downloads.js';
 import { newsHTML, paintSeenByAll, renderSettings, paintCineKey, paintDownloadsWhere, paintSpace } from './views/settings.js';
-import { renderDiscover, openDiscoverSheet } from './views/discover.js';
+import { openDiscoverSheet } from './views/discover.js';
 import { showSheet, closeSheet } from './views/sheet.js';
 
 on('quota', paintQuota);
 on('theme', () => { if (dock.classList.contains('is-open')) fillDock(); });
-on('navigate', ({ hash, replace }) => {
-  if (replace) { navReplacing = true; location.replace(hash); } else go(hash);
-});
 on('notice', (text) => toast(text));
 on('download-changed', (id) => { paintEpisode(id); paintDrawerCount(); });
 on('download-done', (ep) => { cacheChapters(ep).catch(() => {}); });
@@ -62,6 +58,13 @@ on('downloads-removed', () => { if (route().view === 'descargas') renderDownload
 on('folder-moved', () => paintSpace());
 setInUseCheck((id) => !!(playing && playing.ep.id === id));
 viewState.isPlaying = () => !!playing;
+setPlayer({
+  hasMedia: () => !!(playing && video.currentSrc),
+  toMini: () => enterMini(),
+  stop: () => stopPlayback(),
+  show: (id) => renderWatch(id),
+  refreshInfo: () => paintWatchInfo(),
+});
 on('news', () => paintNewsDot());
 on('tree-changed', () => refreshLibrary());
 on('meta-changed', (views) => { if (views.includes(route().view)) softRender(); });
@@ -192,200 +195,16 @@ async function exportCopy(ep) {
 
 /* ───────────────────────── rutas y vistas ───────────────────────── */
 
-/* Historial propio de Kai: "volver" salta las entradas que son la misma página (otra pestaña o
- * temporada de la misma serie) hasta llegar a una distinta, en vez de retroceder de a un paso. */
-const navStack = [location.hash || '#/'];
-let navBackSteps = 0; // pasos que Kai mismo pidió retroceder
-let navReplacing = false;
-const navPage = (h) => String(h || '#/').split('?')[0];
-/* Al volver atrás (deslizar desde el borde en iPhone, o el botón), la página vuelve a donde estaba, no arriba:
- * si no, Safari muestra la foto de la página donde estabas y luego salta al inicio, y las portadas parpadean. */
-const scrollMemo = new Map();
-let navWasBack = false;
-addEventListener('scroll', () => { scrollMemo.set(location.hash || '#/', window.scrollY); }, { passive: true });
-if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
-function onHashChange() {
-  const h = location.hash || '#/';
-  navWasBack = !!navBackSteps || (navStack.length > 1 && navStack[navStack.length - 2] === h);
-  if (navBackSteps) { navStack.length = Math.max(1, navStack.length - navBackSteps); navBackSteps = 0; navStack[navStack.length - 1] = h; }
-  else if (navReplacing) { navStack[navStack.length - 1] = h; navReplacing = false; }
-  else if (navStack.length > 1 && navStack[navStack.length - 2] === h) navStack.pop(); // botón atrás del navegador
-  else if (navStack[navStack.length - 1] !== h) navStack.push(h);
-}
-function go(hash) { if (location.hash !== hash) location.hash = hash; else render(); }
-function goHome() {
-  if (navPage(location.hash) === '#/' || !location.hash) { render(); return; }
-  // si el inicio está en el historial, se vuelve a él; si no, se va directo
-  const i = navStack.map(navPage).lastIndexOf('#/');
-  if (i >= 0 && i < navStack.length - 1) { navBackSteps = navStack.length - 1 - i; history.go(-navBackSteps); }
-  else go('#/');
-}
-function goBack(fallback = '#/') {
-  const cur = navPage(navStack[navStack.length - 1]);
-  let i = navStack.length - 2;
-  while (i >= 0 && navPage(navStack[i]) === cur) i--;
-  if (i >= 0) { navBackSteps = navStack.length - 1 - i; history.go(-navBackSteps); }
-  else { navReplacing = true; location.replace(fallback); }
-}
-
-let lastRouteKey = '';
-
-/** Vuelve a dibujar la vista actual sin tocar el reproductor. */
-function softRender() {
-  if (route().view === 'play') { paintWatchInfo(); return; }
-  render();
-}
-
-function render() {
-  closeDrawer();
-  if (!LS.get('session', null)) { stopPlayback(); renderLogin(loginNote); return; }
-  const { view, arg } = route();
-  if (!state.profile || !visibleProfiles().some((p) => p.id === state.profile.id) && state.sharedLoaded) {
-    if (state.profile && state.sharedLoaded) { state.profile = null; LS.del('profile'); }
-    if (!state.profile) { stopPlayback(); renderProfiles(); paintDock(); lastRouteKey = 'perfiles'; return; }
-  }
-  if (view === 'perfiles') { stopPlayback(); renderProfiles(); paintDock(); lastRouteKey = 'perfiles'; return; }
-  if (viewState.picking && (view !== 'serie' || String(viewState.picking.si) !== arg.split('/')[0])) endPicking(false);
-  if (view === 'play') {
-    const c = resolveContext(arg);
-    const si = c && c.si;
-    setTint(si != null && state.library.series[si] ? seriesColor(state.library.series[si]) : null);
-    renderWatch(arg);
-  } else {
-    if (playing && video.currentSrc) enterMini(); else stopPlayback();
-    setTint(null);
-    if (view === 'serie') renderSeries(arg);
-    else if (view === 'pelicula') renderMovie(arg);
-    else if (view === 'explorar') renderExplorer(arg);
-    else if (view === 'catalogo') renderCatalog();
-    else if (view === 'descargas') renderDownloads();
-    else if (view === 'ajustes') renderSettings();
-    else if (view === 'descubrir') renderDiscover(arg);
-    else renderHome();
-  }
-  paintSync();
-  paintDock();
-  hydrateThumbs(app);
-  const key = view + '/' + arg;
-  if (key !== lastRouteKey && view !== 'play') window.scrollTo(0, navWasBack ? scrollMemo.get(location.hash || '#/') || 0 : 0);
-  navWasBack = false;
-  if (key !== lastRouteKey && view === 'play' && lastRouteKey.split('/')[0] !== 'play') window.scrollTo(0, 0);
-  lastRouteKey = key;
-}
 
 /* ── botón flotante (reemplaza el menú lateral) ── */
 
-const dock = $('#dock');
-
-function paintDock() {
-  const v = route().view;
-  const show = !!(LS.get('session', null) && state.profile && v !== 'perfiles');
-  dock.hidden = !show;
-  if (!show) { closeDock(); return; }
-  const p = visibleProfiles().find((x) => x.id === state.profile.id) || state.profile;
-  const btn = dock.querySelector('.dock-btn');
-  btn.innerHTML = `${avatarHTML(p, 'dock-avatar')}<span class="dock-top" aria-hidden="true">${ICON.top}</span><span class="dock-ring" aria-hidden="true"></span><span class="dock-state" aria-hidden="true"></span>`;
-  btn.dataset.name = p.name;
-  paintSync();
-  paintNewsDot();
-  if (!dock.querySelector('.dock-panel').hidden) fillDock();
-}
-
-function fillDock() {
-  const { view } = route();
-  const p = visibleProfiles().find((x) => x.id === state.profile.id) || state.profile;
-  const item = (href, icon, label, on, extra = '') => `<a class="dock-item ${on ? 'is-on' : ''}" href="${href}" role="menuitem">${icon}<span>${label}</span>${extra}</a>`;
-  const dark = resolvedTheme() === 'dark';
-  dock.querySelector('.dock-panel').innerHTML = `
-    <a class="dock-profile" href="#/perfiles" role="menuitem">${avatarHTML(p)}<span><span class="dock-pname">${esc(p.name)}</span><span class="dock-psub">Cambiar perfil</span></span></a>
-    ${item('#/', ICON.home, 'Inicio', view === 'home' || view === 'serie')}
-    ${item('#/explorar', ICON.folder, 'Explorar MEGA', view === 'explorar')}
-    ${item('#/descargas', ICON.saved, 'Descargados', view === 'descargas', `<span class="dock-count" id="dock-count">${state.saved.size || ''}</span>`)}
-    ${item('#/ajustes', ICON.gear, 'Ajustes', view === 'ajustes', hasUnreadNews() ? '<span class="dock-news">Novedades</span>' : '')}
-    <div class="dock-row">
-      <button class="dock-chip" data-act="refresh" role="menuitem">${ICON.refresh}<span>Actualizar</span></button>
-      <button class="dock-chip" data-act="theme" role="menuitem">${dark ? ICON.sun : ICON.moon}<span>${dark ? 'Claro' : 'Oscuro'}</span></button>
-    </div>
-    <p class="dock-quota" id="drawer-quota">${quotaText()}</p>`;
-}
-
-function openDock() {
-  fillDock();
-  const panel = dock.querySelector('.dock-panel');
-  panel.hidden = false;
-  dock.classList.add('is-open');
-  dock.querySelector('.dock-btn').setAttribute('aria-expanded', 'true');
-  requestAnimationFrame(() => panel.classList.add('is-in'));
-  const first = panel.querySelector('.dock-item.is-on') || panel.querySelector('.dock-item');
-  if (first) first.focus({ preventScroll: true });
-}
-function closeDock() {
-  const panel = dock.querySelector('.dock-panel');
-  if (!panel || panel.hidden) return;
-  panel.classList.remove('is-in');
-  dock.classList.remove('is-open');
-  dock.querySelector('.dock-btn').setAttribute('aria-expanded', 'false');
-  setTimeout(() => { if (!panel.classList.contains('is-in')) panel.hidden = true; }, 180);
-}
-/* Ir arriba: en pantallas táctiles, el botón flotante se vuelve una flecha cuando bajaste más de dos pantallas
- * y empiezas a subir. Vuelve a ser el de siempre al llegar arriba, al seguir bajando o tras unos segundos quieto.
- * (UP_ON_IOS: en iPhone/iPad ya se sube tocando la hora; se deja encendido mientras Alex lo prueba.) */
-const UP_ON_IOS = true;
-const IS_IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-const UP_ENABLED = matchMedia('(pointer: coarse)').matches && (UP_ON_IOS || !IS_IOS);
-let upLastY = 0, upIdle = 0, upFrame = 0, upHoldUntil = 0; // upHoldUntil: mientras sube solo, no volver a mostrar la flecha
-function setDockUp(on) {
-  if (dock.classList.contains('is-up') === on) return;
-  dock.classList.toggle('is-up', on);
-  const btn = dock.querySelector('.dock-btn');
-  if (btn) btn.setAttribute('aria-label', on ? 'Ir arriba' : 'Menú');
-}
-function checkDockUp() {
-  upFrame = 0;
-  const y = window.scrollY;
-  const dy = y - upLastY;
-  if (Math.abs(dy) < 6) return; // movimientos mínimos no cuentan
-  upLastY = y;
-  clearTimeout(upIdle);
-  const ok = !dock.hidden && !dock.classList.contains('is-open') && route().view !== 'play';
-  if (!ok || y < 80 || dy > 0 || Date.now() < upHoldUntil) { setDockUp(false); return; }
-  if (y > window.innerHeight * 2) {
-    setDockUp(true);
-    upIdle = setTimeout(() => setDockUp(false), 3000);
-  }
-}
-if (UP_ENABLED) {
-  addEventListener('scroll', () => { if (!upFrame) upFrame = requestAnimationFrame(checkDockUp); }, { passive: true });
-}
-
-// nombres antiguos que aún usan otras partes
-const closeDrawer = closeDock;
-// Con el menú abierto, tocar fuera solo lo cierra: ese toque no abre un capítulo, ni reproduce, ni sigue un enlace.
-let dockSwallow = 0; // hasta cuándo se ignora el clic de ese toque
-document.addEventListener('pointerdown', (e) => {
-  if (!dock.classList.contains('is-open')) { dockSwallow = 0; return; } // un toque nuevo con el menú cerrado nunca se ignora
-  if (dock.contains(e.target)) return;
-  closeDock();
-  e.stopPropagation(); // que no llegue a los gestos del reproductor
-  dockSwallow = Date.now() + 800;
-}, true);
-document.addEventListener('click', (e) => {
-  if (Date.now() > dockSwallow || dock.contains(e.target)) return;
-  dockSwallow = 0;
-  e.preventDefault();
-  e.stopPropagation();
-}, true);
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && dock.classList.contains('is-open')) { closeDock(); dock.querySelector('.dock-btn').focus(); }
-});
 
 /* ── entrar ── */
 
-let loginNote = ''; // aviso que se mantiene en la pantalla de entrar aunque se vuelva a dibujar
 on('login', async ({ email, password, code, needCode }) => {
   try {
     await login(email, password, code);
-    loginNote = '';
+    viewState.loginNote = '';
     refreshLibrary(false);
     location.hash = '#/';
     render();
@@ -729,7 +548,7 @@ function switchTo(ep) {
   if (!ctx) return;
   if (route().view === 'play') {
     history.replaceState(null, '', '#/play/' + encodeURIComponent(ep.id));
-    lastRouteKey = 'play/' + ep.id;
+    setRouteKey('play/' + ep.id);
     startPlayback(ctx);
     paintWatchInfo();
   } else {
@@ -1591,13 +1410,7 @@ document.addEventListener('click', async (e) => {
     } else el.textContent = 'Este navegador no puede traducir ahora.';
   }
   else if (act === 'dock') {
-    if (dock.classList.contains('is-up')) {
-      setDockUp(false);
-      upHoldUntil = Date.now() + 1500;
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      return;
-    }
-    if (dock.classList.contains('is-open')) closeDock(); else openDock();
+    toggleDock();
   }
   else if (act === 'profiles-retry') {
     state.sharedError = false;
@@ -1791,7 +1604,7 @@ async function boot() {
     const m = megaMessage(err);
     if (/venció/.test(m)) {
       LS.del('session');
-      loginNote = m;
+      viewState.loginNote = m;
       renderLogin(m);
     } else {
       toast(m);
