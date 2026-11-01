@@ -34,6 +34,11 @@ decide. ESLint lo revisa (`no-restricted-imports`).
 | `quota.js` | transferencia de MEGA (avisa `quota`) |
 | `subs.js` | subtítulos y capítulos dentro del MP4, leídos por rangos; archivos .srt/.vtt/.ass |
 | `meta-api.js` | AniList y TMDB: buscar fichas, notas, recomendaciones; traducir sinopsis |
+| `fichas.js` | leer las fichas guardadas y nombrar las temporadas ("Temporada 2", "OVA", "Memory Snow") |
+| `fichas-sync.js` | buscar lo que falta, traducir sinopsis y compartirlas por MEGA (avisa `meta-changed`, `sync-needed`) |
+| `news.js` | burbujas de "nuevo" y Novedades (avisa `news`) |
+| `thumbs.js` | miniaturas de MEGA, guardadas en IndexedDB |
+| `idb.js` | IndexedDB: descargas, miniaturas, subtítulos leídos |
 
 Fuera de las capas:
 
