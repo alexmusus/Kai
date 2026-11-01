@@ -1,12 +1,10 @@
-import { mp4Info, mp4Chapters, mp4Formats, pickIntro, OUTRO_RE as OUTRO } from './models/subs.js';
 import { translateToSpanish } from './models/meta-api.js';
-import { $, LS, esc, sleep, fmtTime, plural } from './lib/util.js';
-import { ICON } from './views/icons.js';
+import { $, LS, plural } from './lib/util.js';
 import { state, index, setIndex, saveSettings, pkey, saveShared, visibleProfiles } from './models/store.js';
-import { C, megaMessage, connect, downloadUrl } from './models/mega.js';
-import { loadProfileState, nodePath, buildIndex, learnAudioLang, setLangPref } from './models/library.js';
+import { megaMessage, connect } from './models/mega.js';
+import { loadProfileState, nodePath, buildIndex, setLangPref } from './models/library.js';
 
-import { setInUseCheck, removeAllDownloads, refreshSaved, resumePendingDownloads, removeDownload, localBlob, holdWake, getDir, dirAccess, flushFolder } from './models/downloads.js';
+import { setInUseCheck, removeAllDownloads, refreshSaved, resumePendingDownloads, removeDownload, holdWake, getDir, dirAccess, flushFolder } from './models/downloads.js';
 import { episodeLabel } from './models/collections.js';
 import { nextUnseen, resumeOffer } from './models/progress.js';
 import { viewState } from './views/view-state.js';
@@ -14,32 +12,30 @@ import { startPicking, endPicking, pickAction } from './controllers/picking.js';
 import { isUpdateReady, markUpdateReady, setRegistration, findUpdate } from './models/updates.js';
 import { renderLogin, renderProfiles } from './views/account.js';
 import { toast, toastCount } from './views/toast.js';
-import { resolvedTheme, paintThemeColor, applyTheme } from './views/theme.js';
+import { resolvedTheme, applyTheme } from './views/theme.js';
 import './views/images.js';
-import { setPlayer, go, goHome, goBack, render, softRender, onHashChange, setRouteKey } from './controllers/router.js';
-import { dock, paintDock, fillDock, closeDrawer, toggleDock } from './controllers/dock.js';
+import { setPlayer, go, goHome, goBack, render, softRender, onHashChange } from './controllers/router.js';
+import { dock, paintDock, fillDock, toggleDock } from './controllers/dock.js';
 import { sync, syncing, refreshLibrary, setLater } from './controllers/sync.js';
 import { selectProfile } from './controllers/account.js';
-import { queueDownload, downloadAndWait, pickFolder, dropFolder } from './controllers/downloads.js';
+import { queueDownload, pickFolder, dropFolder } from './controllers/downloads.js';
 import { openSheet } from './controllers/sheet.js';
 import { P } from './controllers/player/state.js';
 import { on } from './lib/events.js';
-import { countBytes, noteQuota, quotaUntil, refreshAccountInfo } from './models/quota.js';
+import { refreshAccountInfo } from './models/quota.js';
 import { paintQuota } from './views/quota.js';
-import { isCollection, collectionItems, itemMetaKey, movieTitle } from './models/collections.js';
-import { prog, setProgress, markNow, isLater } from './models/progress.js';
-import { seasonLabel, saveMeta } from './models/fichas.js';
+import { collectionItems, itemMetaKey, movieTitle } from './models/collections.js';
+import { prog, setProgress, isLater } from './models/progress.js';
+import { saveMeta } from './models/fichas.js';
 import { setTmdbKey, ensureMeta, saveSyn, translateMissing, resetFichas } from './models/fichas-sync.js';
 import { idb } from './models/idb.js';
-import { saveKnown, newEpisodes, markSeriesSeen } from './models/news.js';
+import { saveKnown } from './models/news.js';
 import { epById } from './models/library.js';
-import { thumbFor } from './models/thumbs.js';
-import { saveChapterCache, rangeReader, cacheChapters, formatProblem, formatSummary, rememberCodec } from './models/media.js';
-import { hydrateThumbs } from './views/thumbs.js';
+import { cacheChapters } from './models/media.js';
 import { nextFor } from './models/plans.js';
-import { header, app } from './views/components.js';
+import { app } from './views/components.js';
 import { setHero } from './views/home.js';
-import { dlButton, episodeRow } from './views/episodes.js';
+import { dlButton } from './views/episodes.js';
 import { route } from './lib/route.js';
 import { resolveContext } from './models/context.js';
 import { paintSync, paintDrawerCount, paintNewsDot } from './views/dock.js';
@@ -47,7 +43,15 @@ import { openHomeSearch, closeHomeSearch } from './views/catalog.js';
 import { renderDownloads } from './views/downloads.js';
 import { newsHTML, paintSeenByAll, renderSettings, paintCineKey, paintDownloadsWhere, paintSpace } from './views/settings.js';
 import { openDiscoverSheet } from './views/discover.js';
-import { closeSheet } from './views/sheet.js';
+import { stage, video } from './controllers/player/dom.js';
+import { watchDlButton } from './views/watch.js';
+import { enterMini } from './controllers/player/mini.js';
+import { togglePlay, setLights } from './controllers/player/controls.js';
+import { switchTo, savePosition, stopPlayback } from './controllers/player/engine.js';
+import { renderWatch, paintWatchInfo } from './controllers/player/page.js';
+// los gestos y los eventos del video se registran al cargarse
+import './controllers/player/gestures.js';
+import './controllers/player/events.js';
 
 on('quota', paintQuota);
 on('theme', () => { if (dock.classList.contains('is-open')) fillDock(); });
@@ -84,7 +88,6 @@ loadProfileState();
 
 /* ───────────────────────── MEGA ───────────────────────── */
 
-
 /* ───────────────────────── miniaturas ───────────────────────── */
 
 /* ───────────────────────── capítulos fuera de la biblioteca ───────────────────────── */
@@ -93,19 +96,13 @@ loadProfileState();
 
 /** Lo que quedó viendo este perfil en otro dispositivo hace poco, si conviene ofrecer seguir aquí. */
 
-
-
 /* ───────────────────────── descargas ───────────────────────── */
-
 
 /* ───────────────────────── rutas y vistas ───────────────────────── */
 
-
 /* ── botón flotante (reemplaza el menú lateral) ── */
 
-
 /* ── entrar ── */
-
 
 /* ── perfiles ── */
 
@@ -131,7 +128,6 @@ document.addEventListener('pointerdown', (e) => {
 
 /* ── selección de varios capítulos de una temporada para descargarlos juntos ── */
 
-
 function paintEpisode(id) {
   const ep = epById(id);
   if (!ep) return;
@@ -148,967 +144,25 @@ function paintEpisode(id) {
 
 /* ── hoja de opciones de un capítulo ── */
 
-
 /* ───────────────────────── página de reproducción ───────────────────────── */
-
-const stage = $('#stage');
-const parking = $('#stage-parking');
-const video = $('#video');
-
-function watchDlButton(ep) {
-  const t = state.dls[ep.id];
-  const queued = state.queue.some((q) => q.ep.id === ep.id);
-  const label = t ? `Descargando ${Math.round((t.loaded / t.total) * 100)}%` : queued ? 'En cola' : state.saved.has(ep.id) ? 'Descargado' : 'Descargar';
-  const icon = t || queued ? ICON.queued : state.saved.has(ep.id) ? ICON.saved : ICON.down;
-  return `<button class="btn ${state.saved.has(ep.id) ? 'is-saved' : ''}" data-act="w-dl" data-id="${esc(ep.id)}">${icon}<span>${label}</span></button>`;
-}
-
-function renderWatch(id) {
-  const ctx = resolveContext(id);
-  // ver un capítulo cuenta como haber visto lo nuevo de esa serie (si no, la burbuja seguía en el inicio)
-  const ws = ctx && ctx.si != null && state.library && state.library.series[ctx.si];
-  if (ws && newEpisodes(ws).length) markSeriesSeen(ws);
-  if (!ctx) {
-    if (LS.get('session', null) && (state.connecting || !state.library)) {
-      app.innerHTML = header('') + '<main><section class="empty"><p class="dim">Cargando…</p></section></main>';
-    } else go('#/');
-    return;
-  }
-  const same = P.playing && P.playing.ep.id === id && stage.isConnected && app.contains(stage);
-  if (!same) {
-    leaveMini();
-    parkStage();
-    app.innerHTML = header('') + `<main class="watch">
-      <div class="watch-grid">
-        <div class="watch-main">
-          <div class="stage-slot" id="stage-slot"></div>
-          <div class="watch-info" id="watch-info"></div>
-        </div>
-        <aside class="watch-list" id="watch-list"></aside>
-      </div>
-    </main>`;
-    $('#stage-slot').appendChild(stage);
-    stage.hidden = false;
-    if (!P.playing || P.playing.ep.id !== id) startPlayback(ctx);
-    else P.playing.ctx = ctx;
-  }
-  paintWatchInfo();
-}
-
-function paintWatchInfo() {
-  if (!P.playing || route().view !== 'play') return;
-  const ctx = resolveContext(P.playing.ep.id) || P.playing.ctx;
-  P.playing.ctx = ctx;
-  const ep = P.playing.ep;
-  const i = ctx.list.findIndex((x) => x.id === ep.id);
-  const prev = ctx.list[i - 1];
-  const next = ctx.list[i + 1];
-  const upcoming = nextUnseen(ep, ctx.list, 3).filter((x) => !state.saved.has(x.id) && !state.dls[x.id]);
-  const info = $('#watch-info');
-  if (!info) return;
-  info.innerHTML = `<div class="watch-text">
-      <a class="watch-series" href="${ctx.back}">${esc(ctx.title)}</a>
-      <h2 class="watch-title">${esc(episodeLabel(ep))}</h2>
-      ${ctx.sub ? `<p class="watch-sub">${esc(ctx.sub)}</p>` : ''}
-    </div>
-    <div class="watch-actions">
-      ${prev ? `<a class="btn" href="#/play/${encodeURIComponent(prev.id)}" data-replace>${ICON.prev}<span>Anterior</span></a>` : ''}
-      ${next ? `<a class="btn" href="#/play/${encodeURIComponent(next.id)}" data-replace><span>Siguiente</span>${ICON.next}</a>` : ''}
-      ${watchDlButton(ep)}
-      ${upcoming.length ? `<button class="btn" data-act="w-dl-next">${ICON.down}<span>Descargar ${upcoming.length === 1 ? 'el siguiente' : `los ${upcoming.length} siguientes`}</span></button>` : ''}
-      <button class="icon-btn" data-act="w-more" aria-label="Más opciones">${ICON.more}</button>
-    </div>`;
-  const list = $('#watch-list');
-  const nextUp = ctx.list[i + 1];
-  const done = ctx.shown.filter((x) => (prog(x) || {}).w).length;
-  list.innerHTML = `<div class="wl-head"><h3 class="wl-title">${esc(ctx.sub || ctx.title)}</h3><span class="wl-count">${done} de ${ctx.shown.length} vistos</span></div>
-    <ol class="episodes is-compact">${ctx.shown.map((x) => episodeRow(x, { current: x.id === ep.id, next: nextUp && x.id === nextUp.id })).join('')}</ol>`;
-  hydrateThumbs(list);
-  const cur = list.querySelector('.is-current');
-  if (cur && list.scrollHeight > list.clientHeight) cur.scrollIntoView({ block: 'nearest' });
-}
-
-function parkStage() {
-  if (stage.parentElement !== parking) parking.appendChild(stage);
-}
-
-/** El archivo descargado que se está reproduciendo, si lo hay (para leerlo por rangos sin ir a MEGA). */
-const sourceBlob = (token) => (token && token.source && token.source.blob) || null;
 
 /* ───────────────────────── motor del reproductor ───────────────────────── */
 
-const ui = {
-  big: $('#st-big'), play: $('#st-play'), chapter: $('#st-chapter'), lights: $('#st-lights'), seek: $('#st-seek'), time: $('#st-time'),
-  speed: $('#st-speed'), pip: $('#st-pip'), fs: $('#st-fs'), mute: $('#st-mute'), next: $('#st-next'),
-  skip: $('#st-skip'), menu: $('#st-menu'), flash: $('#st-flash'), nextCard: $('#p-next'), msg: $('#p-msg'), tap: $('#st-tap'),
-};
-
-async function startPlayback(ctx) {
-  if (P.playing) finishCurrent();
-  clearTimeout(P.nextTimer);
-  const ep = ctx.ep;
-  const token = { ep, ctx, objectUrl: null, lastSaved: 0, lastSync: Date.now(), recover: [], source: null, chapters: [], autoSkipped: false, learned: false, undo: null, offer: null };
-  P.playing = token;
-  ui.msg.hidden = true;
-  ui.nextCard.hidden = true;
-  closeMenu();
-  resetChapters();
-  $('#st-marks').innerHTML = '';
-  stage.classList.add('is-loading');
-  stage.classList.remove('is-ended');
-  video.removeAttribute('src');
-  video.load();
-  paintControls();
-
-  let src = null;
-  let localErr = null;
-  const blob = await localBlob(ep, true).catch((err) => { localErr = err; return null; });
-  if (P.playing !== token) return;
-  if (blob) {
-    src = token.objectUrl = URL.createObjectURL(blob);
-    token.source = { blob };
-  } else if (navigator.onLine) {
-    try {
-      src = await streamUrl(ep);
-      token.source = { stream: true };
-    } catch (err) {
-      if (P.playing !== token) return;
-      return playerMessage(err.message === 'NOSW'
-        ? 'La app se está preparando. Recarga la página y vuelve a intentarlo.'
-        : megaMessage(err));
-    }
-  } else if (localErr && localErr.message === 'NOFOLDER') {
-    return playerMessage('Kai necesita permiso para abrir tu carpeta de descargas.', false, true);
-  } else if (localErr && localErr.message === 'NOFILE') {
-    return playerMessage('El archivo ya no está en tu carpeta de descargas.');
-  } else {
-    return playerMessage('Este capítulo no está descargado y no hay conexión.');
-  }
-  if (P.playing !== token) return;
-
-  const p = prog(ep);
-  const startAt = p && !p.w && p.t > 5 ? Math.max(0, p.t - 3) : 0;
-  // #t= hace que el navegador empiece directo en ese punto, sin un salto aparte
-  video.src = startAt ? `${src}#t=${startAt.toFixed(1)}` : src;
-  video.addEventListener('loadedmetadata', () => {
-    if (P.playing !== token) return;
-    if (startAt && video.duration && startAt < video.duration - 2 && Math.abs(video.currentTime - startAt) > 2) video.currentTime = startAt;
-    video.playbackRate = P.speed;
-  }, { once: true });
-  setMediaSession(ep, ctx);
-  video.play().catch(() => { stage.classList.remove('is-loading'); paintControls(); });
-  initChapters(ep, token);
-}
-
-async function streamUrl(ep) {
-  if (!('serviceWorker' in navigator)) throw new Error('NOSW');
-  if (!navigator.serviceWorker.controller) {
-    await Promise.race([navigator.serviceWorker.ready, sleep(3000)]);
-    await sleep(50);
-    if (!navigator.serviceWorker.controller) throw new Error('NOSW');
-  }
-  const url = await downloadUrl(ep.id);
-  const q = new URLSearchParams({ u: url, k: ep.key, s: String(ep.size), t: ep.mime, i: ep.id });
-  return '__stream?' + q.toString();
-}
-
-function playerMessage(text, offerDownload = false, offerFolder = false, detail = '') {
-  stage.classList.remove('is-loading');
-  ui.msg.innerHTML = `<p>${esc(text)}</p>${detail ? `<p class="p-detail">${esc(detail)}</p>` : ''}<div class="btn-row">
-    ${offerDownload ? '<button class="btn btn-lamp" data-act="p-dl">Descargar y ver</button>' : ''}
-    ${offerFolder ? '<button class="btn btn-lamp" data-act="p-folder">Permitir acceso</button>' : ''}
-    <a class="btn" href="${P.playing ? P.playing.ctx.back : '#/'}">Volver</a></div>`;
-  ui.msg.hidden = false;
-}
-
-async function downloadThenPlay() {
-  if (!P.playing) return;
-  const { ep, ctx } = P.playing;
-  ui.msg.innerHTML = '<p id="p-dl-status">Descargando…</p>';
-  const tick = setInterval(() => {
-    const t = state.dls[ep.id];
-    const st = $('#p-dl-status');
-    if (t && st) st.textContent = `Descargando… ${Math.round((t.loaded / t.total) * 100)}%`;
-  }, 400);
-  await downloadAndWait(ep, ctx.title);
-  clearInterval(tick);
-  if (!P.playing || P.playing.ep !== ep) return;
-  if (state.saved.has(ep.id)) { P.playing = null; startPlayback(ctx); }
-  else playerMessage('No se pudo descargar el capítulo.');
-}
-
-function setMediaSession(ep, ctx) {
-  if (!('mediaSession' in navigator)) return;
-  try {
-    const meta = (art) => new MediaMetadata({ title: episodeLabel(ep), artist: ctx.title, album: 'Kai', artwork: art || [] });
-    navigator.mediaSession.metadata = meta();
-    thumbFor(ep).then((u) => {
-      if (u && P.playing && P.playing.ep === ep) navigator.mediaSession.metadata = meta([{ src: u, sizes: '320x180', type: 'image/jpeg' }]);
-    });
-    const set = (a, fn) => { try { navigator.mediaSession.setActionHandler(a, fn); } catch { /* nada */ } };
-    set('nexttrack', () => playNext());
-    set('previoustrack', () => playPrev());
-    set('seekbackward', () => seekBy(-10));
-    set('seekforward', () => seekBy(10));
-  } catch { /* nada */ }
-}
-
-function neighbor(delta) {
-  if (!P.playing) return null;
-  const list = P.playing.ctx.list;
-  const i = list.findIndex((x) => x.id === P.playing.ep.id);
-  return i >= 0 ? list[i + delta] || null : null;
-}
-function switchTo(ep) {
-  if (!ep) return;
-  const ctx = resolveContext(ep.id);
-  if (!ctx) return;
-  if (route().view === 'play') {
-    history.replaceState(null, '', '#/play/' + encodeURIComponent(ep.id));
-    setRouteKey('play/' + ep.id);
-    startPlayback(ctx);
-    paintWatchInfo();
-  } else {
-    startPlayback(ctx); // sigue en el mini reproductor
-    paintMini();
-  }
-}
-function playNext() { const n = neighbor(1); if (n) switchTo(n); }
-function playPrev() { const n = neighbor(-1); if (n) switchTo(n); }
-
-function savePosition(force = false) {
-  if (!P.playing || !video.duration || !isFinite(video.duration) || !video.currentSrc) return;
-  const now = Date.now();
-  if (!force && now - P.playing.lastSaved < 4000) return;
-  P.playing.lastSaved = now;
-  setProgress(P.playing.ep, video.currentTime, video.duration);
-  markNow(P.playing.ep, video.currentTime, video.duration);
-  if (force || now - P.playing.lastSync > 60000) {
-    P.playing.lastSync = now;
-    sync();
-  }
-}
-
-function finishCurrent() {
-  if (!P.playing) return;
-  savePosition(true);
-  if (P.playing.objectUrl) {
-    const u = P.playing.objectUrl;
-    setTimeout(() => URL.revokeObjectURL(u), 1500);
-  }
-}
-
-function stopPlayback() {
-  clearTimeout(P.nextTimer);
-  if (document.body.classList.contains('lights-off')) setLights(false);
-  if (P.playing) {
-    video.pause();
-    finishCurrent();
-    P.playing = null;
-  }
-  resetChapters();
-  closeMenu();
-  if (isFullscreen()) exitFullscreen();
-  if (video.getAttribute('src')) { video.removeAttribute('src'); video.load(); }
-  stage.hidden = true;
-  leaveMini();
-  parkStage();
-}
-
 /* ── mini reproductor ── */
-
-const mini = $('#mini');
-function enterMini() {
-  if (!P.playing) return;
-  if (stage.classList.contains('kai-fs')) setKaiFullscreen(false);
-  else if (isFullscreen()) exitFullscreen();
-  if (document.body.classList.contains('lights-off')) setLights(false);
-  closeMenu();
-  const slot = $('#mini-slot');
-  if (stage.parentElement !== slot) slot.prepend(stage);
-  stage.classList.add('is-mini');
-  stage.hidden = false;
-  mini.hidden = false;
-  document.documentElement.classList.add('has-mini');
-  paintMini();
-}
-function leaveMini() {
-  stage.classList.remove('is-mini');
-  if (mini.hidden) return;
-  mini.hidden = true;
-  document.documentElement.classList.remove('has-mini');
-}
-function paintMini() {
-  if (mini.hidden || !P.playing) return;
-  $('#mini-title').textContent = episodeLabel(P.playing.ep);
-  $('#mini-sub').textContent = P.playing.ctx.title || '';
-  const t = $('#mini-toggle');
-  t.innerHTML = video.paused ? ICON.play : ICON.pause;
-  t.setAttribute('aria-label', video.paused ? 'Reproducir' : 'Pausar');
-  const d = isFinite(video.duration) ? video.duration : 0;
-  mini.style.setProperty('--mp', d ? (video.currentTime / d) * 100 + '%' : '0%');
-}
-['play', 'pause', 'timeupdate', 'loadedmetadata'].forEach((ev) => video.addEventListener(ev, paintMini));
-
-// al volver de la ventana flotante del sistema con el botón "volver a la pestaña", regresa al reproductor grande
-function backFromSystemPip() {
-  setTimeout(() => {
-    if (P.playing && !video.paused && route().view !== 'play') go('#/play/' + encodeURIComponent(P.playing.ep.id));
-  }, 60);
-}
-video.addEventListener('leavepictureinpicture', backFromSystemPip);
-video.addEventListener('webkitpresentationmodechanged', () => { if (video.webkitPresentationMode === 'inline') backFromSystemPip(); });
 
 /* ── controles ── */
 
-// se llama varias veces por segundo: solo toca el DOM cuando algo cambió
-const painted = {};
-function setOnce(key, value, apply) {
-  if (painted[key] === value) return;
-  painted[key] = value;
-  apply(value);
-}
-function paintControls() {
-  const paused = video.paused;
-  setOnce('play', paused, (v) => {
-    ui.play.innerHTML = v ? ICON.play : ICON.pause;
-    ui.play.setAttribute('aria-label', v ? 'Reproducir' : 'Pausar');
-    stage.classList.toggle('is-paused', v);
-  });
-  const d = isFinite(video.duration) ? video.duration : 0;
-  const t = P.seeking ? Number(ui.seek.value) : video.currentTime;
-  ui.seek.max = String(d || 0);
-  if (!P.seeking) ui.seek.value = String(t || 0);
-  let buf = 0;
-  for (let i = 0; i < video.buffered.length; i++) {
-    if (video.buffered.start(i) <= t + 0.5) buf = Math.max(buf, video.buffered.end(i));
-  }
-  stage.style.setProperty('--played', d ? (t / d) * 100 + '%' : '0%');
-  stage.style.setProperty('--buffered', d ? (buf / d) * 100 + '%' : '0%');
-  setOnce('time', `${fmtTime(t)} / ${fmtTime(d)}`, (v) => { ui.time.textContent = v; });
-  setOnce('next', !neighbor(1), (v) => { ui.next.hidden = v; });
-  paintSkip(t, d);
-  const ch = chapterAt(P.seeking ? t : video.currentTime);
-  setOnce('chapter', ch && ch.title ? ch.title : '', (v) => { ui.chapter.textContent = v; });
-  setOnce('mute', video.muted || video.volume === 0, (v) => {
-    ui.mute.innerHTML = v
-      ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></svg>'
-      : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg>';
-  });
-  setOnce('speed', P.speed === 1 ? '1×' : `${P.speed}×`, (v) => { ui.speed.textContent = v; });
-  setOnce('fs', isFullscreen(), (v) => {
-    ui.fs.setAttribute('aria-label', v ? 'Salir de pantalla completa' : 'Pantalla completa');
-    stage.classList.toggle('is-fs', v);
-  });
-}
-
-function wake() {
-  stage.classList.remove('is-idle');
-  clearTimeout(P.idleTimer);
-  P.idleTimer = setTimeout(() => {
-    if (!video.paused && ui.menu.hidden && !P.seeking) stage.classList.add('is-idle');
-  }, 2800);
-}
-
-function togglePlay() {
-  if (!video.currentSrc) return;
-  if (video.paused) video.play().catch(() => {}); else video.pause();
-}
-
-function seekBy(s) {
-  if (!video.duration) return;
-  video.currentTime = Math.max(0, Math.min(video.duration - 0.5, video.currentTime + s));
-  ui.flash.textContent = s > 0 ? `+${s} s` : `−${-s} s`;
-  ui.flash.dataset.side = s > 0 ? 'right' : 'left';
-  ui.flash.classList.remove('is-on');
-  void ui.flash.offsetWidth;
-  ui.flash.classList.add('is-on');
-  wake();
-}
-
-const isFullscreen = () => !!(document.fullscreenElement || document.webkitFullscreenElement || stage.classList.contains('kai-fs'));
-/* iPhone no deja poner en pantalla completa un elemento de la página, solo el reproductor
- * nativo de iOS, que tapa los controles y gestos de Kai. Ahí se usa una pantalla completa
- * propia: el reproductor ocupa toda la pantalla (sin barras si Kai está en la pantalla de inicio). */
-function setKaiFullscreen(on) {
-  stage.classList.toggle('kai-fs', on);
-  // en el teléfono (sin girar la pantalla) el video horizontal se muestra girado; ver styles.css
-  const wide = !video.videoWidth || video.videoWidth >= video.videoHeight;
-  stage.classList.toggle('kai-rot', on && wide && matchMedia('(pointer: coarse)').matches);
-  document.documentElement.classList.toggle('kai-fs-on', on);
-  paintThemeColor();
-  paintControls();
-  wake();
-}
-function exitFullscreen() {
-  if (stage.classList.contains('kai-fs')) { setKaiFullscreen(false); return; }
-  const fn = document.exitFullscreen || document.webkitExitFullscreen;
-  if (fn) fn.call(document).catch?.(() => {});
-}
-function toggleFullscreen() {
-  if (isFullscreen()) { exitFullscreen(); return; }
-  const req = stage.requestFullscreen || stage.webkitRequestFullscreen;
-  if (req) {
-    Promise.resolve(req.call(stage)).then(() => {
-      try { screen.orientation.lock('landscape').catch(() => {}); } catch { /* nada */ }
-    }).catch(() => setKaiFullscreen(true));
-  } else {
-    setKaiFullscreen(true);
-  }
-}
-
-async function togglePip() {
-  try {
-    if (document.pictureInPictureElement) await document.exitPictureInPicture();
-    else if (video.requestPictureInPicture) await video.requestPictureInPicture();
-    else if (video.webkitSetPresentationMode) video.webkitSetPresentationMode(video.webkitPresentationMode === 'picture-in-picture' ? 'inline' : 'picture-in-picture');
-  } catch { toast('Este navegador no permite ventana flotante aquí.'); }
-}
-
 /* ── menú del reproductor: velocidad ── */
-
-function openMenu(kind) {
-  if (!ui.menu.hidden && ui.menu.dataset.kind === kind) { closeMenu(); return; }
-  ui.menu.dataset.kind = kind;
-  paintMenu();
-  ui.menu.hidden = false;
-  wake();
-}
-function closeMenu() { ui.menu.hidden = true; }
-
-function paintMenu() {
-  if (ui.menu.hidden && !ui.menu.dataset.kind) return;
-  const kind = ui.menu.dataset.kind;
-  if (kind === 'speed') {
-    ui.menu.innerHTML = `<p class="menu-title">Velocidad</p>${[0.75, 1, 1.25, 1.5, 2].map((v) => `<button class="menu-item ${v === P.speed ? 'is-on' : ''}" data-act="m-speed" data-v="${v}">${v === 1 ? 'Normal' : v + '×'}</button>`).join('')}`;
-  }
-}
-
-/* ── capítulos del MP4 ("Intro", "Parte A"…) ──
- * Los videos traen los subtítulos dentro de la imagen, así que Kai ya no busca pistas ni archivos de subtítulos:
- * solo lee los capítulos, y desde MEGA lo hace cuando el video ya empezó, para no quitarle velocidad al arranque. */
-function resetChapters() {
-  if (P.chapCtrl) P.chapCtrl.abort();
-  P.chapCtrl = null;
-}
-
-/** Espera a que el video esté sonando (o a que pase `ms`, por si no arranca solo). */
-const whenPlaying = (ms) => new Promise((res) => {
-  if (!video.paused && video.readyState >= 3) { res(); return; }
-  let timer = 0;
-  const done = () => { clearTimeout(timer); video.removeEventListener('playing', done); res(); };
-  timer = setTimeout(done, ms);
-  video.addEventListener('playing', done);
-});
-
-async function initChapters(ep, token) {
-  // mientras no se sepa si el video trae capítulos, Kai no adivina dónde está la intro (ni salta sola con lo aprendido)
-  token.chaptersDone = false;
-  const giveUp = setTimeout(() => { token.chaptersDone = true; }, 12000);
-  try { await loadChapters(ep, token); } catch (err) { if (P.playing === token) console.warn('capítulos', err); } finally { clearTimeout(giveUp); token.chaptersDone = true; }
-}
-async function loadChapters(ep, token) {
-  const ctrl = new AbortController();
-  P.chapCtrl = ctrl;
-  const alive = () => P.playing === token && !ctrl.signal.aborted;
-  const cached = await idb.get('subcache', ep.id).catch(() => null);
-  if (!alive()) return;
-  if (cached && cached.v === 3) { setChapters(token, cached.chapters || []); return; }
-  if (!/mp4|quicktime/.test(ep.mime)) return;
-  // desde MEGA, primero que arranque el video; si está descargado, se lee al instante
-  if (!(token.source && token.source.blob)) await whenPlaying(4000);
-  if (!alive()) return;
-  const read = await rangeReader(ep, sourceBlob(token), ctrl.signal);
-  const info = await mp4Info(read, ep.size);
-  learnAudioLang(ep, info.audioLang);
-  if (!alive()) return;
-  const chapters = await mp4Chapters(info, read, video.duration);
-  if (!alive()) return;
-  setChapters(token, chapters);
-  saveChapterCache(ep, chapters);
-}
 
 /* ── capítulos e intros ── */
 
-const median = (a) => { const b = [...a].sort((x, y) => x - y); return b.length ? b[Math.floor(b.length / 2)] : 0; };
-
-function setChapters(token, chapters) {
-  if (P.playing !== token) return;
-  token.chapters = (chapters || []).map((c) => ({ ...c, end: c.end == null || !isFinite(c.end) ? (video.duration || Infinity) : c.end }));
-  token.intro = pickIntro(token.chapters); // el opening de verdad (no el pedacito de anime que a veces va antes)
-  token.chaptersDone = true;
-  paintMarks();
-  paintControls();
-}
-
-function chapterAt(t) {
-  const list = P.playing && P.playing.chapters;
-  return list ? list.find((c) => t >= c.start && t < c.end) : null;
-}
-
-function paintMarks() {
-  const el = $('#st-marks');
-  const d = video.duration;
-  const list = (P.playing && P.playing.chapters) || [];
-  el.innerHTML = d && isFinite(d) ? list.filter((c) => c.start > 0.5 && c.start < d).map((c) => `<span style="left:${(c.start / d) * 100}%"></span>`).join('') : '';
-}
-
-/* Sin capítulos, Kai aprende por serie dónde saltaste el opening. */
-function introStats() { return state.shared.intros || {}; }
-function learnIntro(from, to) {
-  if (!P.playing || P.playing.learned) return;
-  const len = to - from;
-  if (from > 360 || len < 40 || len > 150) return;
-  P.playing.learned = true;
-  const all = introStats();
-  const key = P.playing.ctx.title;
-  const st = all[key] || { starts: [], lens: [] };
-  st.starts = [...st.starts, Math.round(from)].slice(-5);
-  st.lens = [...st.lens, Math.round(len)].slice(-5);
-  st.u = Date.now();
-  all[key] = st;
-  state.shared.intros = all;
-  saveShared();
-  state.dirty = true;
-}
-function learnedIntro() {
-  const st = P.playing && introStats()[P.playing.ctx.title];
-  if (!st || !st.lens.length) return null;
-  const len = median(st.lens);
-  const recent = st.starts.slice(-3);
-  const start = median(recent);
-  const sure = recent.length >= 2 && recent.every((x) => Math.abs(x - start) <= 8);
-  return { len, start, sure };
-}
-
-/** Qué ofrece el botón flotante en este momento: saltar intro, ir al siguiente o deshacer. */
-function skipOffer(t, d) {
-  if (!P.playing || !d) return null;
-  if (P.playing.undo && Date.now() < P.playing.undo.until) return { label: 'Volver a la intro', act: 'undo' };
-  const ch = chapterAt(t);
-  if (ch && ch === P.playing.intro && t < ch.end - 2) return { label: 'Saltar intro', to: ch.end, sure: true };
-  if (ch && OUTRO.test(ch.title) && neighbor(1)) return { label: 'Siguiente capítulo', act: 'next' };
-  if (!P.playing.chaptersDone) return null;
-  if (P.playing.intro) return null; // con el opening marcado en el MP4 no hace falta adivinar
-  if (d < 400 || t > 360) return null;
-  const li = learnedIntro();
-  if (li && li.sure) {
-    if (t >= li.start - 3 && t < li.start + li.len - 3) return { label: 'Saltar intro', to: li.start + li.len, sure: true, learned: true };
-    return null;
-  }
-  if (t < 3) return null;
-  if (li) return { label: 'Saltar intro', to: t + li.len, guess: true };
-  return { label: 'Saltar 85 s', to: t + 85, guess: true };
-}
-
-function paintSkip(t, d) {
-  const offer = skipOffer(t, d);
-  P.playing && (P.playing.offer = offer);
-  ui.skip.hidden = !offer;
-  if (!offer) return;
-  if (ui.skip.textContent !== offer.label) ui.skip.textContent = offer.label;
-  ui.skip.classList.toggle('is-sticky', !!(offer.sure || offer.act));
-  // saltar solo: únicamente cuando Kai sabe dónde está la intro
-  if (offer.sure && state.settings.autoSkip && !P.playing.autoSkipped && !video.paused) {
-    P.playing.autoSkipped = true;
-    P.playing.undo = { at: t, until: Date.now() + 6000 };
-    seekSure(Math.min(d - 1, offer.to));
-    paintSkip(video.currentTime, d);
-  }
-}
-
-/** Salta a un punto y comprueba que llegó: si el navegador se queda corto (aún no tenía esa parte), lo intenta otra vez. */
-function seekSure(to) {
-  const tok = P.playing;
-  let tries = 0;
-  const check = () => {
-    if (P.playing !== tok) return;
-    if (video.currentTime < to - 1.5 && tries < 3) { tries++; video.currentTime = to; video.addEventListener('seeked', check, { once: true }); }
-  };
-  video.currentTime = to;
-  video.addEventListener('seeked', check, { once: true });
-}
-
-function doSkip() {
-  if (!P.playing) return;
-  const o = skipOffer(video.currentTime, video.duration);
-  if (!o) return;
-  if (o.act === 'undo') {
-    video.currentTime = P.playing.undo.at;
-    P.playing.undo = null;
-    P.playing.autoSkipped = true;
-  } else if (o.act === 'next') playNext();
-  else {
-    const from = video.currentTime;
-    P.playing.autoSkipped = true;
-    seekSure(Math.min(video.duration - 1, o.to));
-    if (o.guess) learnIntro(from, o.to);
-  }
-  paintControls();
-}
-
 /* ── tema y luz ── */
-
-
-function setLights(off) {
-  document.body.classList.toggle('lights-off', off);
-  $('#lights').hidden = !off;
-  ui.lights.classList.toggle('is-on', off);
-  ui.lights.setAttribute('aria-label', off ? 'Encender la luz' : 'Apagar la luz');
-}
 
 /* ── cuota de MEGA ── */
 
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.addEventListener('message', (e) => {
-    if (e.data && e.data.type === 'mega-bytes') countBytes(e.data.n);
-    if (e.data && e.data.type === 'mega-quota') noteQuota(e.data.timeLeft || 3600);
-    if (e.data && e.data.type === 'stream-error') P.lastStreamError = String(e.data.msg || '').slice(0, 80);
-    // el service worker encontró el enlace de MEGA caducado: se pide otro y se le responde por su canal
-    if (e.data && e.data.type === 'need-url' && e.ports && e.ports[0]) {
-      const port = e.ports[0];
-      downloadUrl(e.data.id, true).then((url) => port.postMessage({ url }), () => port.postMessage({ url: '' }));
-    }
-  });
-}
-
 /* ── eventos del video ── */
 
-video.addEventListener('timeupdate', () => { if (!P.seeking) paintControls(); savePosition(); maybePrefetchNext(); });
-
-/** En los últimos minutos baja en silencio el inicio del siguiente capítulo (unos 3 MB) para que empiece sin espera. */
-function maybePrefetchNext() {
-  if (!P.playing || P.playing.prefetched || state.settings.prefetchNext === false || !navigator.onLine) return;
-  const d = video.duration;
-  if (!isFinite(d) || d - video.currentTime > 150) return;
-  P.playing.prefetched = true;
-  const n = neighbor(1);
-  const sw = navigator.serviceWorker && navigator.serviceWorker.controller;
-  if (!n || !sw || state.saved.has(n.id) || quotaUntil() > 0) return;
-  downloadUrl(n.id).then((u) => sw.postMessage({ type: 'prefetch', u, k: n.key, s: n.size, i: n.id, blocks: 3 })).catch(() => {});
-}
-video.addEventListener('progress', paintControls);
-video.addEventListener('durationchange', () => { paintControls(); paintMarks(); });
-video.addEventListener('play', () => { paintControls(); wake(); document.body.classList.add('is-playing'); });
-video.addEventListener('pause', () => { paintControls(); savePosition(true); stage.classList.remove('is-idle'); document.body.classList.remove('is-playing'); });
-video.addEventListener('emptied', () => document.body.classList.remove('is-playing'));
-video.addEventListener('waiting', () => stage.classList.add('is-loading'));
-['playing', 'canplay', 'seeked'].forEach((ev) => video.addEventListener(ev, () => stage.classList.remove('is-loading')));
-video.addEventListener('volumechange', paintControls);
-video.addEventListener('ended', () => {
-  if (!P.playing) return;
-  setProgress(P.playing.ep, video.duration, video.duration, true);
-  sync();
-  stage.classList.add('is-ended');
-  const n = neighbor(1);
-  if (!n) {
-    // fin de la temporada: no sigue sola. Si hay otra después, se ofrece, pero solo si la tocas.
-    const lib = state.library;
-    const s = P.playing.ctx.si != null && lib && lib.series[P.playing.ctx.si];
-    const nextSe = s && !isCollection(s) && P.playing.ctx.ki != null ? s.seasons[P.playing.ctx.ki + 1] : null;
-    if (!nextSe) { playerMessage(`Terminaste ${P.playing.ctx.title}.`); return; }
-    const first = nextSe.episodes.find((e) => !(prog(e) || {}).w) || nextSe.episodes[0];
-    ui.nextCard.innerHTML = `<p>Terminaste ${esc(seasonLabel(s, s.seasons[P.playing.ctx.ki]))}</p>
-      <div class="btn-row">
-        <button class="btn btn-lamp" data-act="p-next-season" data-id="${esc(first.id)}">${ICON.play}<span>Ver ${esc(seasonLabel(s, nextSe))}</span></button>
-        <a class="btn" href="${P.playing.ctx.back}">Volver</a>
-      </div>`;
-    ui.nextCard.hidden = false;
-    return;
-  }
-  let left = 6;
-  ui.nextCard.innerHTML = `<p>Sigue ${esc(episodeLabel(n))}</p>
-    <div class="btn-row">
-      <button class="btn btn-lamp" data-act="p-next-now">${ICON.play}<span>Ver ahora</span></button>
-      ${state.settings.autoplay ? `<button class="btn" data-act="p-next-cancel">Quedarme aquí <span id="p-count">${left}</span></button>` : ''}
-    </div>`;
-  ui.nextCard.hidden = false;
-  if (state.settings.autoplay) {
-    const tick = () => {
-      left -= 1;
-      const c = $('#p-count');
-      if (c) c.textContent = left;
-      if (left <= 0) { ui.nextCard.hidden = true; playNext(); } else P.nextTimer = setTimeout(tick, 1000);
-    };
-    P.nextTimer = setTimeout(tick, 1000);
-  }
-});
-
-video.addEventListener('error', async () => {
-  if (!P.playing || !video.getAttribute('src')) return;
-  const { ep } = P.playing;
-  const at = video.currentTime;
-  // Un tropiezo de MEGA o de la red no termina la reproducción: se pide un enlace nuevo y se sigue
-  // en el mismo punto. Hasta 4 intentos en 3 minutos, para no quedar en un ciclo si de verdad no hay forma.
-  const now = Date.now();
-  const code = video.error ? video.error.code : 0;
-  P.playing.recover = (P.playing.recover || []).filter((t) => now - t < 180000);
-  // código 3 (decodificar) o 4 (formato no soportado): repetir no sirve más de una vez; se revisa el formato
-  const formatError = code === 3 || code === 4;
-  if (formatError && (P.playing.recover.length >= 1 || P.playing.objectUrl)) { explainFormat(ep, code); return; }
-  if (!P.playing.objectUrl && P.playing.recover.length < 4 && navigator.onLine) {
-    P.playing.recover.push(now);
-    stage.classList.add('is-loading');
-    if (P.playing.recover.length > 1) await sleep(1500 * (P.playing.recover.length - 1));
-    if (!P.playing || P.playing.ep !== ep) return;
-    try {
-      // se comprueba el enlace nuevo; un tropiezo pasajero de MEGA aquí no cuenta como fallo
-      for (let tries = 1; ; tries++) {
-        try {
-          const fresh = await downloadUrl(ep.id, true);
-          await C.readRange(fresh, await C.fileKey(ep.key), 0, 15);
-          break;
-        } catch (err) {
-          const passing = !err.status || err.status === 408 || err.status === 429 || err.status >= 500;
-          if (!passing || tries >= 3 || /QUOTA|509/.test(String(err.code || err.message))) throw err;
-          await sleep(1500 * tries);
-          if (!P.playing || P.playing.ep !== ep) return;
-        }
-      }
-      video.src = await streamUrl(ep);
-      video.addEventListener('loadedmetadata', () => { if (at) video.currentTime = at; }, { once: true });
-      video.play().catch(() => {});
-      return;
-    } catch (err) {
-      playerMessage(megaMessage(err));
-      return;
-    }
-  }
-  // detalle para saber la causa si vuelve a pasar (código del navegador y último error del service worker)
-  const me = video.error;
-  const detail = `Detalle: ${me ? `código ${me.code}${me.message ? `, ${me.message.slice(0, 80)}` : ''}` : 'sin código'}${P.lastStreamError ? `; ${P.lastStreamError}` : ''}; ${P.playing.recover.length} intentos`;
-  if (/\.mkv$/i.test(ep.name)) playerMessage('Este navegador no reproduce archivos MKV. Usa la versión MP4 del capítulo.');
-  else if (!P.playing.objectUrl && navigator.onLine) playerMessage('No se pudo reproducir en línea. Puedes descargarlo y verlo desde el dispositivo.', true, false, detail);
-  else playerMessage('No se pudo reproducir este capítulo en este navegador.');
-});
-
-async function explainFormat(ep, code) {
-  const token = P.playing;
-  stage.classList.add('is-loading');
-  let f = null;
-  try { f = await mp4Formats(await rangeReader(ep, sourceBlob(token)), ep.size); } catch (err) { console.warn('formato', err); }
-  if (f && f.video) rememberCodec(ep, f);
-  if (P.playing !== token) return;
-  const prob = formatProblem(f);
-  const detail = `Detalle: código ${code}; ${formatSummary(f)}`;
-  if (prob) playerMessage(`Este video viene en ${prob.what}. ${prob.fix}`, false, false, detail);
-  else playerMessage('Este navegador no pudo reproducir el video, aunque su formato parece normal. El archivo podría estar dañado o incompleto en MEGA.', !token.objectUrl, false, detail);
-}
-
-ui.seek.addEventListener('input', () => { if (!P.seeking) P.seekFrom = video.currentTime; P.seeking = true; paintControls(); wake(); });
-ui.seek.addEventListener('change', () => {
-  const to = Number(ui.seek.value);
-  if (P.seekFrom != null && !(P.playing && P.playing.chapters && P.playing.chapters.length)) learnIntro(P.seekFrom, to);
-  video.currentTime = to;
-  P.seeking = false;
-  P.seekFrom = null;
-  paintControls();
-});
-ui.seek.addEventListener('pointerup', () => { if (P.seeking) { video.currentTime = Number(ui.seek.value); P.seeking = false; } });
-
-/* Gestos sobre el video.
- * Mouse: un clic pausa, doble clic pantalla completa.
- * Táctil: un toque muestra u oculta los controles; doble toque a la izquierda o derecha salta 10 s
- * (cada toque rápido extra suma otros 10 s); mantener presionado reproduce a 2× mientras no se suelte.
- * Deslizar: en la página, arriba = pantalla completa y abajo = mini reproductor; en pantalla completa,
- * abajo = salir. */
-const holdEl = $('#st-hold');
-
-/** ¿El reproductor está girado 90° con CSS (iPhone vertical en pantalla completa)? */
-const isRotated = () => stage.classList.contains('kai-rot') && stage.classList.contains('kai-fs') && matchMedia('(orientation: portrait)').matches;
-/** Punto del toque en coordenadas del video (x hacia la derecha, y hacia abajo del video), aunque esté girado. */
-function videoPoint(e) {
-  if (isRotated()) return { x: e.clientY, y: innerWidth - e.clientX, w: innerHeight, h: innerWidth };
-  const r = stage.getBoundingClientRect();
-  return { x: e.clientX - r.left, y: e.clientY - r.top, w: r.width, h: r.height };
-}
-
-LS.del('bright'); // la barra de brillo se quitó en v16
-
-function tapSide(fx) {
-  return fx < 0.4 ? 'left' : fx > 0.6 ? 'right' : 'center';
-}
-// como en Android e iOS: el doble toque se mide desde que se soltó el primero hasta que empieza el segundo
-const DOUBLE_TAP = 300;
-function handleTouchTap(fx, downAt = Date.now()) {
-  const side = tapSide(fx);
-  const now = Date.now();
-  const gap = downAt - P.lastTap;
-  // racha de toques: tras un doble toque, cada toque rápido del mismo lado suma otros 10 s
-  if (P.lastTapSide === side + '-streak' && gap < 650 && side !== 'center') {
-    P.lastTap = now;
-    seekBy(side === 'left' ? -10 : 10);
-    return;
-  }
-  if (gap < DOUBLE_TAP && P.lastTapSide === side) {
-    clearTimeout(P.tapTimer);
-    P.lastTap = now;
-    if (side === 'center') { P.lastTapSide = ''; togglePlay(); return; }
-    P.lastTapSide = side + '-streak';
-    seekBy(side === 'left' ? -10 : 10);
-    return;
-  }
-  P.lastTap = now;
-  P.lastTapSide = side;
-  clearTimeout(P.tapTimer);
-  P.tapTimer = setTimeout(() => {
-    if (stage.classList.contains('is-idle') || video.paused) wake(); else stage.classList.add('is-idle');
-  }, DOUBLE_TAP + 60);
-}
-
-function endHold() {
-  if (!P.touch || !P.touch.hold) return;
-  P.touch.hold = false;
-  video.playbackRate = P.speed;
-  holdEl.classList.remove('is-on');
-}
-ui.tap.addEventListener('pointerdown', (e) => {
-  if (e.pointerType !== 'touch' || !e.isPrimary) return;
-  try { ui.tap.setPointerCapture(e.pointerId); } catch { /* nada */ }
-  const p = videoPoint(e);
-  if (Date.now() - P.lastTap < DOUBLE_TAP) clearTimeout(P.tapTimer); // puede ser el segundo toque: no ocultar controles todavía
-  P.touch = { id: e.pointerId, x: p.x, y: p.y, w: p.w, h: p.h, mode: null, hold: false, at: Date.now() };
-  const t = P.touch;
-  t.timer = setTimeout(() => {
-    if (P.touch !== t || t.mode || !video.currentSrc || video.paused || video.ended) return;
-    t.hold = true;
-    t.mode = 'hold';
-    video.playbackRate = 2;
-    holdEl.classList.add('is-on');
-    clearTimeout(P.tapTimer);
-  }, 500);
-});
-ui.tap.addEventListener('pointermove', (e) => {
-  const t = P.touch;
-  if (!t || e.pointerId !== t.id) return;
-  const p = videoPoint(e);
-  const dx = p.x - t.x;
-  const dy = t.y - p.y; // hacia arriba del video es positivo
-  if (!t.mode && Math.hypot(dx, dy) > 12) {
-    clearTimeout(t.timer);
-    const vertical = Math.abs(dy) > Math.abs(dx);
-    // en pantalla completa, abajo = salir; en la página, abajo = mini reproductor y arriba = pantalla completa
-    t.mode = !vertical ? 'none' : isFullscreen() ? (dy < 0 ? 'fs-down' : 'none') : dy < 0 ? 'down' : 'up';
-  }
-  if (t.mode === 'down' || t.mode === 'fs-down') {
-    const d = Math.max(0, p.y - t.y);
-    t.dist = d;
-    // el video sigue al dedo; girado, "abajo" del video es hacia la izquierda de la pantalla
-    const k = Math.min(d, 220);
-    const base = isRotated() ? 'rotate(90deg) ' : '';
-    stage.style.transition = 'none';
-    stage.style.transform = `${base}translateY(${k * 0.6}px) scale(${1 - k / 1100})`;
-    stage.style.opacity = String(1 - k / 600);
-  } else if (t.mode === 'up') {
-    t.dist = Math.max(0, t.y - p.y);
-  }
-});
-function touchEnd(e, cancelled) {
-  const t = P.touch;
-  if (!t || e.pointerId !== t.id) return;
-  clearTimeout(t.timer);
-  P.lastTouchEnd = Date.now();
-  if (t.hold) endHold();
-  else if (t.mode === 'down' || t.mode === 'fs-down') {
-    stage.style.transition = 'transform 0.2s, opacity 0.2s';
-    stage.style.transform = '';
-    stage.style.opacity = '';
-    setTimeout(() => { stage.style.transition = ''; }, 220);
-    if (!cancelled && t.dist > 70) {
-      if (t.mode === 'fs-down') exitFullscreen(); // vuelve al reproductor normal
-      else if (P.playing) goBack(P.playing.ctx.back); // queda en el mini reproductor
-    }
-  } else if (t.mode === 'up') {
-    if (!cancelled && t.dist > 60) toggleFullscreen();
-  }
-  else if (!t.mode && !cancelled) handleTouchTap(t.x / Math.max(1, t.w), t.at);
-  P.touch = null;
-}
-ui.tap.addEventListener('pointerup', (e) => touchEnd(e, false));
-ui.tap.addEventListener('pointercancel', (e) => touchEnd(e, true));
-ui.tap.addEventListener('contextmenu', (e) => e.preventDefault()); // mantener presionado no abre el menú del sistema
-
-ui.tap.addEventListener('click', (e) => {
-  if (Date.now() - P.lastTouchEnd < 800) return; // ya lo manejaron los gestos táctiles
-  if (e.pointerType === 'mouse' || (!e.pointerType && matchMedia('(hover: hover)').matches)) {
-    clearTimeout(P.tapTimer);
-    P.tapTimer = setTimeout(() => { togglePlay(); }, 200);
-    wake();
-    return;
-  }
-  const p = videoPoint(e);
-  handleTouchTap(p.x / Math.max(1, p.w));
-});
-ui.tap.addEventListener('dblclick', (e) => {
-  if (!matchMedia('(hover: hover)').matches) return;
-  clearTimeout(P.tapTimer);
-  e.preventDefault();
-  toggleFullscreen();
-});
-stage.addEventListener('pointermove', (e) => { if (e.pointerType === 'mouse') wake(); });
-
-stage.addEventListener('click', (e) => {
-  const el = e.target.closest('[data-act]');
-  if (!el || el === ui.tap) return;
-  const act = el.dataset.act;
-  wake();
-  if (act === 'toggle') togglePlay();
-  else if (act === 'back10') seekBy(-10);
-  else if (act === 'fwd10') seekBy(10);
-  else if (act === 'next') playNext();
-  else if (act === 'skip') doSkip();
-  else if (act === 'lights') setLights(!document.body.classList.contains('lights-off'));
-  else if (act === 'fs') toggleFullscreen();
-  else if (act === 'pip') togglePip();
-  else if (act === 'mute') video.muted = !video.muted;
-  else if (act === 'speed') openMenu('speed');
-  else if (act === 'm-speed') { P.speed = Number(el.dataset.v); video.playbackRate = P.speed; paintMenu(); paintControls(); }
-  else if (act === 'p-next-now') { ui.nextCard.hidden = true; clearTimeout(P.nextTimer); playNext(); }
-  else if (act === 'p-next-season') { ui.nextCard.hidden = true; switchTo(epById(el.dataset.id)); }
-  else if (act === 'p-next-cancel') { clearTimeout(P.nextTimer); ui.nextCard.hidden = true; }
-  else if (act === 'p-dl') downloadThenPlay();
-  else if (act === 'p-folder' && P.playing) {
-    const ctx = P.playing.ctx;
-    dirAccess(state.dlMeta.get(P.playing.ep.id)?.dirKey, true).then((d) => { if (d) { P.playing = null; startPlayback(ctx); flushFolder(); } });
-  }
-});
-ui.menu.addEventListener('change', (e) => {
-});
-document.addEventListener('pointerdown', (e) => {
-  if (!ui.menu.hidden && !ui.menu.contains(e.target) && !e.target.closest('[data-act="cc"],[data-act="speed"]')) closeMenu();
-});
-['fullscreenchange', 'webkitfullscreenchange'].forEach((ev) => document.addEventListener(ev, () => {
-  document.documentElement.classList.toggle('kai-fs-on', isFullscreen());
-  paintThemeColor();
-  paintControls();
-  wake();
-}));
-
-if (!(document.pictureInPictureEnabled || video.webkitSupportsPresentationMode)) ui.pip.hidden = true;
-
-document.addEventListener('keydown', (e) => {
-  if (route().view !== 'play' || !P.playing) {
-    if (e.key === 'Escape') { closeSheet(); closeDrawer(); if (viewState.picking) endPicking(); }
-    return;
-  }
-  if (e.target.closest('input:not([type="range"]), textarea, select')) return;
-  const k = e.key.toLowerCase();
-  if (k === ' ' || k === 'k') { e.preventDefault(); togglePlay(); }
-  else if (k === 'arrowright' || k === 'l') { e.preventDefault(); seekBy(10); }
-  else if (k === 'arrowleft' || k === 'j') { e.preventDefault(); seekBy(-10); }
-  else if (k === 'f') toggleFullscreen();
-  else if (k === 'm') video.muted = !video.muted;
-  else if (k === 'n') playNext();
-  else if (k === 'b') setLights(!document.body.classList.contains('lights-off'));
-  else if (k === 's' && P.playing && P.playing.offer) doSkip();
-  else if (k === 'p') playPrev();
-  else if (k === 'escape') { if (!ui.menu.hidden) closeMenu(); else if (stage.classList.contains('kai-fs')) setKaiFullscreen(false); }
-  else return;
-  wake();
-});
-
 /* ───────────────────────── avisos ───────────────────────── */
-
 
 /* ───────────────────────── eventos globales ───────────────────────── */
 
