@@ -1,6 +1,6 @@
 import { isSubtitleName, mp4Info, mp4Chapters, mp4Formats, pickIntro, OUTRO_RE as OUTRO } from './models/subs.js';
 import { tmdbCheckKey, translateToSpanish, canTranslate, recommendationsFor, airingTop, toDiscover } from './models/meta-api.js';
-import { $, LS, esc, sleep, debounce, fmtTime, fmtLeft, fmtSize, hue, plural } from './lib/util.js';
+import { $, LS, esc, sleep, debounce, fmtTime, fmtSize, hue, plural } from './lib/util.js';
 import { ICON } from './views/icons.js';
 import { langText, hasOwnTitle, sortEpisodes } from './models/naming.js';
 import { DARK_TONES, TONES, profileFile, state, index, setIndex, knownEps, saveSettings, pkey, saveShared, visibleProfiles } from './models/store.js';
@@ -10,13 +10,14 @@ import { langsOf, loadProfileState, nodePath, makeEpisode, isPlayable, buildLibr
 import * as downloads from './models/downloads.js';
 import { setInUseCheck, removeAllDownloads, refreshSaved, resumePendingDownloads, removeDownload, localBlob, holdWake, canFolder, currentDir, getDir, dirPermission, dirAccess, flushFolder, useFolder, forgetFolder } from './models/downloads.js';
 import { episodeLabel } from './models/collections.js';
-import { nextUnseen } from './models/progress.js';
+import { nextUnseen, resumeOffer } from './models/progress.js';
+import { viewState } from './views/view-state.js';
 import { on } from './lib/events.js';
 import { syncShared, syncProgress } from './models/sync.js';
 import { countBytes, noteQuota, quotaUntil, refreshAccountInfo } from './models/quota.js';
 import { quotaText, paintQuota } from './views/quota.js';
 import { isCine, isCollection, collectionItems, itemMetaKey, itemFor, movieTitle, itemMeta } from './models/collections.js';
-import { prog, setProgress, DEVICE, markNow, isLater, laterList, continueList, mergeProgress } from './models/progress.js';
+import { prog, setProgress, markNow, isLater, mergeProgress } from './models/progress.js';
 import { setLaterFlag } from './models/progress.js';
 import { profilesFromBackup, normName } from './models/profiles.js';
 import { isMainSeason, seasonLabel, seasonFullName, saveMeta, isFranchise, seasonMeta, metaFor, synopsisOf, hasSpanish, tmdbKey, displayMeta } from './models/fichas.js';
@@ -27,7 +28,10 @@ import { epById } from './models/library.js';
 import { thumbFor } from './models/thumbs.js';
 import { saveChapterCache, rangeReader, cacheChapters, formatProblem, formatSummary, rememberCodec } from './models/media.js';
 import { hydrateThumbs, codecTagHTML } from './views/thumbs.js';
-const app = $('#app');
+import { heroPlan, seasonPlan, moviePlan, shelfItems, nextFor } from './models/plans.js';
+import { episodeArt, seriesColor } from './models/fichas.js';
+import { langChip, header, movieHref, collageHTML, setTint, factsRowsHTML, factRows, titleSize, posterAny, entryTile, seasonHref, moviePosterHTML, app, resetPosterCache } from './views/components.js';
+import { setHero, renderHome } from './views/home.js';
 
 on('quota', paintQuota);
 on('notice', (text) => toast(text));
@@ -36,14 +40,13 @@ on('download-done', (ep) => { cacheChapters(ep).catch(() => {}); });
 on('downloads-removed', () => { if (route().view === 'descargas') renderDownloads(); });
 on('folder-moved', () => paintSpace());
 setInUseCheck((id) => !!(playing && playing.ep.id === id));
+viewState.isPlaying = () => !!playing;
 on('news', () => paintNewsDot());
 on('tree-changed', () => refreshLibrary());
 on('meta-changed', (views) => { if (views.includes(route().view)) softRender(); });
 on('sync-needed', () => sync());
 
 /* ───────────────────────── utilidades ───────────────────────── */
-
-const langChip = (langs) => (langs.length ? `<span class="lang-chip">${langs.map((l) => (l === 'sub' ? 'SUB' : 'DOB')).join(' · ')}</span>` : '');
 
 /* ───────────────────────── estado ───────────────────────── */
 
@@ -119,16 +122,6 @@ function titleFor(ep) {
 /* ───────────────────────── progreso ───────────────────────── */
 
 /** Lo que quedó viendo este perfil en otro dispositivo hace poco, si conviene ofrecer seguir aquí. */
-function resumeOffer() {
-  const n = state.progress['@now'];
-  if (!n || !n.p || n.dev === DEVICE || n.w || n.t < 15 || Date.now() - n.u > 12 * 3600000) return null;
-  if (playing || LS.get('nowSeen', 0) === n.u) return null;
-  const e = index.byPath.get(n.p);
-  if (!e) return null; // ya no está en MEGA
-  const p = prog(e.ep);
-  if (p && p.w) return null;
-  return { ep: e.ep, s: state.library.series[e.si], n };
-}
 
 function setLater(s, itemKey, on) {
   setLaterFlag(s, itemKey, on);
@@ -269,15 +262,6 @@ function goBack(fallback = '#/') {
   while (i >= 0 && navPage(navStack[i]) === cur) i--;
   if (i >= 0) { navBackSteps = navStack.length - 1 - i; history.go(-navBackSteps); }
   else { navReplacing = true; location.replace(fallback); }
-}
-
-function header(title, { actions = '', overlay = false } = {}) {
-  return `<header class="bar ${overlay ? 'is-overlay' : ''}">
-    <button class="icon-btn" data-act="back" aria-label="Volver">${ICON.back}</button>
-    <button class="icon-btn" data-act="home" aria-label="Inicio">${ICON.home}</button>
-    <h1 class="bar-title">${title}</h1>
-    ${actions}
-  </header>`;
 }
 
 let lastRouteKey = '';
@@ -596,313 +580,8 @@ function newsHTML() {
 
 /* ── sinopsis e imágenes ── */
 
-function movieImage(s, it) {
-  const m = itemMeta(s, it.key);
-  return (m && (m.banner || m.cover)) || '';
-}
-/** Dirección de la página de una película de la colección. */
-const movieHref = (si, key) => `#/pelicula/${si}/${encodeURIComponent(key)}`;
-function collageHTML(urls, cls = '') {
-  const u = urls.slice(0, 4);
-  return `<span class="collage n${u.length} ${cls}" aria-hidden="true">${u.map((x) => `<img src="${esc(x)}" alt="" loading="lazy" decoding="async">`).join('')}</span>`;
-}
-/** Imagen para la tarjeta de un capítulo: la del anime (o de la película), no un fotograma. */
-function episodeArt(ep) {
-  const e = index.byId.get(ep.id);
-  const s = e && state.library && state.library.series[e.si];
-  if (!s) return '';
-  const m = isCollection(s) ? itemMeta(s, itemFor(s, ep).key) : (seasonMeta(s, s.seasons[e.ki]) || metaFor(s));
-  return m ? m.banner || m.cover || '' : '';
-}
-
-/** Color de la serie para teñir el fondo de Kai (nunca una imagen estirada). */
-function seriesColor(s) {
-  const m = displayMeta(s);
-  return (m && m.color) || `hsl(${hue(s.name)} 45% 55%)`;
-}
-function setTint(color) {
-  const r = document.documentElement.style;
-  if (color) r.setProperty('--tint', color); else r.removeProperty('--tint');
-}
-
-function tileHTML(s, si, { href, label = '', sub = '', pct = 0, badge = '', img: own = '' } = {}) {
-  const m = own ? null : displayMeta(s);
-  const img = own || (m && (m.banner || m.cover));
-  const coverEp = s.all.find((e) => e.fa);
-  return `<a class="tile" href="${href}" data-si="${si}" style="--h:${hue(s.name)}">
-    ${m && m.collage && m.collage.length ? collageHTML(m.collage, 'tile-img') : img ? `<img class="tile-img" src="${esc(img)}" alt="" loading="lazy" decoding="async">` : `<span class="tile-img is-fallback" ${coverEp ? `data-thumb="${esc(coverEp.id)}"` : ''}><span class="cover-glyph">${esc([...s.name.trim()][0] || '·')}</span></span>`}
-    ${badge ? `<span class="tile-badge">${esc(badge)}</span>` : ''}
-    <span class="tile-text"><span class="tile-title">${esc(label || s.name)}</span>${sub ? `<span class="tile-sub">${esc(sub)}</span>` : ''}</span>
-    ${pct ? `<span class="tile-bar"><span style="width:${pct}%"></span></span>` : ''}
-  </a>`;
-}
-
 /* ── portada estilo TV ── */
 
-function greeting() {
-  const h = new Date().getHours();
-  const g = h < 12 ? 'Buenos días' : h < 19 ? 'Buenas tardes' : 'Buenas noches';
-  return state.profile ? `${g}, ${state.profile.name}` : g;
-}
-function clockParts() {
-  const d = new Date();
-  const time = new Intl.DateTimeFormat('es', { hour: 'numeric', minute: '2-digit', hour12: true }).formatToParts(d);
-  const hm = time.filter((p) => p.type !== 'dayPeriod').map((p) => p.value).join('').trim();
-  const ap = (time.find((p) => p.type === 'dayPeriod') || {}).value || '';
-  const date = new Intl.DateTimeFormat('es', { weekday: 'long', day: 'numeric', month: 'long' }).format(d);
-  return { hm, ap, date };
-}
-function clockHTML() {
-  const { hm, ap, date } = clockParts();
-  // en la PC, Kai va echado encima de la fecha
-  return `<span class="tv-hm">${esc(hm)}</span><span class="tv-ap">${esc(ap)}</span><span class="tv-sep" aria-hidden="true"></span><span class="tv-date"><span class="tv-date-t">${esc(date)}</span>${catHTML('top')}</span>`;
-}
-setInterval(() => {
-  // solo cambia el texto (así Kai no se vuelve a cargar cada vez)
-  const el = $('#tv-clock');
-  if (el) {
-    const p = clockParts();
-    for (const [sel, v] of [['.tv-hm', p.hm], ['.tv-ap', p.ap], ['.tv-date-t', p.date]]) { const x = el.querySelector(sel); if (x && x.textContent !== v) x.textContent = v; }
-  }
-  const g = $('#tv-greet');
-  if (g) g.textContent = greeting();
-}, 20000);
-
-function tvTop() {
-  return `<header class="tv-top">
-    <div class="tv-when">
-      <p class="tv-greet" id="tv-greet">${esc(greeting())}</p>
-      <p class="tv-clock" id="tv-clock">${clockHTML()}</p>
-    </div>
-    <div class="tv-top-tools">
-      <button class="tv-icon" data-act="home-search" aria-label="Buscar" aria-expanded="false">${ICON.search}</button>
-    </div>
-  </header>
-  <div class="home-search" id="home-search" hidden>
-    <span class="search-icon">${ICON.search}</span>
-    <input id="home-q" type="search" placeholder="Buscar un anime o película" autocomplete="off" enterkeyhint="search" aria-label="Buscar">
-    <button class="tv-icon is-small" data-act="home-search-close" aria-label="Cerrar la búsqueda">${ICON.close}</button>
-  </div>`;
-}
-
-let heroSi = null;
-let heroUser = false; // el usuario eligió qué serie destacar (mouse, teclado o entrando a ella)
-
-function heroPlan(s) {
-  const next = nextFor(s);
-  const np = next && prog(next);
-  const resume = np && np.t > 5 && !np.w;
-  // al empezar otra temporada se dice cuál ("Ver Fate Zero"), no "Ver Episodio 1"
-  const e = next && index.byId.get(next.id);
-  const startsSeason = e && !isCollection(s) && s.seasons.length > 1 && e.ei === 0 && !resume;
-  const label = !next ? 'Serie terminada' : startsSeason ? `Ver ${seasonLabel(s, s.seasons[e.ki])}` : `${resume ? 'Continuar' : 'Ver'} ${episodeLabel(next)}`;
-  return { next, label, left: resume ? fmtLeft(np) : '' };
-}
-/** Lo siguiente dentro de UNA temporada (la pestaña que estás mirando). */
-function seasonPlan(s, se) {
-  let cur = null;
-  for (const ep of se.episodes) { const p = prog(ep); if (p && p.t > 5 && !p.w && (!cur || p.u > cur.p.u)) cur = { ep, p }; }
-  const next = cur ? cur.ep : se.episodes.find((e) => !(prog(e) || {}).w) || null;
-  if (!next) return { next: null, label: 'Temporada vista', left: '' };
-  const np = prog(next);
-  const resume = np && np.t > 5 && !np.w;
-  return { next, label: `${resume ? 'Continuar' : 'Ver'} ${episodeLabel(next)}`, left: resume ? fmtLeft(np) : '' };
-}
-
-/** Año, tipo y géneros: cada uno lleva al catálogo filtrado por esa etiqueta. */
-function factsHTML(s, m, extra = '') {
-  const chip = (label, params) => `<a class="fact" href="#/catalogo?${new URLSearchParams(params)}">${esc(label)}</a>`;
-  return [
-    m && m.year ? chip(m.year, { y: m.year }) : '',
-    m && m.format ? (m.collection ? `<span>${esc(m.format)}</span>` : chip(m.format, { f: m.format })) : '',
-    `<span>${esc(countLabel(s, m))}</span>`,
-    ...((m && m.genres) || []).slice(0, 3).map((g) => chip(g, { g })),
-  ].join('') + extra;
-}
-/** Etiquetas de la página de una serie, en filas:
- *  arriba lo informativo (capítulos, vistos) | ★ nota de AniList; abajo lo que se toca (año, tipo, géneros → catálogo). */
-function factsRowsHTML(s, m, { count = null, seen = 0, total = 0, lang = '' } = {}) {
-  const chip = (label, params) => `<a class="fact" href="#/catalogo?${new URLSearchParams(params)}">${esc(label)}</a>`;
-  const info = [
-    `<span>${esc(count != null ? plural(count, 'capítulo', 'capítulos') : countLabel(s, m))}</span>`,
-    lang ? `<span>${esc(lang)}</span>` : '',
-    seen ? `<span>${seen} de ${total} vistos</span>` : '',
-  ].filter(Boolean).join('');
-  const links = [
-    m && m.year ? chip(m.year, { y: m.year }) : '',
-    m && m.format ? (m.collection ? `<span>${esc(m.format)}</span>` : chip(m.format, { f: m.format })) : '',
-    ...((m && m.genres) || []).slice(0, 3).map((g) => chip(g, { g })),
-  ].join('');
-  return factRows(info, m, links);
-}
-function factRows(info, m, links) {
-  const score = m && m.score ? `${info ? '<span class="fact-sep" aria-hidden="true">|</span>' : ''}<span class="fact-score" title="Nota en ${esc(m.src || 'AniList')}">★ ${esc(m.score)}</span>` : '';
-  return `<div class="facts-rows">${info || score ? `<p class="tv-facts is-info">${info}${score}</p>` : ''}${links ? `<p class="tv-facts">${links}</p>` : ''}</div>`;
-}
-function countLabel(s, m) {
-  return m && m.collection ? plural(m.count, 'película', 'películas') : plural(s.all.length, 'capítulo', 'capítulos');
-}
-/** Kai, el gatito: sentado detrás del título de la portada, parpadeando de vez en cuando. */
-function catHTML(where) {
-  if (state.settings.cat === false) return '';
-  if (where === 'top') return '<span class="kcat-sit is-top" aria-hidden="true"><img src="gato/echado.webp" alt="" decoding="async"></span>';
-  return `<span class="kcat-sit is-${where}" aria-hidden="true"><img src="gato/sentado.webp" alt="" decoding="async"><img class="is-blink" src="gato/sentado-cierra.webp" alt="" decoding="async"></span>`;
-}
-(function blinkLoop() {
-  setTimeout(() => {
-    // en el teléfono parpadea el del título; en la PC, el echado sobre la fecha todavía no tiene dibujo con ojos cerrados
-    const el = !document.hidden && !matchMedia('(prefers-reduced-motion: reduce)').matches && [...document.querySelectorAll('.kcat-sit.is-title')].find((x) => x.offsetParent);
-    if (el) {
-      const blink = (then) => { el.classList.add('is-closed'); setTimeout(() => { el.classList.remove('is-closed'); if (then) setTimeout(then, 180); }, 150); };
-      blink(Math.random() < 0.25 ? () => blink() : null); // a veces dos seguidas
-    }
-    blinkLoop();
-  }, 3000 + Math.random() * 3000);
-})();
-
-// nombres largos: letra más chica en la portada para no pasar de ~2 líneas
-function titleSize(name) {
-  const n = (name || '').length;
-  return n > 60 ? ' is-xlong' : n > 34 ? ' is-long' : '';
-}
-
-function heroInnerHTML(s, si) {
-  const m = displayMeta(s);
-  const plan = heroPlan(s);
-  const fresh = newEpisodes(s).length;
-  const syn = synopsisOf(m);
-  const coverEp = s.all.find((e) => e.fa);
-  const poster = m && m.collage && m.collage.length
-    ? `<a class="hero-poster is-collage" href="#/serie/${si}" aria-hidden="true" tabindex="-1">${collageHTML(m.collage)}</a>`
-    : m && m.cover
-    ? `<a class="hero-poster" href="#/serie/${si}" aria-hidden="true" tabindex="-1"><img src="${esc(m.cover)}" alt="" decoding="async"></a>`
-    : (coverEp ? `<a class="hero-poster is-thumb" href="#/serie/${si}" aria-hidden="true" tabindex="-1"><span data-thumb="${esc(coverEp.id)}"></span></a>` : '');
-  return `${poster}<div class="tvh-text"><h2 class="tv-title${titleSize(s.name)}"><span class="tvt">${esc(s.name)}${catHTML('title')}</span></h2>
-    ${m && m.title && m.title.toLowerCase() !== s.name.toLowerCase() ? `<p class="tv-alt">${esc(m.title)}</p>` : ''}
-    <p class="tv-facts">${factsHTML(s, m, fresh ? `<span class="tv-new">${fresh === 1 ? '1 nuevo' : `${fresh} nuevos`}</span>` : '')}</p>
-    ${syn ? `<p class="tv-synopsis">${esc(syn.replace(/\s*\n+\s*/g, ' '))}</p>` : ''}
-    <div class="tv-actions">
-      ${plan.next ? `<a class="tv-btn is-primary" href="#/play/${encodeURIComponent(plan.next.id)}">${ICON.play}<span>${esc(plan.label)}</span></a>` : ''}
-      <a class="tv-btn" href="#/serie/${si}">${ICON.menu}<span>Episodios</span></a>
-    </div></div>`;
-}
-
-function setHero(si) {
-  heroUser = true;
-  if (!state.library || heroSi === si) return;
-  const s = state.library.series[si];
-  if (!s) return;
-  heroSi = si;
-  const box = $('#tv-hero');
-  if (!box) return;
-  setTint(seriesColor(s));
-  box.classList.add('is-switching');
-  setTimeout(() => {
-    box.innerHTML = heroInnerHTML(s, si);
-    hydrateThumbs(box);
-    box.classList.remove('is-switching');
-  }, 120);
-}
-
-function renderHome() {
-  const lib = state.library && state.library.v === 2 ? state.library : null;
-  const err = state.error;
-  let body = '';
-  if (err && err.message === 'NOROOT') {
-    body = `<section class="empty tv-empty">
-      <p>No encontré la carpeta <strong>${esc(state.settings.root)}</strong> en tu MEGA.</p>
-      <p class="dim">Elige la carpeta donde guardas tus series. Cada carpeta adentro será una serie.</p>
-      <a class="tv-btn is-primary" href="#/explorar">Elegir carpeta</a>
-    </section>`;
-  } else if (!lib) {
-    body = `<section class="empty tv-empty"><p class="dim">${navigator.onLine ? 'Conectando con MEGA…' : 'Sin conexión. Lo que descargaste está en Descargados.'}</p>
-      ${navigator.onLine ? '' : '<a class="tv-btn" href="#/descargas">Ver descargados</a>'}</section>`;
-  } else if (!lib.series.length) {
-    body = `<section class="empty tv-empty"><p>La carpeta <strong>${esc(lib.root)}</strong> está vacía.</p>
-      <p class="dim">Crea una carpeta por serie y pon los capítulos adentro, o una subcarpeta por temporada.</p></section>`;
-  }
-  if (body) {
-    app.innerHTML = `<div class="tv">${tvTop()}<main class="tv-main">${body}</main></div>`;
-    return;
-  }
-  const cont = continueList();
-  const later = laterList();
-  const siOf = (s) => lib.series.indexOf(s);
-  // la portada muestra una serie (la carpeta de películas no tiene una ficha propia que mostrar)
-  if (!heroUser || heroSi == null || !lib.series[heroSi] || isCollection(lib.series[heroSi])) {
-    const c = cont.find((x) => !isCollection(x.series));
-    const first = lib.series.findIndex((x) => !isCollection(x));
-    heroSi = c ? siOf(c.series) : Math.max(0, first);
-  }
-  const hs = lib.series[heroSi];
-  setTint(seriesColor(hs));
-  app.innerHTML = `<div class="tv is-home">
-    ${tvTop()}
-    <main class="tv-main">
-      ${resumeCardHTML()}
-      <section class="tv-hero" id="tv-hero">${heroInnerHTML(hs, heroSi)}</section>
-      <section class="tv-row" id="home-results" hidden></section>
-      ${cont.length ? `<section class="tv-row"><h3 class="tv-row-title">Continuar viendo</h3><div class="tiles is-grid" role="list">
-        ${cont.slice(0, HOME_CONTINUE).map((c) => tileHTML(c.series, siOf(c.series), {
-          // primero la página de la serie (o de la película), con "Continuar" listo
-          href: isCollection(c.series) ? movieHref(siOf(c.series), itemFor(c.series, c.ep).key) : '#/serie/' + siOf(c.series),
-          label: isCollection(c.series) ? movieTitle(c.series, itemFor(c.series, c.ep)) : '',
-          img: isCollection(c.series) ? movieImage(c.series, itemFor(c.series, c.ep)) : '',
-          sub: `${episodeLabel(c.ep)}${c.p && c.p.t > 5 ? `, ${fmtLeft(c.p)}` : ''}`,
-          pct: c.p && c.p.d ? Math.min(100, (c.p.t / c.p.d) * 100) : 0,
-        })).join('')}
-      </div></section>` : ''}
-      ${later.length ? `<section class="tv-row"><h3 class="tv-row-title">Más tarde</h3><div class="tiles is-grid" role="list">
-        ${later.slice(0, 12).map(({ s, si, it }) => tileHTML(s, si, {
-          href: it ? movieHref(si, it.key) : '#/serie/' + si,
-          label: it ? movieTitle(s, it) : s.name,
-          img: it ? movieImage(s, it) : '',
-          sub: it ? 'Película' : plural(s.all.length, 'capítulo', 'capítulos'),
-        })).join('')}
-      </div></section>` : ''}
-      <section class="tv-row">
-        <div class="tv-row-head"><h3 class="tv-row-title">Series</h3>
-          <a class="tv-more" href="#/catalogo?t=series">${ICON.grid}<span>Ver catálogo${lib.series.filter((x) => !isCollection(x)).length > HOME_RECENT ? ` (${lib.series.filter((x) => !isCollection(x)).length})` : ''}</span></a></div>
-        <ul class="shelf is-row" role="list">${homeSeries(lib).map(({ s, si }) => seriesPosterHTML(s, si)).join('')}</ul>
-</section>
-      ${homeMoviesHTML(lib)}
-      <nav class="discover-links" aria-label="Descubrir">
-        ${lib.series.some(isCine) ? `<a class="tv-more" href="#/serie/${lib.series.findIndex(isCine)}">${ICON.grid}<span>${esc(lib.series.find(isCine).name)}</span></a>` : ''}
-        <a class="tv-more" href="#/descubrir/porque">${ICON.grid}<span>Porque viste…</span></a>
-        <a class="tv-more" href="#/descubrir/emision">${ICON.grid}<span>En emisión</span></a>
-      </nav>
-    </main>
-  </div>`;
-}
-/** Fila "Películas" del inicio: las 10 primeras en orden alfabético y el enlace al estante completo. */
-function homeMoviesHTML(lib) {
-  const si = lib.series.findIndex((x) => isCollection(x) && !isCine(x));
-  if (si < 0) return '';
-  const s = lib.series[si];
-  const items = shelfItems(s);
-  if (!items.length) return '';
-  const fresh = new Set(newEpisodes(s).map((e) => e.id));
-  return `<section class="tv-row">
-    <div class="tv-row-head"><h3 class="tv-row-title">Películas</h3>
-      <a class="tv-more" href="#/catalogo?t=peliculas">${ICON.grid}<span>Ver catálogo${items.length > HOME_MOVIES ? ` (${items.length})` : ''}</span></a></div>
-    <ul class="shelf is-row" role="list">${items.slice(0, HOME_MOVIES).map((x) => moviePosterHTML(s, si, x, fresh)).join('')}</ul>
-  </section>`;
-}
-
-/** Tarjeta "Estabas viendo … en el iPhone — Seguir aquí". */
-function resumeCardHTML() {
-  const o = resumeOffer();
-  if (!o) return '';
-  const mins = Math.round((Date.now() - o.n.u) / 60000);
-  const when = mins < 2 ? 'hace un momento' : mins < 60 ? `hace ${mins} min` : `hace ${Math.round(mins / 60)} h`;
-  const title = isCollection(o.s) ? episodeLabel(o.ep) : `${o.s.name} · ${episodeLabel(o.ep)}`;
-  return `<section class="resume-card" aria-label="Seguir en este dispositivo">
-    <div class="resume-text"><p class="resume-kicker">En tu ${esc(o.n.dn || 'otro dispositivo')}, ${when}</p>
-      <p class="resume-title">${esc(title)}</p></div>
-    <button class="tv-btn is-primary" data-act="resume-here">${ICON.play}<span>Seguir aquí en ${fmtTime(o.n.t)}</span></button>
-    <button class="icon-btn resume-x" data-act="resume-dismiss" aria-label="Descartar">${ICON.close}</button>
-  </section>`;
-}
 
 /* ── Ajustes: lo que ya vieron todos los perfiles (solo informa; no borra nada) ── */
 async function paintSeenByAll(btn) {
@@ -947,17 +626,7 @@ async function paintSeenByAll(btn) {
 
 /* ── catálogo: todo lo que hay, con buscador y filtros ── */
 
-const HOME_RECENT = 10;
-const HOME_MOVIES = 10;
-const HOME_CONTINUE = 3;
 const norm = (t) => String(t ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-
-/** Fila "Series" del inicio: en orden alfabético, como el catálogo (pedido de Alex, v37). */
-function homeSeries(lib) {
-  return lib.series.map((s, si) => ({ s, si })).filter(({ s }) => !isCollection(s))
-    .sort((a, b) => a.s.name.localeCompare(b.s.name, 'es', { numeric: true }))
-    .slice(0, HOME_RECENT);
-}
 
 /** Series y, de las colecciones, cada película por separado (cada una con sus etiquetas de AniList). */
 function catalogEntries() {
@@ -996,43 +665,6 @@ function sortEntries(list, o) {
   if (o === 'recent') return list.sort((a, b) => (b.added || 0) - (a.added || 0) || az(a, b));
   if (o === 'year') return list.sort((a, b) => (b.year || 0) - (a.year || 0) || az(a, b));
   return list.sort(az); // por defecto, A–Z (v37)
-}
-/** Una serie como póster vertical (mismo diseño que las películas). */
-function seriesPosterHTML(s, si) {
-  const m = displayMeta(s);
-  const fresh = newEpisodes(s).length;
-  const seen = s.all.filter((e) => (prog(e) || {}).w).length;
-  const sub = seen ? `${seen} de ${s.all.length} vistos` : plural(s.all.length, 'capítulo', 'capítulos');
-  const coverEp = s.all.find((e) => e.fa) || s.all[0];
-  const pct = s.all.length && seen ? Math.round((seen / s.all.length) * 100) : 0;
-  return `<li><a class="shelf-item" href="#/serie/${si}" style="--h:${hue(s.name)}">
-    <span class="shelf-poster">
-      ${m && m.cover ? `<img src="${esc(m.cover)}" alt="" loading="lazy" decoding="async">` : `<span class="is-fallback" ${coverEp ? `data-thumb="${esc(coverEp.id)}"` : ''}><span class="cover-glyph">${esc([...s.name.trim()][0] || '·')}</span></span>`}
-      ${fresh ? `<span class="tile-badge">${fresh === 1 ? 'Nuevo' : `${fresh} nuevos`}</span>` : ''}
-      ${langChip(langsOf(s.all))}
-      ${pct && pct < 100 ? `<span class="tile-bar"><span style="width:${pct}%"></span></span>` : ''}
-    </span>
-    <span class="shelf-title">${esc(s.name)}</span>
-    <span class="shelf-sub">${esc(sub)}</span>
-  </a></li>`;
-}
-/** Cualquier título del catálogo como póster: serie o película. */
-function posterAny(e) { return e.movie ? posterEntry(e) : seriesPosterHTML(state.library.series[e.si], e.si); }
-
-/** Una película del catálogo como póster (mismo diseño que la fila del inicio). */
-let posterCache = null; // se arma una vez por dibujo: { s, items: Map(clave → película), fresh }
-function posterEntry(e) {
-  const s = state.library.series[e.si];
-  if (!posterCache || posterCache.s !== s) posterCache = { s, items: new Map(shelfItems(s).map((y) => [y.it.key, y])), fresh: new Set(newEpisodes(s).map((ep) => ep.id)) };
-  const x = posterCache.items.get(e.movie);
-  return x ? moviePosterHTML(s, e.si, x, posterCache.fresh) : '';
-}
-function entryTile(e) {
-  const sub = [e.year, e.format, e.count ? plural(e.count, 'capítulo', 'capítulos') : ''].filter(Boolean).join(' · ');
-  return `<a class="tile" href="${e.href || '#/serie/' + e.si}" style="--h:${hue(e.title)}">
-    ${e.img ? `<img class="tile-img" src="${esc(e.img)}" alt="" loading="lazy" decoding="async">` : `<span class="tile-img is-fallback"><span class="cover-glyph">${esc([...e.title.trim()][0] || '·')}</span></span>`}
-    <span class="tile-text"><span class="tile-title">${esc(e.title)}</span>${sub ? `<span class="tile-sub">${esc(sub)}</span>` : ''}</span>
-  </a>`;
 }
 
 /* Dos catálogos, Series y Películas (?t=series | ?t=peliculas). Al buscar o filtrar por una etiqueta,
@@ -1099,7 +731,7 @@ function paintCatalog() {
   // si al teclear sigue saliendo lo mismo, no se vuelven a dibujar todos los mosaicos
   const sig = (posters ? 'p' : 't') + list.map((e) => e.href || e.si).join('|') + '#' + list.map((e) => e.img || '').join('').length;
   if (box.dataset.sig !== sig) {
-    posterCache = null;
+    resetPosterCache();
     box.innerHTML = posters ? `<ul class="shelf" role="list">${list.map(posterAny).join('')}</ul>` : `<div class="tiles is-grid" role="list">${list.map(entryTile).join('')}</div>`;
     box.dataset.sig = sig;
     if (posters) hydrateThumbs(box);
@@ -1157,7 +789,7 @@ function paintHomeSearch() {
   box.innerHTML = `<div class="tv-row-head"><h3 class="tv-row-title">${list.length ? plural(list.length, 'resultado', 'resultados') : 'Sin resultados'}</h3>
       <a class="tv-more" href="#/catalogo?${new URLSearchParams({ q: qv })}">${ICON.grid}<span>Buscar en el catálogo</span></a></div>
     <ul class="shelf is-row" role="list">${list.slice(0, 24).map(posterAny).join('')}</ul>`;
-  posterCache = null;
+  resetPosterCache();
 }
 
 /* ── serie ── */
@@ -1168,8 +800,6 @@ function langSwitchHTML(s, langs) {
   const cur = langPref(s);
   return `<div class="lang-switch" role="group" aria-label="Idioma">${langs.map((l) => `<button class="${l === cur ? 'is-on' : ''}" data-act="lang" data-lang="${l}" aria-pressed="${l === cur}">${l === 'sub' ? 'Sub' : 'Doblado'}</button>`).join('')}</div>`;
 }
-/** Dirección de una temporada: con varias, cada una tiene su página (#/serie/3/1); con una sola, la serie. */
-function seasonHref(si, s, ki) { return s && !isCollection(s) && s.seasons.length > 1 ? `#/serie/${si}/${ki}` : `#/serie/${si}`; }
 
 function renderSeries(arg) {
   const lib = state.library;
@@ -1178,8 +808,8 @@ function renderSeries(arg) {
   const s = lib && lib.series && lib.series[si];
   if (!s) { go('#/'); return; }
   if (isCollection(s)) { renderShelf(s, si); return; }
-  heroSi = si;
-  heroUser = true;
+  viewState.heroSi = si;
+  viewState.heroUser = true;
   const flat = false;
   const multi = s.seasons.length > 1;
   // con varias temporadas, primero el menú de temporadas; los capítulos, al entrar a una
@@ -1332,39 +962,6 @@ function renderSeasonMenu(s, si) {
 
 /* ── películas: el estante (la carpeta) y la página de cada una ── */
 
-/** Lo siguiente que conviene ver de una película (o de sus partes) y cómo decirlo en el botón. */
-function moviePlan(it) {
-  const eps = it.eps;
-  const next = eps.find((e) => !(prog(e) || {}).w) || null;
-  const ep = next || eps[0];
-  const p = prog(ep);
-  const part = eps.length > 1 ? ` parte ${eps.indexOf(ep) + 1}` : '';
-  const label = !next ? 'Ver de nuevo' : p && p.t > 5 ? `Continuar${part} en ${fmtTime(p.t)}` : `Ver${part}`;
-  const pct = p && p.d ? (p.w ? 100 : Math.min(100, (p.t / p.d) * 100)) : 0;
-  return { ep, label, pct, seen: !next, left: next && p && p.t > 5 ? fmtLeft(p) : '' };
-}
-
-/** Las películas de la colección, en orden alfabético (v37; antes, las más recientes primero). */
-function shelfItems(s) {
-  return collectionItems(s).map((it) => ({ it, m: itemMeta(s, it.key), plan: moviePlan(it), added: Math.max(0, ...it.eps.map((e) => e.ts || 0)) }))
-    .sort((a, b) => movieTitle(s, a.it).localeCompare(movieTitle(s, b.it), 'es', { numeric: true }));
-}
-function moviePosterHTML(s, si, { it, m, plan }, fresh) {
-  const t = movieTitle(s, it);
-  const isNew = it.eps.some((e) => fresh.has(e.id));
-  const sub = [m && m.year, plan.seen ? 'Vista' : plan.left].filter(Boolean).join(' · ');
-  return `<li><a class="shelf-item" href="${movieHref(si, it.key)}" style="--h:${hue(t)}">
-    <span class="shelf-poster">
-      ${m && m.cover ? `<img src="${esc(m.cover)}" alt="" loading="lazy" decoding="async">` : `<span class="is-fallback" data-thumb="${esc(it.eps[0].id)}"><span class="cover-glyph">${esc([...t.trim()][0] || '·')}</span></span>`}
-      ${isNew ? '<span class="tile-badge">Nueva</span>' : ''}
-      ${langChip(langsOf(it.eps))}
-      ${plan.pct && !plan.seen ? `<span class="tile-bar"><span style="width:${plan.pct}%"></span></span>` : ''}
-    </span>
-    <span class="shelf-title">${esc(t)}</span>
-    ${sub ? `<span class="shelf-sub">${esc(sub)}</span>` : ''}
-  </a></li>`;
-}
-
 function renderShelf(s, si) {
   setTint(seriesColor(s));
   const fresh = new Set(newEpisodes(s).map((e) => e.id));
@@ -1384,7 +981,7 @@ function renderMovie(arg) {
   const s = lib && lib.series && lib.series[si];
   const it = s && isCollection(s) ? collectionItems(s).find((x) => x.key === key) : null;
   if (!it) { go(s ? '#/serie/' + si : '#/'); return; }
-  heroSi = si;
+  viewState.heroSi = si;
   const m = itemMeta(s, it.key);
   const t = movieTitle(s, it);
   const plan = moviePlan(it);
@@ -1445,10 +1042,10 @@ function pickSeason() {
 const pickable = (ep) => !state.saved.has(ep.id) && !state.dls[ep.id] && !state.queue.some((q) => q.ep.id === ep.id);
 
 function startPicking() {
-  const s = state.library && state.library.series[heroSi];
+  const s = state.library && state.library.series[viewState.heroSi];
   if (!s) return;
   const ki = Number(route().arg.split('/')[1]) || 0;
-  picking = { si: heroSi, ki: Math.min(ki, s.seasons.length - 1), ids: new Set() };
+  picking = { si: viewState.heroSi, ki: Math.min(ki, s.seasons.length - 1), ids: new Set() };
   paintPick();
 }
 function endPicking(repaint = true) {
@@ -1532,13 +1129,6 @@ app.addEventListener('click', (e) => {
   if (picking.ids.has(ep.id)) picking.ids.delete(ep.id); else picking.ids.add(ep.id);
   paintPick();
 }, true);
-
-function nextFor(s) {
-  const c = continueList().find((x) => x.series === s);
-  if (c) return c.ep;
-  if (s.all.every((e) => (prog(e) || {}).w)) return null;
-  return s.all.find((e) => !(prog(e) || {}).w) || s.all[0];
-}
 
 function episodeStatus(ep) {
   const p = prog(ep);
@@ -3148,7 +2738,7 @@ document.addEventListener('click', async (e) => {
   }
   else if (act === 'later') { const sr = state.library.series[Number(el.dataset.si)]; if (sr) setLater(sr, '', !isLater(sr)); }
   else if (act === 'resume-here') {
-    const o = resumeOffer();
+    const o = resumeOffer(!!playing);
     if (!o) { render(); return; }
     LS.set('nowSeen', o.n.u);
     const p = prog(o.ep);
@@ -3156,9 +2746,9 @@ document.addEventListener('click', async (e) => {
     if (!p || Math.abs((p.t || 0) - o.n.t) > 5) setProgress(o.ep, o.n.t, o.n.d || (p && p.d) || 0, false);
     go('#/play/' + encodeURIComponent(o.ep.id));
   }
-  else if (act === 'resume-dismiss') { const o = resumeOffer(); if (o) LS.set('nowSeen', o.n.u); render(); }
+  else if (act === 'resume-dismiss') { const o = resumeOffer(!!playing); if (o) LS.set('nowSeen', o.n.u); render(); }
   else if (act === 'lang') {
-    const sr = state.library && state.library.series[heroSi];
+    const sr = state.library && state.library.series[viewState.heroSi];
     if (!sr) return;
     setLangPref(sr, el.dataset.lang);
     if (picking) picking.ids = new Set();
@@ -3177,7 +2767,7 @@ document.addEventListener('click', async (e) => {
   }
   else if (act === 'tmdb-del') { setTmdbKey(''); paintCineKey('Clave quitada.'); }
   else if (act === 'translate') {
-    const sr = state.library.series[heroSi];
+    const sr = state.library.series[viewState.heroSi];
     const m = sr && state.meta[el.dataset.key ? itemMetaKey(sr, el.dataset.key) : sr.name];
     if (!m) return;
     el.textContent = 'Traduciendo…';

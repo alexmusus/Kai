@@ -15,7 +15,7 @@
  */
 
 import { state, index } from './store.js';
-import { itemMetaKey, isCollection, collectionItems, isCine, itemMeta } from './collections.js';
+import { itemMetaKey, isCollection, collectionItems, isCine, itemMeta, itemFor } from './collections.js';
 import {
   isSpecialSeason,
   MAIN_FORMATS,
@@ -27,7 +27,7 @@ import {
   hasOwnTitle,
 } from './naming.js';
 import { seasonNumOf } from './meta-api.js';
-import { LS } from '../lib/util.js';
+import { LS, hue } from '../lib/util.js';
 import { prog } from './progress.js';
 
 /** La ficha propia de la temporada (sin usar la de la serie). */
@@ -203,4 +203,20 @@ export function displayMeta(s) {
     count: items.length,
     genres: [],
   };
+}
+
+/** Imagen para la tarjeta de un capítulo: la del anime (o de la película), no un fotograma. */
+export function episodeArt(ep) {
+  const e = index.byId.get(ep.id);
+  const s = e && state.library && state.library.series[e.si];
+  if (!s) return '';
+  const it = isCollection(s) ? itemFor(s, ep) : null;
+  const m = it ? itemMeta(s, it.key) : seasonMeta(s, s.seasons[e.ki]) || metaFor(s);
+  return m ? m.banner || m.cover || '' : '';
+}
+
+/** Color de la serie para teñir el fondo de Kai (nunca una imagen estirada). */
+export function seriesColor(s) {
+  const m = displayMeta(s);
+  return (m && m.color) || `hsl(${hue(s.name)} 45% 55%)`;
 }

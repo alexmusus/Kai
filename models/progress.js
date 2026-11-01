@@ -111,6 +111,22 @@ export function markNow(ep, t, d) {
   };
 }
 
+/**
+ * Lo que este perfil dejó a medias en OTRO dispositivo hace poco (menos de 12 h), si conviene ofrecer seguir aquí:
+ * no si ya se vio, si fueron menos de 15 s, si ya se descartó, o si aquí se está reproduciendo algo.
+ * @param {boolean} busy ¿se está reproduciendo algo aquí?
+ */
+export function resumeOffer(busy) {
+  const n = state.progress['@now'];
+  if (!n || !n.p || n.dev === DEVICE || n.w || (n.t || 0) < 15 || Date.now() - n.u > 12 * 3600000) return null;
+  if (busy || LS.get('nowSeen', 0) === n.u) return null;
+  const e = index.byPath.get(n.p);
+  if (!e || !state.library) return null; // ya no está en MEGA
+  const p = prog(e.ep);
+  if (p && p.w) return null;
+  return { ep: e.ep, s: state.library.series[e.si], n };
+}
+
 /* ── Más tarde ── */
 
 /** @param {{ name: string }} s @param {string} [itemKey] una película de la colección */

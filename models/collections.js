@@ -121,3 +121,8 @@ export function episodeLabel(ep) {
   }
   return ep.ep != null ? `Episodio ${ep.ep}` : ep.name.replace(/\.[^.]+$/, '');
 }
+
+export function movieImage(s, it) {
+  const m = itemMeta(s, it.key);
+  return (m && (m.banner || m.cover)) || '';
+}
