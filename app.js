@@ -17,9 +17,12 @@ import { setLaterFlag } from './models/progress.js';
 import { profilesFromBackup, normName } from './models/profiles.js';
 import { isMainSeason, seasonLabel, seasonFullName, saveMeta, isFranchise, seasonMeta, metaFor, synopsisOf, hasSpanish, tmdbKey, displayMeta } from './models/fichas.js';
 import { ensureMeta, saveSyn, translateMissing, syncSynopses, syncFichas, resetFichas } from './models/fichas-sync.js';
+import { idb } from './models/idb.js';
+import { saveKnown, initKnown, newEpisodes, markSeriesSeen, newsList, hasUnreadNews, announceNew } from './models/news.js';
 const app = $('#app');
 
 on('quota', paintQuota);
+on('news', () => paintNewsDot());
 on('tree-changed', () => refreshLibrary());
 on('meta-changed', (views) => { if (views.includes(route().view)) softRender(); });
 on('sync-needed', () => sync());
@@ -48,43 +51,6 @@ function episodeLabel(ep) {
 }
 
 /* ───────────────────────── IndexedDB ───────────────────────── */
-
-const idb = (() => {
-  let dbp;
-  const open = () => dbp || (dbp = new Promise((res, rej) => {
-    const r = indexedDB.open('yoru', 2);
-    r.onupgradeneeded = () => {
-      const db = r.result;
-      if (!db.objectStoreNames.contains('chunks')) db.createObjectStore('chunks', { keyPath: ['id', 'i'] });
-      if (!db.objectStoreNames.contains('dl')) db.createObjectStore('dl', { keyPath: 'id' });
-      if (!db.objectStoreNames.contains('thumbs')) db.createObjectStore('thumbs');
-      if (!db.objectStoreNames.contains('subcache')) db.createObjectStore('subcache');
-    };
-    r.onsuccess = () => res(r.result);
-    r.onerror = () => rej(r.error);
-  }));
-  const run = async (store, mode, fn) => {
-    const db = await open();
-    return new Promise((res, rej) => {
-      const tx = db.transaction(store, mode);
-      const out = fn(tx.objectStore(store));
-      tx.oncomplete = () => res(out && 'result' in out ? out.result : out);
-      tx.onerror = () => rej(tx.error);
-      tx.onabort = () => rej(tx.error);
-    });
-  };
-  const range = (id) => IDBKeyRange.bound([id, 0], [id, Infinity]);
-  return {
-    get: (s, k) => run(s, 'readonly', (st) => st.get(k)),
-    put: (s, v, k) => run(s, 'readwrite', (st) => (k === undefined ? st.put(v) : st.put(v, k))),
-    del: (s, k) => run(s, 'readwrite', (st) => st.delete(k)),
-    all: (s) => run(s, 'readonly', (st) => st.getAll()),
-    chunkKeys: (id) => run('chunks', 'readonly', (st) => st.getAllKeys(range(id))),
-    chunks: (id) => run('chunks', 'readonly', (st) => st.getAll(range(id))),
-    dropChunks: (id) => run('chunks', 'readwrite', (st) => st.delete(range(id))),
-    clear: (s) => run(s, 'readwrite', (st) => st.clear()),
-  };
-})();
 
 /* ───────────────────────── MEGA ───────────────────────── */
 
@@ -1055,69 +1021,9 @@ function selectProfile(id) {
 
 /* ── capítulos nuevos ── */
 
-// se lee una vez y se guarda en memoria: antes se volvía a leer (y descifrar el JSON) por cada serie
-let knownCache = { key: null, val: null };
-function knownMap() {
-  const key = pkey('known');
-  if (knownCache.key !== key) knownCache = { key, val: LS.get(key, null) };
-  return knownCache.val;
-}
-function saveKnown(k) { knownCache = { key: pkey('known'), val: k }; LS.set(pkey('known'), k); }
-function initKnown() {
-  if (!state.profile || !state.library || !state.library.series || knownMap()) return;
-  saveKnown(Object.fromEntries(state.library.series.map((s) => [s.name, (s.full || s.all).map((e) => e.id)])));
-}
-function newEpisodes(s) {
-  const k = knownMap();
-  if (!k) return [];
-  const set = new Set(k[s.name] || []);
-  return s.all.filter((e) => !set.has(e.id));
-}
-function markSeriesSeen(s) {
-  const k = { ...(knownMap() || {}) };
-  k[s.name] = [...new Set([...(k[s.name] || []), ...(s.full || s.all).map((e) => e.id)])];
-  saveKnown(k);
-}
-/* Al importar varios capítulos, MEGA avisa de cada archivo por separado: los cambios se juntan
- * unos segundos y se muestra un solo aviso ("Hay contenido nuevo: Fate (3), Frieren (1)"). */
-/* Novedades: lo nuevo que llega a MEGA ya no sale como aviso en el inicio; se anota en Ajustes → Novedades
- * y el botón del menú muestra un puntito hasta que se mira. Por perfil y por dispositivo. */
-const NEWS_DAYS = 30;
-function newsList() {
-  const l = LS.get(pkey('news'), []);
-  return (Array.isArray(l) ? l : []).filter((x) => x && x.name && Date.now() - (x.at || 0) < NEWS_DAYS * 86400000);
-}
-function noteNews(name, n) {
-  const l = newsList().filter((x) => x.name !== name);
-  l.unshift({ name, n, at: Date.now() });
-  LS.set(pkey('news'), l.slice(0, 60));
-  LS.set(pkey('newsUnread'), true);
-}
-const hasUnreadNews = () => !!(state.profile && LS.get(pkey('newsUnread'), false) && newsList().length);
 function paintNewsDot() {
   const btn = dock && dock.querySelector('.dock-btn');
   if (btn) btn.classList.toggle('has-news', hasUnreadNews());
-}
-/* Se recuerda qué capítulos ya se anunciaron (por su id), no cuántos había: así, si MEGA entrega la lista
- * a medias al abrir (unos segundos con menos capítulos), al completarse no se vuelve a anunciar lo mismo. */
-const NEWS_IDS_MAX = 4000;
-function announceNew() {
-  if (!state.library || !state.library.series || !state.profile) return;
-  const told = LS.get(pkey('newsIds'), null);
-  const first = !Array.isArray(told);
-  const seen = new Set(first ? [] : told);
-  const added = [];
-  for (const s of state.library.series) {
-    const fresh = newEpisodes(s);
-    const unseen = fresh.filter((e) => !seen.has(e.id));
-    if (!unseen.length) continue;
-    unseen.forEach((e) => { seen.add(e.id); added.push(e.id); });
-    // la primera vez (al pasar a esta versión) solo se toma nota, sin anunciar lo que ya se avisó antes
-    if (!first) noteNews(s.name, fresh.length);
-  }
-  if (first || added.length) LS.set(pkey('newsIds'), [...seen].slice(-NEWS_IDS_MAX));
-  LS.del(pkey('newsCount'));
-  paintNewsDot();
 }
 function newsHTML() {
   const lib = state.library && state.library.v === 2 ? state.library : null;
@@ -1139,7 +1045,6 @@ function newsHTML() {
 }
 
 /* ── sinopsis e imágenes ── */
-
 
 function movieImage(s, it) {
   const m = itemMeta(s, it.key);
