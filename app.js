@@ -1,17 +1,18 @@
 import { isSubtitleName, mp4Info, mp4Chapters, mp4Formats, pickIntro, OUTRO_RE as OUTRO } from './models/subs.js';
-import { tmdbCheckKey, translateToSpanish, canTranslate, recommendationsFor, airingTop, toDiscover } from './models/meta-api.js';
+import { tmdbCheckKey, translateToSpanish, recommendationsFor, airingTop, toDiscover } from './models/meta-api.js';
 import { $, LS, esc, sleep, debounce, fmtTime, fmtSize, hue, plural } from './lib/util.js';
 import { ICON } from './views/icons.js';
-import { langText, hasOwnTitle, sortEpisodes } from './models/naming.js';
+import { hasOwnTitle, sortEpisodes } from './models/naming.js';
 import { DARK_TONES, TONES, profileFile, state, index, setIndex, knownEps, saveSettings, pkey, saveShared, visibleProfiles } from './models/store.js';
 import { C, filesNamed, readJson, visibleChildren, megaMessage, login, connect, downloadUrl } from './models/mega.js';
-import { langsOf, loadProfileState, nodePath, makeEpisode, isPlayable, buildLibrary, buildIndex, langPref, learnAudioLang, setLangPref, setLibrary, librarySignature } from './models/library.js';
+import { langsOf, loadProfileState, nodePath, makeEpisode, isPlayable, buildLibrary, buildIndex, learnAudioLang, setLangPref, setLibrary, librarySignature } from './models/library.js';
 
 import * as downloads from './models/downloads.js';
 import { setInUseCheck, removeAllDownloads, refreshSaved, resumePendingDownloads, removeDownload, localBlob, holdWake, canFolder, currentDir, getDir, dirPermission, dirAccess, flushFolder, useFolder, forgetFolder } from './models/downloads.js';
 import { episodeLabel } from './models/collections.js';
 import { nextUnseen, resumeOffer } from './models/progress.js';
 import { viewState } from './views/view-state.js';
+import { startPicking, endPicking, pickAction } from './controllers/picking.js';
 import { on } from './lib/events.js';
 import { syncShared, syncProgress } from './models/sync.js';
 import { countBytes, noteQuota, quotaUntil, refreshAccountInfo } from './models/quota.js';
@@ -20,20 +21,25 @@ import { isCine, isCollection, collectionItems, itemMetaKey, itemFor, movieTitle
 import { prog, setProgress, markNow, isLater, mergeProgress } from './models/progress.js';
 import { setLaterFlag } from './models/progress.js';
 import { profilesFromBackup, normName } from './models/profiles.js';
-import { isMainSeason, seasonLabel, seasonFullName, saveMeta, isFranchise, seasonMeta, metaFor, synopsisOf, hasSpanish, tmdbKey, displayMeta } from './models/fichas.js';
+import { seasonLabel, saveMeta, seasonMeta, metaFor, tmdbKey } from './models/fichas.js';
 import { ensureMeta, saveSyn, translateMissing, syncSynopses, syncFichas, resetFichas } from './models/fichas-sync.js';
 import { idb } from './models/idb.js';
 import { saveKnown, initKnown, newEpisodes, markSeriesSeen, newsList, hasUnreadNews, announceNew } from './models/news.js';
 import { epById } from './models/library.js';
 import { thumbFor } from './models/thumbs.js';
 import { saveChapterCache, rangeReader, cacheChapters, formatProblem, formatSummary, rememberCodec } from './models/media.js';
-import { hydrateThumbs, codecTagHTML } from './views/thumbs.js';
-import { heroPlan, seasonPlan, moviePlan, shelfItems, nextFor } from './models/plans.js';
-import { episodeArt, seriesColor } from './models/fichas.js';
-import { langChip, header, movieHref, collageHTML, setTint, factsRowsHTML, factRows, titleSize, posterAny, entryTile, seasonHref, moviePosterHTML, app, resetPosterCache } from './views/components.js';
+import { hydrateThumbs } from './views/thumbs.js';
+import { nextFor } from './models/plans.js';
+import { seriesColor } from './models/fichas.js';
+import { header, movieHref, setTint, posterAny, entryTile, seasonHref, app, resetPosterCache } from './views/components.js';
 import { setHero, renderHome } from './views/home.js';
+import { dlButton, episodeRow } from './views/episodes.js';
+import { renderSeries, renderMovie } from './views/series.js';
 
 on('quota', paintQuota);
+on('navigate', ({ hash, replace }) => {
+  if (replace) { navReplacing = true; location.replace(hash); } else go(hash);
+});
 on('notice', (text) => toast(text));
 on('download-changed', (id) => { paintEpisode(id); paintDrawerCount(); });
 on('download-done', (ep) => { cacheChapters(ep).catch(() => {}); });
@@ -281,7 +287,7 @@ function render() {
     if (!state.profile) { stopPlayback(); renderProfiles(); paintDock(); lastRouteKey = 'perfiles'; return; }
   }
   if (view === 'perfiles') { stopPlayback(); renderProfiles(); paintDock(); lastRouteKey = 'perfiles'; return; }
-  if (picking && (view !== 'serie' || String(picking.si) !== arg.split('/')[0])) endPicking(false);
+  if (viewState.picking && (view !== 'serie' || String(viewState.picking.si) !== arg.split('/')[0])) endPicking(false);
   if (view === 'play') {
     const c = resolveContext(arg);
     const si = c && c.si;
@@ -582,7 +588,6 @@ function newsHTML() {
 
 /* ── portada estilo TV ── */
 
-
 /* ── Ajustes: lo que ya vieron todos los perfiles (solo informa; no borra nada) ── */
 async function paintSeenByAll(btn) {
   const box = $('#seen-all-list');
@@ -794,394 +799,10 @@ function paintHomeSearch() {
 
 /* ── serie ── */
 
-/** Botones Sub | Doblado de una serie que tiene capítulos en los dos idiomas. */
-function langSwitchHTML(s, langs) {
-  if (!langs || langs.length < 2) return '';
-  const cur = langPref(s);
-  return `<div class="lang-switch" role="group" aria-label="Idioma">${langs.map((l) => `<button class="${l === cur ? 'is-on' : ''}" data-act="lang" data-lang="${l}" aria-pressed="${l === cur}">${l === 'sub' ? 'Sub' : 'Doblado'}</button>`).join('')}</div>`;
-}
-
-function renderSeries(arg) {
-  const lib = state.library;
-  const [siPart, kiPart] = String(arg).split('/');
-  const si = Number(siPart);
-  const s = lib && lib.series && lib.series[si];
-  if (!s) { go('#/'); return; }
-  if (isCollection(s)) { renderShelf(s, si); return; }
-  viewState.heroSi = si;
-  viewState.heroUser = true;
-  const flat = false;
-  const multi = s.seasons.length > 1;
-  // con varias temporadas, primero el menú de temporadas; los capítulos, al entrar a una
-  if (multi && kiPart == null) { renderSeasonMenu(s, si); return; }
-  const ki = multi ? Number(kiPart) : 0;
-  if (multi && !(ki >= 0 && ki < s.seasons.length)) { navReplacing = true; location.replace('#/serie/' + si); return; }
-  const season = s.seasons[ki];
-  // con varias temporadas, el botón grande es de la temporada que estás mirando
-  const plan = multi ? seasonPlan(s, season) : heroPlan(s);
-  const next = plan.next;
-  // cada temporada con su ficha (póster, banner, sinopsis); si no tiene, la de la serie
-  const ownMeta = flat ? null : seasonMeta(s, season);
-  const m = ownMeta || displayMeta(s);
-  const fresh = new Set(newEpisodes(s).map((e) => e.id));
-  const upcoming = next ? [next, ...nextUnseen(next, flat || s.seasons.length < 2 ? s.all : season.episodes, 2)].filter((x) => !state.saved.has(x.id)) : [];
-  const syn = synopsisOf(m);
-  const coverEp = season.episodes.find((e) => e.fa) || s.all.find((e) => e.fa);
-  const scope = !flat && s.seasons.length > 1 ? season.episodes : s.all; // con pestañas, los números son de la temporada
-  const seen = scope.filter((e) => (prog(e) || {}).w).length;
-  const collage = m && m.collage && m.collage.length ? m.collage : null;
-  setTint(seriesColor(s));
-  app.innerHTML = header('', { overlay: true }) + `<div class="tv is-series">
-    <div class="series-wash" aria-hidden="true">${m && m.cover ? `<img src="${esc(m.cover)}" alt="">` : ''}</div>
-    <main class="tv-main series-main">
-      <section class="series-hero ${(m && m.banner) || collage ? 'has-banner' : ''}">
-        ${collage ? `<div class="banner is-collage" aria-hidden="true">${Array.from({ length: Math.max(12, collage.length) }, (_, i) => collage[i % collage.length]).map((u) => `<img src="${esc(u)}" alt="" decoding="async">`).join('')}</div>`
-          : m && m.banner ? `<div class="banner"><img src="${esc(m.banner)}" alt="" decoding="async"></div>` : ''}
-        <div class="series-top">
-          ${collage ? `<span class="poster is-collage">${collageHTML(collage)}</span>` : m && m.cover ? `<img class="poster" src="${esc(m.cover)}" alt="" decoding="async">` : (coverEp ? `<span class="poster is-thumb" data-thumb="${esc(coverEp.id)}"></span>` : '')}
-          <div class="series-info">
-            ${multi ? `<p class="tv-kicker"><a href="#/serie/${si}">${esc(s.name)}</a><span>${esc(seasonLabel(s, season))}</span></p>` : ''}
-            <h2 class="tv-title${titleSize(multi ? seasonFullName(s, season) : s.name)}">${esc(multi ? seasonFullName(s, season) : s.name)}</h2>
-            ${m && m.title && m.title.toLowerCase() !== (multi ? seasonFullName(s, season) : s.name).toLowerCase() ? `<p class="tv-alt">${esc(m.title)}${m.native ? ` <span lang="ja">${esc(m.native)}</span>` : ''}</p>` : ''}
-            ${factsRowsHTML(s, m, { count: flat ? null : scope.length, seen, total: scope.length, lang: langText(langsOf(season.episodes)) })}
-          </div>
-        </div>
-        ${syn ? `<p class="tv-synopsis is-long" id="synopsis">${esc(syn)}</p>` : ''}
-        ${m && !hasSpanish(m) && m.synopsis && canTranslate() ? `<button class="link-btn" data-act="translate"${ownMeta ? ` data-key="${esc(season.name)}"` : ''}>Traducir sinopsis al español</button>` : ''}
-        <div class="tv-actions">
-          ${next ? `<a class="tv-btn is-primary" href="#/play/${encodeURIComponent(next.id)}">${ICON.play}<span>${esc(plan.label)}</span></a>` : `<span class="tv-done">${esc(plan.label)}</span>`}
-          ${upcoming.length ? `<button class="tv-btn" data-act="series-dl" data-si="${si}"${multi ? ` data-from="${esc(next.id)}"` : ''}>${ICON.down}<span>Descargar ${upcoming.length === 1 ? 'el siguiente' : `los ${upcoming.length} siguientes`}</span></button>` : ''}
-          ${flat ? '' : `<button class="tv-btn ${isLater(s) ? 'is-on' : ''}" data-act="later" data-si="${si}" aria-pressed="${isLater(s)}">${isLater(s) ? ICON.laterOn : ICON.later}<span>Más tarde</span></button>`}
-        </div>
-      </section>
-      <section class="ep-section">
-        <div class="ep-head">
-          <h3 class="ep-heading">${flat ? 'Películas' : 'Episodios'}</h3>
-          <button class="pick-toggle" data-act="pick-mode" id="pick-toggle" aria-pressed="false">${ICON.check}<span>Seleccionar</span></button>
-          ${langSwitchHTML(s, season.langs)}
-          ${multi ? `<nav class="season-step" aria-label="Otras temporadas">
-            ${ki > 0 ? `<a class="step-btn" href="#/serie/${si}/${ki - 1}" data-replace title="${esc(seasonLabel(s, s.seasons[ki - 1]))}">${ICON.back}<span>Anterior</span></a>` : ''}
-            <a class="step-btn" href="#/serie/${si}" data-replace>${ICON.grid}<span>Temporadas</span></a>
-            ${ki < s.seasons.length - 1 ? `<a class="step-btn is-next" href="#/serie/${si}/${ki + 1}" data-replace title="${esc(seasonLabel(s, s.seasons[ki + 1]))}"><span>Siguiente</span>${ICON.back}</a>` : ''}
-          </nav>` : ''}
-        </div>
-        ${season.title && season.title !== s.name && !multi ? `<p class="season-title">${esc(season.title)}</p>` : ''}
-        <ol class="episodes is-grid" id="season-eps">${season.episodes.map((ep) => episodeRow(ep, { fresh: fresh.has(ep.id), next: next && ep.id === next.id })).join('')}</ol>
-      </section>
-    </main>
-    <div class="pick-bar" id="pick-bar" role="toolbar" aria-label="Capítulos seleccionados" hidden>
-      <span class="pick-count" id="pick-count" aria-live="polite"></span>
-      <button class="pick-btn" data-act="pick-all">Todos</button>
-      <button class="pick-btn" data-act="pick-unseen">Sin ver</button>
-      <button class="pick-btn is-primary" data-act="pick-dl" disabled>${ICON.down}<span>Descargar</span></button>
-    </div>
-  </div>`;
-  if (picking && (picking.si !== si || picking.ki !== ki)) picking = { si, ki, ids: new Set() };
-  paintPick();
-  let focusId = null;
-  try { focusId = sessionStorage.getItem('kai.focus'); sessionStorage.removeItem('kai.focus'); } catch { /* nada */ }
-  const fli = focusId && app.querySelector(`.ep[data-id="${CSS.escape(focusId)}"]`);
-  if (fli) requestAnimationFrame(() => { fli.scrollIntoView({ block: 'center' }); fli.classList.add('is-flash'); });
-  // los "nuevos" se muestran esta vez y quedan vistos
-  if (fresh.size) { markSeriesSeen(s); announceNew(); }
-}
-
-/** La ficha de la página de una serie con varias temporadas: siempre la de la Temporada 1 (v37: antes era la de la
- *  última temporada vista, y con una OVA se leía raro). Si la Temporada 1 no tiene ficha, la primera temporada que sí. */
-function firstSeasonMeta(s) {
-  if (!isFranchise(s)) return displayMeta(s);
-  const first = s.seasons.find((se) => seasonLabel(s, se) === 'Temporada 1');
-  return (first && seasonMeta(s, first)) || s.seasons.filter((se) => isMainSeason(s, se)).map((se) => seasonMeta(s, se)).find(Boolean) || displayMeta(s);
-}
-
-/** Menú de una serie con varias temporadas: la ficha de la serie y una tarjeta por temporada. */
-function renderSeasonMenu(s, si) {
-  const m = firstSeasonMeta(s);
-  const plan = heroPlan(s);
-  const next = plan.next;
-  const nextKi = next ? index.byId.get(next.id).ki : -1;
-  const fresh = new Set(newEpisodes(s).map((e) => e.id));
-  const upcoming = next ? [next, ...nextUnseen(next, s.all, 2)].filter((x) => !state.saved.has(x.id)) : [];
-  const syn = synopsisOf(m);
-  const seen = s.all.filter((e) => (prog(e) || {}).w).length;
-  const coverEp = s.all.find((e) => e.fa);
-  // la ficha de una franquicia ("Fate") es la de una de sus temporadas: traducir va a esa
-  const metaKey = isFranchise(s) ? (s.seasons.find((se) => seasonMeta(s, se) === m) || {}).name : '';
-  const cards = s.seasons.map((se, ki) => {
-    const t = seasonLabel(s, se);
-    // la Temporada 1 de una serie usa la ficha de la serie como propia (con su año)
-    const own = seasonMeta(s, se) || (t === 'Temporada 1' && !isFranchise(s) ? m : null);
-    const sm = own || (isFranchise(s) ? null : m);
-    const done = se.episodes.filter((e) => (prog(e) || {}).w).length;
-    const all = done === se.episodes.length;
-    const isNew = se.episodes.some((e) => fresh.has(e.id));
-    const first = se.episodes.find((e) => e.fa) || se.episodes[0];
-    const sub = [own && own.year ? own.year : '', all ? 'Vista' : done ? `${done} de ${plural(se.episodes.length, 'capítulo', 'capítulos')}` : plural(se.episodes.length, 'capítulo', 'capítulos')].filter(Boolean).join(' · ');
-    return `<li><a class="shelf-item" href="#/serie/${si}/${ki}" style="--h:${hue(t)}">
-      <span class="shelf-poster">
-        ${sm && sm.cover ? `<img src="${esc(sm.cover)}" alt="" loading="lazy" decoding="async">` : first ? `<span class="is-fallback" data-thumb="${esc(first.id)}"><span class="cover-glyph">${esc([...t.trim()][0] || '·')}</span></span>` : ''}
-        ${isNew ? '<span class="tile-badge">Nuevo</span>' : ki === nextKi && done ? '<span class="tile-badge">Viendo</span>' : ''}
-        ${langChip(langsOf(se.episodes))}
-        ${done && !all ? `<span class="tile-bar"><span style="width:${(done / se.episodes.length) * 100}%"></span></span>` : ''}
-      </span>
-      <span class="shelf-title" title="${esc(seasonFullName(s, se))}">${esc(t)}</span>
-      <span class="shelf-sub">${esc(sub)}</span>
-    </a></li>`;
-  }).join('');
-  setTint(seriesColor(s));
-  app.innerHTML = header('', { overlay: true }) + `<div class="tv is-series">
-    <div class="series-wash" aria-hidden="true">${m && m.cover ? `<img src="${esc(m.cover)}" alt="">` : ''}</div>
-    <main class="tv-main series-main">
-      <section class="series-hero ${m && m.banner ? 'has-banner' : ''}">
-        ${m && m.banner ? `<div class="banner"><img src="${esc(m.banner)}" alt="" decoding="async"></div>` : ''}
-        <div class="series-top">
-          ${m && m.cover ? `<img class="poster" src="${esc(m.cover)}" alt="" decoding="async">` : (coverEp ? `<span class="poster is-thumb" data-thumb="${esc(coverEp.id)}"></span>` : '')}
-          <div class="series-info">
-            <h2 class="tv-title${titleSize(s.name)}">${esc(s.name)}</h2>
-            ${m && m.title && !isFranchise(s) && m.title.toLowerCase() !== s.name.toLowerCase() ? `<p class="tv-alt">${esc(m.title)}${m.native ? ` <span lang="ja">${esc(m.native)}</span>` : ''}</p>` : ''}
-            ${factRows(`<span>${plural(s.seasons.length, 'temporada', 'temporadas')}</span><span>${plural(s.all.length, 'capítulo', 'capítulos')}</span>${langsOf(s.all).length ? `<span>${esc(langText(langsOf(s.all)))}</span>` : ''}${seen ? `<span>${seen} vistos</span>` : ''}`, m,
-              [m && m.year ? `<a class="fact" href="#/catalogo?${new URLSearchParams({ y: m.year })}">${esc(m.year)}</a>` : '', ...((m && m.genres) || []).slice(0, 3).map((g) => `<a class="fact" href="#/catalogo?${new URLSearchParams({ g })}">${esc(g)}</a>`)].join(''))}
-          </div>
-        </div>
-        ${syn ? `<p class="tv-synopsis is-long" id="synopsis">${esc(syn)}</p>` : ''}
-        ${m && !hasSpanish(m) && m.synopsis && canTranslate() ? `<button class="link-btn" data-act="translate"${metaKey ? ` data-key="${esc(metaKey)}"` : ''}>Traducir sinopsis al español</button>` : ''}
-        <div class="tv-actions">
-          ${next ? `<a class="tv-btn is-primary" href="#/play/${encodeURIComponent(next.id)}">${ICON.play}<span>${esc(plan.label)}</span></a>` : `<span class="tv-done">${esc(plan.label)}</span>`}
-          ${upcoming.length ? `<button class="tv-btn" data-act="series-dl" data-si="${si}">${ICON.down}<span>Descargar ${upcoming.length === 1 ? 'el siguiente' : `los ${upcoming.length} siguientes`}</span></button>` : ''}
-          <button class="tv-btn ${isLater(s) ? 'is-on' : ''}" data-act="later" data-si="${si}" aria-pressed="${isLater(s)}">${isLater(s) ? ICON.laterOn : ICON.later}<span>Más tarde</span></button>
-        </div>
-      </section>
-      <section class="ep-section">
-        <div class="ep-head"><h3 class="ep-heading">Temporadas</h3>${langSwitchHTML(s, s.seasons.some((se) => se.langs) ? ['sub', 'dob'] : null)}</div>
-        <ul class="shelf season-grid" role="list">${cards}</ul>
-      </section>
-    </main>
-  </div>`;
-  if (fresh.size) { markSeriesSeen(s); announceNew(); }
-}
-
 /* ── películas: el estante (la carpeta) y la página de cada una ── */
-
-function renderShelf(s, si) {
-  setTint(seriesColor(s));
-  const fresh = new Set(newEpisodes(s).map((e) => e.id));
-  const items = shelfItems(s);
-  app.innerHTML = header(esc(s.name)) + `<main class="shelf-main">
-    <p class="dim shelf-count">${plural(items.length, 'película', 'películas')}</p>
-    <ul class="shelf" role="list">${items.map((x) => moviePosterHTML(s, si, x, fresh)).join('')}</ul>
-  </main>`;
-  if (fresh.size) { markSeriesSeen(s); announceNew(); }
-}
-
-function renderMovie(arg) {
-  const lib = state.library;
-  const cut = arg.indexOf('/');
-  const si = Number(arg.slice(0, cut));
-  const key = arg.slice(cut + 1);
-  const s = lib && lib.series && lib.series[si];
-  const it = s && isCollection(s) ? collectionItems(s).find((x) => x.key === key) : null;
-  if (!it) { go(s ? '#/serie/' + si : '#/'); return; }
-  viewState.heroSi = si;
-  const m = itemMeta(s, it.key);
-  const t = movieTitle(s, it);
-  const plan = moviePlan(it);
-  const syn = synopsisOf(m);
-  const pending = it.eps.filter((e) => !state.saved.has(e.id));
-  const busy = it.eps.some((e) => state.dls[e.id] || state.queue.some((q) => q.ep.id === e.id));
-  const dur = (prog(plan.ep) || {}).d;
-  const chip = (label, params) => `<a class="fact" href="#/catalogo?${new URLSearchParams(params)}">${esc(label)}</a>`;
-  const facts = factRows(
-    [dur ? `<span>${Math.round(dur / 60)} min</span>` : '', it.eps.length > 1 ? `<span>${it.eps.length} partes</span>` : '', langsOf(it.eps).length ? `<span>${esc(langText(langsOf(it.eps)))}</span>` : ''].join(''),
-    m,
-    [m && m.year ? chip(m.year, { y: m.year }) : '', chip('Película', { f: 'Película' }), ...((m && m.genres) || []).slice(0, 3).map((g) => chip(g, { g }))].join(''),
-  );
-  const later = isLater(s, it.key);
-  setTint((m && m.color) || seriesColor(s));
-  app.innerHTML = header('', { overlay: true }) + `<div class="tv is-series is-movie">
-    <div class="series-wash" aria-hidden="true">${m && m.cover ? `<img src="${esc(m.cover)}" alt="">` : ''}</div>
-    <main class="tv-main series-main">
-      <section class="series-hero ${m && m.banner ? 'has-banner' : ''}">
-        ${m && m.banner ? `<div class="banner"><img src="${esc(m.banner)}" alt="" decoding="async"></div>` : ''}
-        <div class="series-top">
-          ${m && m.cover ? `<img class="poster" src="${esc(m.cover)}" alt="" decoding="async">` : `<span class="poster is-thumb" data-thumb="${esc(it.eps[0].id)}"></span>`}
-          <div class="series-info">
-            <h2 class="tv-title">${esc(t)}</h2>
-            ${m && m.title && m.title.toLowerCase() !== t.toLowerCase() ? `<p class="tv-alt">${esc(m.title)}${m.native ? ` <span lang="ja">${esc(m.native)}</span>` : ''}</p>` : ''}
-            ${facts}
-          </div>
-        </div>
-        ${syn ? `<p class="tv-synopsis is-long" id="synopsis">${esc(syn)}</p>` : ''}
-        ${m && !hasSpanish(m) && m.synopsis && canTranslate() ? `<button class="link-btn" data-act="translate" data-key="${esc(it.key)}">Traducir sinopsis al español</button>` : ''}
-        <div class="tv-actions">
-          <a class="tv-btn is-primary" href="#/play/${encodeURIComponent(plan.ep.id)}">${ICON.play}<span>${esc(plan.label)}</span></a>
-          ${busy ? `<span class="tv-btn is-quiet">${ICON.queued}<span>Descargando…</span></span>`
-            : pending.length ? `<button class="tv-btn" data-act="movie-dl" data-si="${si}" data-key="${esc(it.key)}">${ICON.down}<span>Descargar</span></button>`
-            : `<span class="tv-btn is-quiet">${ICON.saved}<span>Descargada</span></span>`}
-          <button class="tv-btn ${later ? 'is-on' : ''}" data-act="later-item" data-si="${si}" data-key="${esc(it.key)}" aria-pressed="${later}">${later ? ICON.laterOn : ICON.later}<span>Más tarde</span></button>
-          ${langSwitchHTML(s, langsOf(it.eps).length > 1 ? langsOf(it.eps) : null)}
-        </div>
-      </section>
-      ${it.eps.length > 1 ? `<section class="ep-section">
-        <div class="ep-head"><h3 class="ep-heading">Partes</h3></div>
-        <ol class="episodes is-grid" id="season-eps">${it.eps.map((ep) => episodeRow(ep, { next: ep.id === plan.ep.id && !plan.seen })).join('')}</ol>
-      </section>` : ''}
-    </main>
-  </div>`;
-}
 
 /* ── selección de varios capítulos de una temporada para descargarlos juntos ── */
 
-let picking = null; // { si, ki, ids: Set } mientras se eligen capítulos
-
-function pickSeason() {
-  const s = picking && state.library && state.library.series[picking.si];
-  if (!s) return null;
-  return isCollection(s) ? { episodes: s.all } : s.seasons[picking.ki] || null;
-}
-/** Se puede elegir lo que no está descargado ni en camino. */
-const pickable = (ep) => !state.saved.has(ep.id) && !state.dls[ep.id] && !state.queue.some((q) => q.ep.id === ep.id);
-
-function startPicking() {
-  const s = state.library && state.library.series[viewState.heroSi];
-  if (!s) return;
-  const ki = Number(route().arg.split('/')[1]) || 0;
-  picking = { si: viewState.heroSi, ki: Math.min(ki, s.seasons.length - 1), ids: new Set() };
-  paintPick();
-}
-function endPicking(repaint = true) {
-  picking = null;
-  document.documentElement.classList.remove('is-picking');
-  if (repaint) paintPick();
-}
-
-function paintPick() {
-  const on = !!picking;
-  document.documentElement.classList.toggle('is-picking', on);
-  const list = $('#season-eps');
-  const bar = $('#pick-bar');
-  const btn = $('#pick-toggle');
-  if (!list || !bar) return;
-  list.classList.toggle('is-picking', on);
-  if (btn) {
-    btn.setAttribute('aria-pressed', String(on));
-    btn.classList.toggle('is-on', on);
-    btn.querySelector('span').textContent = on ? 'Cancelar' : 'Seleccionar';
-  }
-  bar.hidden = !on;
-  list.querySelectorAll('.ep').forEach((li) => {
-    const ep = epById(li.dataset.id);
-    const picked = on && picking.ids.has(li.dataset.id);
-    li.classList.toggle('is-picked', picked);
-    li.classList.toggle('is-unpickable', on && !!ep && !pickable(ep));
-    const a = li.querySelector('.ep-main');
-    if (on) { a.setAttribute('role', 'checkbox'); a.setAttribute('aria-checked', String(picked)); } else { a.removeAttribute('role'); a.removeAttribute('aria-checked'); }
-  });
-  if (!on) return;
-  const eps = [...picking.ids].map(epById).filter(Boolean);
-  const size = eps.reduce((a, e) => a + (e.size || 0), 0);
-  $('#pick-count').textContent = eps.length ? `${plural(eps.length, 'capítulo', 'capítulos')}, ${fmtSize(size)}` : 'Toca los capítulos que quieras';
-  bar.querySelector('[data-act="pick-dl"]').disabled = !eps.length;
-  const season = pickSeason();
-  const all = season ? season.episodes.filter(pickable) : [];
-  bar.querySelector('[data-act="pick-all"]').textContent = all.length && all.every((e) => picking.ids.has(e.id)) ? 'Ninguno' : 'Todos';
-}
-
-function pickAction(act) {
-  const season = pickSeason();
-  if (!picking || !season) return;
-  const avail = season.episodes.filter(pickable);
-  if (act === 'pick-all') {
-    const allOn = avail.length && avail.every((e) => picking.ids.has(e.id));
-    picking.ids = allOn ? new Set() : new Set(avail.map((e) => e.id));
-  } else if (act === 'pick-unseen') {
-    picking.ids = new Set(avail.filter((e) => !(prog(e) || {}).w).map((e) => e.id));
-    if (!picking.ids.size) toast('No hay capítulos sin ver para descargar en esta temporada.');
-  } else if (act === 'pick-dl') {
-    const s = state.library.series[picking.si];
-    const eps = season.episodes.filter((e) => picking.ids.has(e.id) && pickable(e)); // en el orden de la temporada
-    if (!navigator.onLine) { toast('Necesitas conexión para descargar.'); return; }
-    eps.forEach((e) => queueDownload(e, s.name));
-    if (eps.length) toast(`${plural(eps.length, 'capítulo', 'capítulos')} en cola de descarga.`);
-    endPicking();
-    return;
-  }
-  paintPick();
-}
-
-// en modo selección, tocar un capítulo lo marca en vez de abrirlo
-// cambiar de temporada (anterior, siguiente, al menú) no deja una entrada más en el historial
-app.addEventListener('click', (e) => {
-  const a = e.target.closest('a[data-replace]');
-  if (!a || e.metaKey || e.ctrlKey || e.shiftKey) return;
-  e.preventDefault();
-  navReplacing = true;
-  location.replace(a.getAttribute('href'));
-});
-app.addEventListener('click', (e) => {
-  if (!picking) return;
-  const li = e.target.closest('#season-eps.is-picking .ep');
-  if (!li) return;
-  e.preventDefault();
-  e.stopPropagation();
-  const ep = epById(li.dataset.id);
-  if (!ep) return;
-  if (!pickable(ep)) { toast(state.saved.has(ep.id) ? 'Ya está descargado.' : 'Ya se está descargando.'); return; }
-  if (picking.ids.has(ep.id)) picking.ids.delete(ep.id); else picking.ids.add(ep.id);
-  paintPick();
-}, true);
-
-function episodeStatus(ep) {
-  const p = prog(ep);
-  if (p && p.w) return `<span class="ep-seen">${ICON.check}Visto</span>`;
-  if (p && p.t > 5) return `${fmtTime(p.t)} de ${fmtTime(p.d)}`;
-  return 'Sin ver';
-}
-
-function dlButton(ep) {
-  const t = state.dls[ep.id];
-  if (t) {
-    const pct = Math.max(2, Math.min(100, Math.round((t.loaded / t.total) * 100)));
-    return `<button class="dl is-busy" data-act="dl" style="--p:${pct}" aria-label="Descargando ${pct}%. Toca para cancelar"><span class="dl-pct">${pct}</span></button>`;
-  }
-  if (state.queue.some((q) => q.ep.id === ep.id)) return `<button class="dl is-queued" data-act="dl" aria-label="En cola. Toca para cancelar">${ICON.queued}</button>`;
-  if (state.saved.has(ep.id)) return `<button class="dl is-saved" data-act="dl" aria-label="Descargado. Toca para quitarlo del dispositivo">${ICON.saved}</button>`;
-  return `<button class="dl" data-act="dl" aria-label="Descargar para ver sin conexión">${ICON.down}</button>`;
-}
-
-function episodeRow(ep, { current = false, extra = '', fresh = false, next = false } = {}) {
-  const art = episodeArt(ep);
-  const e = index.byId.get(ep.id);
-  const movie = !!e && isCollection(state.library.series[e.si]);
-  const p = prog(ep);
-  const pct = p && p.d ? (p.w ? 100 : Math.min(100, (p.t / p.d) * 100)) : 0;
-  const seen = !!(p && p.w);
-  // en una temporada con los dos idiomas, el capítulo que solo existe en el otro se marca
-  const sr = e && state.library.series[e.si];
-  const only = sr && sr.seasons[e.ki] && sr.seasons[e.ki].langs && ep.lang && !index.twins.has(ep.path) && ep.lang !== langPref(sr) ? `Solo ${ep.lang === 'sub' ? 'sub' : 'doblado'}` : '';
-  const status = current ? '<span class="ep-now"><span class="eq" aria-hidden="true"><i></i><i></i><i></i></span>Reproduciendo</span>'
-    : next && !seen ? `<span class="ep-next">${p && p.t > 5 ? `Seguir en ${fmtTime(p.t)}` : 'A continuación'}</span>`
-    : episodeStatus(ep);
-  return `<li class="ep ${seen ? 'is-seen' : ''} ${current ? 'is-current' : ''} ${next ? 'is-next' : ''}" data-id="${esc(ep.id)}">
-    <a class="ep-main" href="#/play/${encodeURIComponent(ep.id)}" ${current ? 'aria-current="true"' : ''}>
-      <span class="ep-thumb ${art ? 'has-img is-art' : ''}" ${!art && ep.fa ? `data-thumb="${esc(ep.id)}"` : ''}>
-        ${art ? `<img src="${esc(art)}" alt="" loading="lazy" decoding="async">` : ''}
-        <span class="ep-num" aria-hidden="true">${movie ? '' : ep.ep != null ? esc(ep.ep) : '·'}</span>
-        <span class="ep-flags">${only ? `<span class="ep-new is-lang">${only}</span>` : ''}${fresh ? '<span class="ep-new">Nuevo</span>' : ''}${state.saved.has(ep.id) ? `<span class="ep-flag" title="Descargado">${ICON.saved}</span>` : ''}${seen ? `<span class="ep-flag is-seen" title="Visto">${ICON.check}</span>` : ''}</span>
-        ${codecTagHTML(ep)}
-        <span class="ep-play" aria-hidden="true">${ICON.play}</span>
-        ${pct ? `<span class="mini-bar"><span style="width:${pct}%"></span></span>` : ''}
-      </span>
-      <span class="ep-text">
-        <span class="ep-title">${esc(episodeLabel(ep))}</span>
-        <span class="ep-sub">${status}${extra}</span>
-      </span>
-    </a>
-    <span class="ep-tools">
-      ${dlButton(ep)}
-      <button class="icon-btn ep-more" data-act="more" aria-label="Más opciones">${ICON.more}</button>
-    </span>
-  </li>`;
-}
 
 /* Las imágenes aparecen con un fundido solo la primera vez que se cargan. Al redibujar una página (o volver a
  * ella) las que ya estaban cargadas se muestran de una vez: si no, todas parpadeaban en cada cambio. */
@@ -2639,7 +2260,7 @@ if (!(document.pictureInPictureEnabled || video.webkitSupportsPresentationMode))
 
 document.addEventListener('keydown', (e) => {
   if (route().view !== 'play' || !playing) {
-    if (e.key === 'Escape') { closeSheet(); closeDrawer(); if (picking) endPicking(); }
+    if (e.key === 'Escape') { closeSheet(); closeDrawer(); if (viewState.picking) endPicking(); }
     return;
   }
   if (e.target.closest('input:not([type="range"]), textarea, select')) return;
@@ -2718,7 +2339,7 @@ document.addEventListener('click', async (e) => {
     if (await dirAccess(null, true)) { flushFolder(); if (route().view === 'ajustes') paintDownloadsWhere(); else softRender(); }
     else toast('Sin permiso, Kai guarda las descargas dentro de la app.');
   }
-  else if (act === 'pick-mode') { if (picking) endPicking(); else startPicking(); }
+  else if (act === 'pick-mode') { if (viewState.picking) endPicking(); else startPicking(Number(route().arg.split('/')[1]) || 0); }
   else if (act === 'pick-all' || act === 'pick-unseen' || act === 'pick-dl') pickAction(act);
   else if (act === 'seen-all') paintSeenByAll(el);
   else if (act === 'news-clear') {
@@ -2751,7 +2372,7 @@ document.addEventListener('click', async (e) => {
     const sr = state.library && state.library.series[viewState.heroSi];
     if (!sr) return;
     setLangPref(sr, el.dataset.lang);
-    if (picking) picking.ids = new Set();
+    if (viewState.picking) viewState.picking.ids = new Set();
     softRender();
   }
   else if (act === 'series-dl') {

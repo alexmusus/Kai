@@ -469,3 +469,7 @@ export function forgetFolder() {
   LS.del(KEY_DIR);
   dirHandle = null;
 }
+
+/** Se puede elegir lo que no está descargado ni en camino. */
+export const pickable = (ep) =>
+  !state.saved.has(ep.id) && !state.dls[ep.id] && !state.queue.some((q) => q.ep.id === ep.id);

@@ -9,6 +9,8 @@ export const viewState = {
   heroSi: null,
   /** la eligió quien usa Kai (mouse, teclado o entrando a ella); si no, la portada elige sola */
   heroUser: false,
+  /** @type {{ si: number, ki: number, ids: Set<string> } | null} capítulos elegidos para descargar juntos */
+  picking: null,
   /** ¿se está reproduciendo algo? (lo pone el reproductor) */
   isPlaying: () => false,
 };

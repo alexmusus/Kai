@@ -176,3 +176,27 @@ test('seguir aquí lo que quedó a medias en otro dispositivo', async ({ page },
   await expect(page.locator('.resume-card')).toHaveCount(0);
   expect(k.errors).toEqual([]);
 });
+
+test('Seleccionar capítulos de una temporada', async ({ page }, info) => {
+  const k = await openKai(page, '#/');
+  await go(page, '#/serie/' + k.si('Dorohedoro'));
+  await page.locator('[data-act="pick-mode"]').click();
+  await expect(page.locator('#pick-bar')).toBeVisible();
+  await expect(page.locator('#pick-count')).toHaveText('Toca los capítulos que quieras');
+  const eps = page.locator('#season-eps .ep .ep-main');
+  await eps.nth(0).click();
+  await eps.nth(4).click();
+  await expect(page).toHaveURL(new RegExp(`#/serie/${k.si('Dorohedoro')}$`)); // no abrió el capítulo
+  await expect(page.locator('#pick-count')).toHaveText('2 capítulos, 500 MB');
+  await page.locator('[data-act="pick-unseen"]').click(); // Dorohedoro: ninguno visto del todo
+  await expect(page.locator('#pick-count')).toHaveText('12 capítulos, 3.0 GB');
+  await expect(page.locator('[data-act="pick-all"]')).toHaveText('Ninguno');
+  await shot(page, 'seleccionar', info);
+  await page.locator('[data-act="pick-dl"]').click(); // sin conexión: avisa y no sale del modo
+  await expect(page.locator('#pick-bar')).toBeVisible();
+  await page.locator('[data-act="pick-mode"]').click();
+  await expect(page.locator('#pick-bar')).toBeHidden();
+  await eps.nth(1).click();
+  await expect(page).toHaveURL(/#\/play\//); // fuera del modo, tocar abre el capítulo
+  expect(k.errors).toEqual([]);
+});

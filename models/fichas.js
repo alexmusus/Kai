@@ -220,3 +220,18 @@ export function seriesColor(s) {
   const m = displayMeta(s);
   return (m && m.color) || `hsl(${hue(s.name)} 45% 55%)`;
 }
+
+/** La ficha de la página de una serie con varias temporadas: siempre la de la Temporada 1 (v37: antes era la de la
+ *  última temporada vista, y con una OVA se leía raro). Si la Temporada 1 no tiene ficha, la primera temporada que sí. */
+export function firstSeasonMeta(s) {
+  if (!isFranchise(s)) return displayMeta(s);
+  const first = s.seasons.find((se) => seasonLabel(s, se) === 'Temporada 1');
+  return (
+    (first && seasonMeta(s, first)) ||
+    s.seasons
+      .filter((se) => isMainSeason(s, se))
+      .map((se) => seasonMeta(s, se))
+      .find(Boolean) ||
+    displayMeta(s)
+  );
+}
