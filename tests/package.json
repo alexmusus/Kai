@@ -6,8 +6,8 @@
   "scripts": {
     "lint": "cd .. && tests/node_modules/.bin/eslint -c tests/eslint.config.js .",
     "types": "tsc -p tsconfig.json",
-    "format": "prettier --no-error-on-unmatched-pattern --config .prettierrc.json --write ../lib ../models ../views ../controllers",
-    "format:check": "prettier --no-error-on-unmatched-pattern --config .prettierrc.json --check ../lib ../models ../views ../controllers",
+    "format": "prettier --no-error-on-unmatched-pattern --config .prettierrc.json --write ../app.js ../lib ../models ../views ../controllers",
+    "format:check": "prettier --no-error-on-unmatched-pattern --config .prettierrc.json --check ../app.js ../lib ../models ../views ../controllers",
     "test": "vitest run",
     "e2e": "playwright test",
     "check": "npm run lint && npm run types && npm run format:check && vitest run && playwright test"

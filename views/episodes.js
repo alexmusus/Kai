@@ -9,7 +9,8 @@ import { fmtTime, esc } from '../lib/util.js';
 import { state, index } from '../models/store.js';
 import { episodeArt } from '../models/fichas.js';
 import { isCollection, episodeLabel } from '../models/collections.js';
-import { langPref } from '../models/library.js';
+import { langPref, epById } from '../models/library.js';
+import { watchDlButton } from './watch.js';
 import { codecTagHTML } from './thumbs.js';
 
 export function episodeStatus(ep) {
@@ -70,4 +71,15 @@ export function episodeRow(ep, { current = false, extra = '', fresh = false, nex
       <button class="icon-btn ep-more" data-act="more" aria-label="Más opciones">${ICON.more}</button>
     </span>
   </li>`;
+}
+
+/** Vuelve a pintar el botón de descarga de un capítulo dondequiera que esté a la vista (lista y reproductor). */
+export function paintEpisode(id) {
+  const ep = epById(id);
+  if (!ep) return;
+  document.querySelectorAll(`.ep[data-id="${CSS.escape(id)}"] [data-act="dl"]`).forEach((btn) => {
+    btn.outerHTML = dlButton(ep);
+  });
+  const wd = document.querySelector(`[data-act="w-dl"][data-id="${CSS.escape(id)}"]`);
+  if (wd) wd.outerHTML = watchDlButton(ep);
 }
