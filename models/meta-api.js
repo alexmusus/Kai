@@ -1,5 +1,7 @@
+// @ts-check
 /*
- * meta.js — sinopsis e imágenes de AniList (gratis, sin cuenta).
+ * models/meta-api.js — fichas de AniList (gratis, sin cuenta) y de TMDB (con la clave de Ajustes): buscar por
+ * nombre de carpeta, notas, OVAs relacionadas, recomendaciones y lo que está en emisión; traducir sinopsis.
  */
 
 const API = 'https://graphql.anilist.co';
@@ -412,10 +414,10 @@ async function doTranslate(text, allowDownload) {
   try {
     if (!translator) {
       const opts = { sourceLanguage: 'en', targetLanguage: 'es' };
-      const avail = await self.Translator.availability(opts);
+      const avail = await /** @type {any} */ (self).Translator.availability(opts);
       if (avail === 'unavailable') return null;
       if (avail !== 'available' && !allowDownload) return null;
-      translator = await self.Translator.create(opts);
+      translator = await /** @type {any} */ (self).Translator.create(opts);
     }
     return await translator.translate(text);
   } catch {
@@ -516,9 +518,7 @@ async function tmdb(path, params, key) {
     bearer ? { headers: { Authorization: `Bearer ${key}`, Accept: 'application/json' } } : undefined,
   );
   if (r.status === 401) {
-    const e = new Error('La clave de TMDB no es válida.');
-    e.code = 'KEY';
-    throw e;
+    throw Object.assign(new Error('La clave de TMDB no es válida.'), { code: 'KEY' });
   }
   if (r.status === 429) throw new Error('TMDB pidió esperar un momento.');
   if (!r.ok) throw new Error('TMDB respondió ' + r.status);
@@ -530,7 +530,7 @@ export async function tmdbCheckKey(key) {
     await tmdb('/configuration', {}, key);
     return true;
   } catch (err) {
-    if (err.code === 'KEY') return false;
+    if (/** @type {any} */ (err).code === 'KEY') return false;
     throw err;
   }
 }

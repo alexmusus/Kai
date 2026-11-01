@@ -1,3 +1,4 @@
+// @ts-check
 /*
  * subs.js — subtítulos y capítulos para Kai.
  *  - Pistas de texto incrustadas en MP4 (mov_text/tx3g y WebVTT), leídas por rangos:
@@ -56,6 +57,7 @@ function cleanVttText(t) {
 
 /** SRT y WebVTT → [[inicio, fin, texto]] */
 export function parseSrtVtt(text) {
+  /** @type {[number, number, string][]} */
   const out = [];
   const blocks = String(text)
     .replace(/^﻿/, '')
@@ -66,7 +68,7 @@ export function parseSrtVtt(text) {
     const lines = b.split('\n');
     const i = lines.findIndex((l) => re.test(l));
     if (i < 0) continue;
-    const m = re.exec(lines[i]);
+    const m = /** @type {RegExpExecArray} */ (re.exec(lines[i])); // la línea ya pasó re.test
     const start = ts(m[1], m[2], m[3], m[4].padEnd(3, '0'));
     const end = ts(m[5], m[6], m[7], m[8].padEnd(3, '0'));
     const body = cleanVttText(lines.slice(i + 1).join('\n'));
@@ -77,6 +79,7 @@ export function parseSrtVtt(text) {
 
 /** ASS/SSA → [[inicio, fin, texto]] (sin estilos: posición y colores se pierden) */
 export function parseAss(text) {
+  /** @type {[number, number, string][]} */
   const out = [];
   let format = null;
   let inEvents = false;
@@ -200,8 +203,9 @@ function sampleTable(b, stbl) {
     const n = u32(b, stco.start + 4);
     for (let i = 0; i < n; i++) chunks.push(u32(b, stco.start + 8 + i * 4));
   } else {
-    const n = u32(b, co64.start + 4);
-    for (let i = 0; i < n; i++) chunks.push(u64(b, co64.start + 8 + i * 8));
+    const box = /** @type {NonNullable<typeof co64>} */ (co64); // sin stco, hay co64 (se revisó arriba)
+    const n = u32(b, box.start + 4);
+    for (let i = 0; i < n; i++) chunks.push(u64(b, box.start + 8 + i * 8));
   }
 
   const sc = [];
@@ -323,6 +327,7 @@ export async function mp4Info(read, size) {
 export async function mp4Formats(read, size) {
   const moov = await readMoov(read, size);
   if (!moov) return null;
+  /** @type {{ video: any, audio: any }} */
   const out = { video: null, audio: null };
   for (const trak of boxes(moov, 8, moov.length)) {
     if (trak.type !== 'trak') continue;
@@ -388,6 +393,7 @@ export async function mp4QuickFormats(read, size, limit = 256 * 1024) {
   }
   if (moovPos < 0) return null;
   const b = await read(moovPos, moovPos + Math.min(moovSize, limit) - 1);
+  /** @type {{ video: any, audio: any }} */
   const out = { video: null, audio: null };
   // recorre cajas sin exigir que quepan completas en lo que se bajó
   const walk = (start, end, depth) => {
@@ -518,7 +524,12 @@ export function decodeSample(codec, bytes) {
  * Descarga las muestras de una pista (las cercanas a `near` primero) y entrega
  * cada subtítulo apenas llega mediante onCue(inicio, fin, texto).
  */
-export async function loadTrackCues(track, read, { near = 0, parallel = 6, onCue, signal } = {}) {
+/**
+ * @param {any} track
+ * @param {(start: number, end: number) => Promise<Uint8Array>} read
+ * @param {{ near?: number, parallel?: number, onCue: (start: number, end: number, text: string) => void, signal?: AbortSignal }} opts
+ */
+export async function loadTrackCues(track, read, { near = 0, parallel = 6, onCue, signal }) {
   const ts = track.timescale;
   const groups = [];
   for (const s of track.samples) {
