@@ -12,7 +12,7 @@ const dir = (name, children) => {
   return d;
 };
 // buildLibrary recibe el árbol, pero las rutas las saca de state.storage (el de la sesión): se ponen los dos
-const buildLibrary = (st) => { state.storage = st; return build0(st); };
+const buildLibrary = (st) => build0(st);
 const tree = (anime) => {
   const root = dir('', [anime]);
   root.parent = null;

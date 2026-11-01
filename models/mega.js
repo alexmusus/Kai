@@ -1,3 +1,4 @@
+// @ts-check
 /*
  * models/mega.js — la cuenta de MEGA: el árbol de carpetas y lo que hace falta para leer archivos.
  */
@@ -18,17 +19,28 @@ Storage.prototype._importFile = function (f) {
 /* MEGA a veces entrega primero una foto vieja de tus carpetas y enseguida manda los cambios que faltan
  * (por eso al tocar Actualizar se veía unos segundos One Piece y otras series de hace meses). Antes de usar
  * el árbol nuevo se espera a que esos cambios dejen de llegar: 2.5 s sin novedades (máximo 20 s). */
+/** @param {any} st sesión de megajs @returns {Promise<void>} */
 export function settleTree(st) {
-  return new Promise((resolve) => {
+  return new Promise((/** @type {() => void} */ resolve) => {
     let quiet;
     const evs = ['add', 'delete', 'move', 'update'];
-    const done = () => { clearTimeout(quiet); clearTimeout(cap); evs.forEach((ev) => st.removeListener(ev, bump)); resolve(); };
-    const bump = () => { clearTimeout(quiet); quiet = setTimeout(done, 2500); };
+    const done = () => {
+      clearTimeout(quiet);
+      clearTimeout(cap);
+      evs.forEach((ev) => st.removeListener(ev, bump));
+      resolve();
+    };
+    const bump = () => {
+      clearTimeout(quiet);
+      quiet = setTimeout(done, 2500);
+    };
     const cap = setTimeout(done, 20000);
     evs.forEach((ev) => st.on(ev, bump));
     bump();
   });
 }
 
+/** @type {Map<string, { url: string, at: number }>} enlaces de descarga de MEGA por id (duran ~20 min) */
 export const urlCache = new Map();
+/** @type {Set<string>} */
 export const goneNodes = new Set(); // borrados por nosotros; megajs los quita del árbol cuando MEGA lo confirma

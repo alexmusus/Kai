@@ -32,6 +32,11 @@ function isMainSeason(s, se) {
   const m = ownSeasonMeta(s, se);
   return m && m.format ? MAIN_FORMATS.has(m.format) : true;
 }
+/* Nombres de las tarjetas de temporada (v37): manda lo que AniList dice que es cada carpeta, no cómo se llama.
+ *  - Serie de TV (o sin ficha y sin "OVA" en el nombre) → "Temporada N", contando solo las temporadas;
+ *    el número que dice la carpeta o AniList ("2nd Season") se respeta; "Part 2" o carpetas con el mismo número → "· Parte 2".
+ *  - OVA, especial o película → su subtítulo ("Memory Snow"); si no tiene, "OVA" / "Especial" / "Película".
+ *  Dentro de la temporada se muestra el nombre completo de AniList. */
 const labelMemo = new WeakMap();
 function seasonLabels(s) {
   const key = s.seasons.map((se) => { const m = ownSeasonMeta(s, se); return `${se.name}|${m ? m.id + (m.format || '') : ''}`; }).join('/');
