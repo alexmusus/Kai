@@ -127,10 +127,7 @@ describe('buscar en AniList', () => {
 
 describe('ficha', () => {
   it('toMeta: títulos, imágenes, formato y géneros en español, sinopsis sin HTML', () => {
-    // el navegador quita el HTML con un <div>; aquí basta uno de mentira que quite las etiquetas
-    globalThis.document = { createElement: () => ({ set innerHTML(h) { this.textContent = h.replace(/<[^>]+>/g, ''); } }) };
-    const m = toMeta(byId(21519));
-    delete globalThis.document;
+    const m = toMeta(byId(21519)); // el <div> que quita el HTML es el de mentira de setup.js
     expect(m).toMatchObject({ id: 21519, title: 'Your Name.', romaji: 'Kimi no Na wa.', cover: 'https://img/21519.jpg', year: 2016, score: 80 });
     expect(m.format).toBe('Película');
     expect(m.genres).toEqual(['Comedia']);

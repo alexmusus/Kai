@@ -13,5 +13,12 @@ globalThis.localStorage = {
   get length() { return mem.size; },
 };
 Object.defineProperty(globalThis.localStorage, 'keys', { value: () => [...mem.keys()] });
+// lo poco de la página que tocan los modelos al cargarse (guardar al salir, quitar HTML de una sinopsis)
+globalThis.addEventListener = () => {};
+globalThis.document = {
+  hidden: false,
+  addEventListener: () => {},
+  createElement: () => ({ set innerHTML(h) { this.textContent = String(h).replace(/<[^>]+>/g, ''); } }),
+};
 // core.js es un script clásico (lo comparte el service worker): define globalThis.MegaCore
 vm.runInThisContext(fs.readFileSync(new URL('../../core.js', import.meta.url), 'utf8'));
