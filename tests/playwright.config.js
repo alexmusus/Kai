@@ -4,6 +4,8 @@ import { defineConfig } from '@playwright/test';
 export default defineConfig({
   testDir: 'e2e',
   timeout: 30_000,
+  // con todo corriendo en paralelo, el video puede tardar un poco más en llegar a donde se le pide
+  expect: { timeout: 10_000 },
   fullyParallel: true,
   // el reproductor depende de tiempos reales: en GitHub, un reintento antes de dar por malo un recorrido
   retries: process.env.CI ? 1 : 0,
