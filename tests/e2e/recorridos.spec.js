@@ -321,3 +321,21 @@ test('Inicio y Volver aciertan aunque se vuelva adelante a la página de antes',
   await expect(page).toHaveURL(/#\/ajustes$/);
   expect(k.errors).toEqual([]);
 });
+
+test('cerrar sesión pregunta con la hoja de Kai, sin ventanas del navegador', async ({ page }) => {
+  const k = await openKai(page, '#/ajustes');
+  page.on('dialog', (d) => { k.errors.push('ventana del navegador: ' + d.message()); d.dismiss(); });
+  const logout = page.locator('[data-act="logout"]');
+  await logout.scrollIntoViewIfNeeded();
+  await logout.click();
+  const sheet = page.locator('#sheet [role="alertdialog"]');
+  await expect(sheet).toContainText('¿Cerrar sesión en este dispositivo?');
+  await sheet.locator('text=Cancelar').click();
+  await expect(page.locator('#sheet')).toBeHidden();
+  expect(await page.evaluate(() => localStorage.getItem('kai.library'))).not.toBeNull();
+  await logout.click();
+  await page.locator('#sheet [data-act="confirm-ok"]').click();
+  await expect(page.locator('main.login')).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem('kai.library'))).toBeNull();
+  expect(k.errors).toEqual([]);
+});

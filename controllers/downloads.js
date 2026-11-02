@@ -7,6 +7,7 @@ import * as dl from '../models/downloads.js';
 import { titleFor } from '../models/context.js';
 import { dirAccess, useFolder, flushFolder, forgetFolder, localBlob } from '../models/downloads.js';
 import { toast } from '../views/toast.js';
+import { askConfirm } from '../views/sheet.js';
 import { route } from '../lib/route.js';
 import { renderSettings } from '../views/settings.js';
 
@@ -35,13 +36,13 @@ export async function pickFolder() {
   if (route().view === 'ajustes') renderSettings();
   flushFolder();
 }
-export function dropFolder() {
-  if (
-    !confirm(
+export async function dropFolder() {
+  const ok = await askConfirm('¿Dejar de usar la carpeta?', {
+    detail:
       'Las descargas nuevas se guardarán dentro de la app. Lo que ya está en la carpeta se queda ahí y Kai lo sigue usando.',
-    )
-  )
-    return;
+    ok: 'Dejar de usarla',
+  });
+  if (!ok) return;
   forgetFolder();
   if (route().view === 'ajustes') renderSettings();
 }

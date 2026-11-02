@@ -101,3 +101,27 @@ test('al terminar un capítulo queda visto y ofrece el siguiente', async ({ page
   await expect(page).toHaveURL(new RegExp(`#/play/${k.eps[1].id}$`));
   expect(k.errors).toEqual([]);
 });
+
+test('quitar un capítulo y quitar todas las descargas preguntan con la hoja de Kai', async ({ page }) => {
+  const k = await openWithDownloads(page, '#/descargas');
+  page.on('dialog', (d) => { k.errors.push('ventana del navegador: ' + d.message()); d.dismiss(); });
+  await expect(page.locator('.downloads .ep')).toHaveCount(2);
+  // uno: Escape es que no
+  await page.locator(`.ep[data-id="${k.eps[0].id}"] [data-act="dl"]`).click();
+  await expect(page.locator('#sheet [role="alertdialog"]')).toContainText('del dispositivo?');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#sheet')).toBeHidden();
+  await page.locator(`.ep[data-id="${k.eps[0].id}"] [data-act="dl"]`).click();
+  await page.locator('#sheet [data-act="confirm-ok"]').click();
+  await expect(page.locator('.downloads .ep')).toHaveCount(1);
+  // todas
+  await page.locator('[data-act="clear-dl"]').click();
+  await expect(page.locator('#sheet [role="alertdialog"]')).toContainText('¿Quitar todas las descargas?');
+  await page.locator('#sheet [data-act="confirm-ok"]').click();
+  await expect(page.locator('.downloads')).toContainText('No hay capítulos descargados.');
+  expect(await page.evaluate(() => new Promise((res) => {
+    const r = indexedDB.open('yoru', 2);
+    r.onsuccess = () => { const q = r.result.transaction('dl').objectStore('dl').count(); q.onsuccess = () => res(q.result); };
+  }))).toBe(0);
+  expect(k.errors).toEqual([]);
+});

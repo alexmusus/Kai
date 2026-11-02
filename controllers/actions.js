@@ -19,6 +19,7 @@ import { nextFor } from '../models/plans.js';
 import { resolveContext } from '../models/context.js';
 import { viewState } from '../views/view-state.js';
 import { renderProfiles } from '../views/account.js';
+import { askConfirm } from '../views/sheet.js';
 import { toast, toastCount } from '../views/toast.js';
 import { resolvedTheme, applyTheme } from '../views/theme.js';
 import { app } from '../views/components.js';
@@ -43,9 +44,9 @@ const seriesAt = (el) => state.library && state.library.series[Number(el.dataset
 const isQueued = (id) => !!state.dls[id] || state.queue.some((q) => q.ep.id === id);
 
 /** Descarga un capítulo, o lo quita si ya está (pregunta antes de borrar uno terminado). */
-function toggleDownload(ep, title) {
+async function toggleDownload(ep, title) {
   if (state.saved.has(ep.id)) {
-    if (confirm(`¿Quitar ${episodeLabel(ep)} del dispositivo?`)) removeDownload(ep.id);
+    if (await askConfirm(`¿Quitar ${episodeLabel(ep)} del dispositivo?`, { ok: 'Quitar' })) removeDownload(ep.id);
   } else if (isQueued(ep.id)) removeDownload(ep.id);
   else queueDownload(ep, title);
 }
@@ -64,9 +65,14 @@ function setThemeSetting(key, value, repaint = true) {
 
 /* ── perfiles y cuenta ── */
 
-function deleteProfile(el) {
+async function deleteProfile(el) {
   const prof = visibleProfiles().find((x) => x.id === el.dataset.id);
-  if (!prof || !confirm(`¿Quitar el perfil ${prof.name}? Su progreso deja de mostrarse en Kai.`)) return;
+  if (!prof) return;
+  const ok = await askConfirm(`¿Quitar el perfil ${prof.name}?`, {
+    detail: 'Su progreso deja de mostrarse en Kai.',
+    ok: 'Quitar perfil',
+  });
+  if (!ok) return;
   prof.deleted = true;
   prof.u = Date.now();
   saveShared();
@@ -93,12 +99,11 @@ async function retryProfiles() {
 }
 
 async function logout() {
-  if (
-    !confirm(
-      'Cerrar sesión borra de este dispositivo la biblioteca y los capítulos descargados. Tu progreso sigue en MEGA.',
-    )
-  )
-    return;
+  const ok = await askConfirm('¿Cerrar sesión en este dispositivo?', {
+    detail: 'Se borran de este dispositivo la biblioteca y los capítulos descargados. Tu progreso sigue en MEGA.',
+    ok: 'Cerrar sesión',
+  });
+  if (!ok) return;
   if (state.dirty) await sync().catch(() => {});
   try {
     if (state.storage) state.storage.close();
@@ -250,7 +255,11 @@ async function grantFolder() {
 }
 
 async function clearDownloads() {
-  if (!confirm('¿Quitar todos los capítulos descargados de este dispositivo?')) return;
+  const ok = await askConfirm('¿Quitar todas las descargas?', {
+    detail: 'Se quitan de este dispositivo todos los capítulos descargados.',
+    ok: 'Quitar todas',
+  });
+  if (!ok) return;
   await removeAllDownloads();
   toast('Descargas quitadas.');
   render();

@@ -25,6 +25,8 @@ export default [
       'no-var': 'error',
       'prefer-const': ['error', { destructuring: 'all' }],
       eqeqeq: ['error', 'always', { null: 'ignore' }],
+      // las ventanas del navegador a veces no aparecen en iPhone: Kai pregunta con su propia hoja
+      'no-restricted-globals': ['error', ...['confirm', 'alert', 'prompt'].map((name) => ({ name, message: 'Usa askConfirm (views/sheet.js) o toast.' }))],
     },
   },
   {
