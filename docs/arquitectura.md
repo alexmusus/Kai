@@ -3,9 +3,6 @@
 Kai es una página estática: HTML, CSS y módulos ES que el navegador carga tal cual, sin compilar. No hay servidor
 propio; todo pasa entre el navegador, MEGA, AniList y TMDB. Cloudflare Pages publica la raíz del repo.
 
-> Reestructura en curso: `app.js` se está repartiendo en `models/`, `views/` y `controllers/`. Mientras tanto,
-> lo que aún no se movió sigue en `app.js`.
-
 ## Capas
 
 ```
@@ -13,7 +10,7 @@ lib/          utilidades generales (localStorage, HTML seguro, tiempos). No sabe
 models/       los datos y sus reglas: MEGA, biblioteca, nombres, progreso, perfiles, fichas, descargas.
 views/        dibujan: reciben datos y devuelven HTML. No guardan nada ni hablan con MEGA.
 controllers/  deciden: rutas, clics, reproductor, sincronización. Unen modelos y vistas.
-app.js        arranque.
+app.js        punto de entrada: conecta los avisos de los modelos con las vistas, registra los controladores y arranca.
 ```
 
 Las dependencias van en una sola dirección: `lib ← models ← views ← controllers`. Un modelo nunca importa una
@@ -41,19 +38,36 @@ decide. ESLint lo revisa (`no-restricted-imports`).
 | `idb.js` | IndexedDB: descargas, miniaturas, subtítulos leídos |
 | `downloads.js` | descargas en pedazos, reanudar, carpeta de descargas (avisa `download-changed`, `download-done`, `notice`…) |
 | `media.js` | leer videos por rangos, códec de cada archivo, si este navegador lo reproduce, capítulos guardados |
+| `plans.js` | qué capítulo toca después y qué ofrece la portada, una temporada o una película |
+| `context.js` | de qué serie, temporada o película es un capítulo, y su título |
+| `updates.js` | si hay una versión nueva de Kai lista |
+| `discover.js` | Descubrir: recomendaciones y lo que está en emisión (AniList) |
+
+| Utilidad (`lib/`) | De qué se encarga |
+|---|---|
+| `util.js` | `$`, `LS` (localStorage que nunca lanza), HTML seguro, tiempos y tamaños |
+| `events.js` | avisos entre capas: `on` y `emit` |
+| `route.js` | leer la dirección actual (`#/serie/3` → vista y argumento) |
+| `nav-history.js` | la copia del historial del navegador: cada entrada lleva su posición, así "volver" e "Inicio" no se desfasan |
 
 | Controlador | De qué se encarga |
 |---|---|
 | `router.js` | qué página se dibuja, historial de "volver", scroll al volver; el reproductor se registra con `setPlayer` |
+| `actions.js` | los botones (`data-act`): una tabla nombre → función; las del reproductor las atiende `player/` |
+| `home.js` | portada estilo TV: destacado al pasar o enfocar un mosaico, flechas como control remoto |
+| `lifecycle.js` | dirección, conexión, segundo plano y cierre: guardar y sincronizar a tiempo |
+| `updates.js` | registrar el service worker, aviso de versión nueva, "Buscar actualización" |
 | `dock.js` | botón flotante: menú, flecha para subir, tocar fuera solo cierra |
 | `sync.js` | cuándo sincronizar y qué redibujar después |
 | `account.js` | entrar a MEGA, crear y elegir perfil |
 | `downloads.js` | elegir carpeta, copia aparte, poner en cola con el nombre de la serie |
 | `sheet.js` | hoja de opciones de un capítulo |
 | `picking.js` | "Seleccionar" varios capítulos |
+| `player/` | el reproductor: `state` (lo que suena), `dom` (sus elementos), `engine` (cargar, cambiar y guardar), `page` (la página de reproducción), `mini`, `controls`, `chapters` (marcas, saltar intro), `gestures` (toques y teclado), `events` (los del video) |
 
 Las vistas (`views/`) dibujan; si necesitan navegar avisan `navigate`, y los formularios avisan `login` y
-`profile-create`. Ninguna vista llama a un controlador.
+`profile-create`. Ninguna vista llama a un controlador. Antes de quitar o cerrar algo se pregunta con `askConfirm`
+(`views/sheet.js`), nunca con `confirm()` del navegador: en iPhone a veces no aparece (ESLint lo prohíbe).
 
 Fuera de las capas:
 
@@ -83,7 +97,9 @@ se cambian sus campos, nunca se reemplazan (`setIndex` cambia el contenido del �
 - Módulos pequeños con un tema; funciones que reciben lo que usan en vez de leerlo de variables globales.
 - Comentarios en español que explican el **porqué**; JSDoc con tipos en los modelos (`// @ts-check`).
 - Nada de `var`; `const` siempre que se pueda; `===` (salvo `== null`).
-- Formato con Prettier (120 columnas, comillas simples) en los módulos nuevos.
+- Formato con Prettier (120 columnas, comillas simples) en `app.js`, `lib/`, `models/`, `views/` y `controllers/`.
+- Los controladores registran sus eventos en una función `init…()` que llama `app.js`, no al importarse
+  (salvo `player/gestures.js` y `player/events.js`, que se cargan por eso mismo).
 - Claves de localStorage: con prefijo `kai.` (lo pone `LS`), declaradas como constantes en el módulo dueño.
 - Cada módulo nuevo va en `SHELL` de `sw.js` (para abrir sin conexión) y en un `<link rel="modulepreload">`
   de `index.html` (para pedirlos todos a la vez); `tests/unit/modulos.test.js` revisa las dos listas.
