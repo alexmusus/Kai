@@ -188,7 +188,7 @@ export function switchTo(ep) {
   const ctx = resolveContext(ep.id);
   if (!ctx) return;
   if (route().view === 'play') {
-    history.replaceState(null, '', '#/play/' + encodeURIComponent(ep.id));
+    history.replaceState(history.state, '', '#/play/' + encodeURIComponent(ep.id));
     setRouteKey('play/' + ep.id);
     startPlayback(ctx);
     paintWatchInfo();

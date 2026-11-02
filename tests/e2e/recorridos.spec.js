@@ -302,3 +302,22 @@ test('volver: Anterior/Siguiente no dejan entradas de más, y el menú lleva a l
   await expect(page.locator('#toast')).toHaveText('Necesitas conexión para descargar.');
   expect(k.errors).toEqual([]);
 });
+
+test('Inicio y Volver aciertan aunque se vuelva adelante a la página de antes', async ({ page }) => {
+  const k = await openKai(page, '#/');
+  for (const h of ['#/ajustes', '#/descargas', '#/ajustes']) {
+    await page.evaluate((x) => { location.hash = x; }, h);
+    await page.waitForTimeout(150);
+  }
+  // el botón atrás del navegador y luego el adelante
+  await page.goBack();
+  await expect(page).toHaveURL(/#\/descargas$/);
+  await page.goForward();
+  await expect(page).toHaveURL(/#\/ajustes$/);
+  await page.locator('header [data-act="home"]').first().click();
+  await expect(page).toHaveURL(/#\/$/);
+  // de vuelta en la portada el atrás del navegador no se pierde
+  await page.goForward();
+  await expect(page).toHaveURL(/#\/ajustes$/);
+  expect(k.errors).toEqual([]);
+});

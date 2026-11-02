@@ -203,7 +203,7 @@ export function paintCatalog() {
   for (const k of ['q', 'g', 'y', 'f', 'l']) if (st[k]) params.set(k, st[k]);
   if (st.o !== 'az') params.set('o', st.o);
   const h = '#/catalogo' + (params.toString() ? '?' + params : '');
-  if (location.hash !== h) history.replaceState(null, '', h);
+  if (location.hash !== h) history.replaceState(history.state, '', h);
 }
 
 /* búsqueda rápida desde el inicio */

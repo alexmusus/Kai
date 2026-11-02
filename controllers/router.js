@@ -10,6 +10,7 @@ import { on } from '../lib/events.js';
 import { route } from '../lib/route.js';
 import { closeDrawer, paintDock } from './dock.js';
 import { LS } from '../lib/util.js';
+import { createNavHistory } from '../lib/nav-history.js';
 import { renderLogin, renderProfiles } from '../views/account.js';
 import { viewState } from '../views/view-state.js';
 import { state, visibleProfiles } from '../models/store.js';
@@ -53,8 +54,16 @@ on('navigate', ({ hash, replace }) => {
 
 /* Historial propio de Kai: "volver" salta las entradas que son la misma página (otra pestaña o
  * temporada de la misma serie) hasta llegar a una distinta, en vez de retroceder de a un paso. */
-const navStack = [location.hash || '#/'];
-let navBackSteps = 0; // pasos que Kai mismo pidió retroceder
+const KEY = 'kaiPos'; // la posición de cada entrada, guardada en history.state
+const markedPos = () => {
+  const s = history.state;
+  return s && typeof s[KEY] === 'number' ? s[KEY] : null;
+};
+const mark = (pos) => {
+  if (markedPos() !== pos) history.replaceState({ ...(history.state || {}), [KEY]: pos }, '');
+};
+const nav = createNavHistory(location.hash || '#/', markedPos() ?? 0);
+mark(nav.pos);
 let navReplacing = false;
 const navPage = (h) => String(h || '#/').split('?')[0];
 /* Al volver atrás (deslizar desde el borde en iPhone, o el botón), la página vuelve a donde estaba, no arriba:
@@ -70,18 +79,10 @@ addEventListener(
 );
 if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
 export function onHashChange() {
-  const h = location.hash || '#/';
-  navWasBack = !!navBackSteps || (navStack.length > 1 && navStack[navStack.length - 2] === h);
-  if (navBackSteps) {
-    navStack.length = Math.max(1, navStack.length - navBackSteps);
-    navBackSteps = 0;
-    navStack[navStack.length - 1] = h;
-  } else if (navReplacing) {
-    navStack[navStack.length - 1] = h;
-    navReplacing = false;
-  } else if (navStack.length > 1 && navStack[navStack.length - 2] === h)
-    navStack.pop(); // botón atrás del navegador
-  else if (navStack[navStack.length - 1] !== h) navStack.push(h);
+  const r = nav.arrive(location.hash || '#/', markedPos(), navReplacing);
+  navReplacing = false;
+  navWasBack = r.back;
+  mark(r.pos);
 }
 export function go(hash) {
   if (location.hash !== hash) location.hash = hash;
@@ -93,20 +94,15 @@ export function goHome() {
     return;
   }
   // si el inicio está en el historial, se vuelve a él; si no, se va directo
-  const i = navStack.map(navPage).lastIndexOf('#/');
-  if (i >= 0 && i < navStack.length - 1) {
-    navBackSteps = navStack.length - 1 - i;
-    history.go(-navBackSteps);
-  } else go('#/');
+  const steps = nav.stepsBackTo((h) => navPage(h) === '#/');
+  if (steps) history.go(steps);
+  else go('#/');
 }
 export function goBack(fallback = '#/') {
-  const cur = navPage(navStack[navStack.length - 1]);
-  let i = navStack.length - 2;
-  while (i >= 0 && navPage(navStack[i]) === cur) i--;
-  if (i >= 0) {
-    navBackSteps = navStack.length - 1 - i;
-    history.go(-navBackSteps);
-  } else {
+  const cur = navPage(nav.current);
+  const steps = nav.stepsBackTo((h) => navPage(h) !== cur);
+  if (steps) history.go(steps);
+  else {
     navReplacing = true;
     location.replace(fallback);
   }

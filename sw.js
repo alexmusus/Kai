@@ -9,7 +9,7 @@ importScripts('core.js');
 const VERSION = 'kai-v49';
 const SHELL = [
   './', 'styles.css', 'app.js', 'core.js', 'models/subs.js', 'models/meta-api.js',
-  'lib/util.js', 'lib/events.js', 'lib/route.js', 'models/naming.js', 'models/store.js', 'models/mega.js', 'models/library.js',
+  'lib/util.js', 'lib/events.js', 'lib/route.js', 'lib/nav-history.js', 'models/naming.js', 'models/store.js', 'models/mega.js', 'models/library.js',
   'models/quota.js', 'models/collections.js', 'models/progress.js', 'models/profiles.js', 'models/sync.js', 'models/fichas.js', 'models/fichas-sync.js', 'models/idb.js', 'models/news.js', 'models/thumbs.js', 'models/downloads.js', 'models/media.js', 'models/plans.js', 'models/context.js', 'models/updates.js', 'models/discover.js', 'views/icons.js', 'views/quota.js', 'views/thumbs.js', 'views/view-state.js', 'views/components.js', 'views/home.js', 'views/episodes.js', 'views/series.js', 'views/dock.js', 'views/catalog.js', 'views/explorer.js', 'views/downloads.js',
   'views/settings.js', 'views/discover.js', 'views/account.js', 'views/sheet.js', 'views/toast.js', 'views/theme.js', 'views/images.js',
   'controllers/picking.js', 'controllers/router.js', 'controllers/dock.js', 'controllers/sync.js',
