@@ -6,7 +6,7 @@
  */
 importScripts('core.js');
 
-const VERSION = 'kai-v50';
+const VERSION = 'kai-v51';
 const SHELL = [
   './', 'styles.css', 'app.js', 'core.js', 'models/subs.js', 'models/meta-api.js',
   'lib/util.js', 'lib/events.js', 'lib/route.js', 'lib/nav-history.js', 'models/naming.js', 'models/store.js', 'models/mega.js', 'models/library.js',
