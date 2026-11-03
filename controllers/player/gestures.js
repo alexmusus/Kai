@@ -17,9 +17,12 @@ ui.tap.addEventListener('pointerdown', (e) => {
   } catch {
     /* nada */
   }
-  const p = videoPoint(e);
+  // la posición del video se mide una vez al tocar: medirla en cada movimiento, justo después de moverlo, obligaba
+  // al navegador a recalcular la página en cada cuadro (en teléfonos de gama media se sentía trabado)
+  const rect = stage.getBoundingClientRect();
+  const p = videoPoint(e, rect);
   if (Date.now() - P.lastTap < DOUBLE_TAP) clearTimeout(P.tapTimer); // puede ser el segundo toque: no ocultar controles todavía
-  P.touch = { id: e.pointerId, x: p.x, y: p.y, w: p.w, h: p.h, mode: null, hold: false, at: Date.now() };
+  P.touch = { id: e.pointerId, x: p.x, y: p.y, w: p.w, h: p.h, mode: null, hold: false, at: Date.now(), rect };
   const t = P.touch;
   t.timer = setTimeout(() => {
     if (P.touch !== t || t.mode || !video.currentSrc || video.paused || video.ended) return;
@@ -34,7 +37,7 @@ ui.tap.addEventListener('pointerdown', (e) => {
 ui.tap.addEventListener('pointermove', (e) => {
   const t = P.touch;
   if (!t || e.pointerId !== t.id) return;
-  const p = videoPoint(e);
+  const p = videoPoint(e, t.rect);
   const dx = p.x - t.x;
   const dy = t.y - p.y; // hacia arriba del video es positivo
   if (!t.mode && Math.hypot(dx, dy) > 12) {
@@ -47,11 +50,17 @@ ui.tap.addEventListener('pointermove', (e) => {
     const d = Math.max(0, p.y - t.y);
     t.dist = d;
     // el video sigue al dedo; girado, "abajo" del video es hacia la izquierda de la pantalla
-    const k = Math.min(d, 220);
-    const base = isRotated() ? 'rotate(90deg) ' : '';
-    stage.style.transition = 'none';
-    stage.style.transform = `${base}translateY(${k * 0.6}px) scale(${1 - k / 1100})`;
-    stage.style.opacity = String(1 - k / 600);
+    // se dibuja una vez por cuadro aunque el dedo mande más movimientos (Android manda hasta 120 por segundo)
+    if (!t.frame)
+      t.frame = requestAnimationFrame(() => {
+        t.frame = 0;
+        if (P.touch !== t) return;
+        const k = Math.min(t.dist || 0, 220);
+        const base = isRotated() ? 'rotate(90deg) ' : '';
+        stage.style.transition = 'none';
+        stage.style.transform = `${base}translateY(${k * 0.6}px) scale(${1 - k / 1100})`;
+        stage.style.opacity = String(1 - k / 600);
+      });
   } else if (t.mode === 'up') {
     t.dist = Math.max(0, t.y - p.y);
   }
@@ -94,9 +103,9 @@ export const isRotated = () =>
   stage.classList.contains('kai-fs') &&
   matchMedia('(orientation: portrait)').matches;
 /** Punto del toque en coordenadas del video (x hacia la derecha, y hacia abajo del video), aunque esté girado. */
-export function videoPoint(e) {
+export function videoPoint(e, rect) {
   if (isRotated()) return { x: e.clientY, y: innerWidth - e.clientX, w: innerHeight, h: innerWidth };
-  const r = stage.getBoundingClientRect();
+  const r = rect || stage.getBoundingClientRect();
   return { x: e.clientX - r.left, y: e.clientY - r.top, w: r.width, h: r.height };
 }
 
@@ -142,23 +151,31 @@ export function endHold() {
   video.playbackRate = P.speed;
   holdEl.classList.remove('is-on');
 }
+const SWIPE_DOWN = 110;
 export function touchEnd(e, cancelled) {
   const t = P.touch;
   if (!t || e.pointerId !== t.id) return;
   clearTimeout(t.timer);
+  cancelAnimationFrame(t.frame || 0);
   P.lastTouchEnd = Date.now();
   if (t.hold) endHold();
   else if (t.mode === 'down' || t.mode === 'fs-down') {
-    stage.style.transition = 'transform 0.2s, opacity 0.2s';
-    stage.style.transform = '';
-    stage.style.opacity = '';
-    setTimeout(() => {
-      stage.style.transition = '';
-    }, 220);
-    if (!cancelled && t.dist > 70) {
-      if (t.mode === 'fs-down')
-        exitFullscreen(); // vuelve al reproductor normal
-      else if (P.playing) goBack(P.playing.ctx.back); // queda en el mini reproductor
+    /* cuánto hay que bajar el dedo: antes la distancia se medía contra el video que ya iba bajando y había que
+     * arrastrar unos 170 px para que pasara; ahora es lo que de verdad se movió el dedo */
+    const far = !cancelled && (t.dist || 0) > SWIPE_DOWN;
+    const toMini = far && t.mode === 'down' && !!P.playing;
+    if (toMini) {
+      // pasa al mini reproductor desde donde lo dejó el dedo: sin regresar antes a su lugar (las dos animaciones a la
+      // vez se veían trabadas). Al llegar al mini se le quita lo que le puso el dedo (enterMini).
+      if (P.playing) goBack(P.playing.ctx.back);
+    } else {
+      stage.style.transition = 'transform 0.2s, opacity 0.2s';
+      stage.style.transform = '';
+      stage.style.opacity = '';
+      setTimeout(() => {
+        stage.style.transition = '';
+      }, 220);
+      if (far) exitFullscreen(); // vuelve al reproductor normal
     }
   } else if (t.mode === 'up') {
     if (!cancelled && t.dist > 60) toggleFullscreen();

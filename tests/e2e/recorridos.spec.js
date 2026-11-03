@@ -127,6 +127,17 @@ test('volver atrás dibuja la página en popstate, sin esperar a hashchange (ges
   expect(k.errors).toEqual([]);
 });
 
+test('volver a una página que no cambió reusa lo que ya estaba dibujado (no parpadea nada)', async ({ page }) => {
+  const k = await openKai(page, '#/');
+  await page.evaluate(() => { window.__tile = document.querySelector('.tv-row a'); });
+  await go(page, `#/serie/${k.si('Dorohedoro')}`);
+  await page.evaluate(() => history.back());
+  await expect(page.locator('.tv.is-home')).toBeVisible();
+  // la portada cambió (muestra la serie que acabas de ver), pero las filas de pósters son los mismos elementos de antes
+  expect(await page.evaluate(() => !!window.__tile && window.__tile.isConnected)).toBe(true);
+  expect(k.errors).toEqual([]);
+});
+
 test('volver atrás conserva el scroll', async ({ page }) => {
   const k = await openKai(page, '#/');
   await page.evaluate(() => window.scrollTo(0, 500));
@@ -359,4 +370,21 @@ test('cerrar sesión pregunta con la hoja de Kai, sin ventanas del navegador', a
   await expect(page.locator('main.login')).toBeVisible();
   expect(await page.evaluate(() => localStorage.getItem('kai.library'))).toBeNull();
   expect(k.errors).toEqual([]);
+});
+
+test('teléfono de gama media (4 GB): modo liviano sin desenfoques ni fondo en movimiento', async ({ page }) => {
+  await page.addInitScript(() => Object.defineProperty(Navigator.prototype, 'deviceMemory', { get: () => 4 }));
+  const k = await openKai(page, '#/');
+  await expect(page.locator('html.lite')).toHaveCount(1);
+  const bar = await page.evaluate(() => getComputedStyle(document.querySelector('.dock-btn')).backdropFilter);
+  expect(bar).toBe('none');
+  const drift = await page.evaluate(() => getComputedStyle(document.querySelector('.ambient'), '::before').animationName);
+  expect(drift).toBe('none');
+  expect(k.errors).toEqual([]);
+});
+
+test('teléfono de gama alta: sin modo liviano', async ({ page }) => {
+  await page.addInitScript(() => Object.defineProperty(Navigator.prototype, 'deviceMemory', { get: () => 8 }));
+  await openKai(page, '#/');
+  await expect(page.locator('html.lite')).toHaveCount(0);
 });

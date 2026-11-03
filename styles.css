@@ -1200,3 +1200,28 @@ img.no-fade { animation: none !important; }
   /* en el teléfono el botón de play de cada capítulo nunca se ve (sale al pasar el mouse) */
   .ep-play { -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
+
+/* Mini reproductor: su fondo ya es casi opaco, así que el desenfoque no se notaba, pero el iPhone lo recalculaba en
+ * cada cuadro de la animación de entrada (se veía con tirones). Y al volver al reproductor grande, el video crece
+ * desde abajo en vez de aparecer de golpe. */
+.mini { -webkit-backdrop-filter: none; backdrop-filter: none; }
+.stage-slot.is-from-mini { animation: player-in 0.26s cubic-bezier(0.2, 0.8, 0.2, 1); }
+@keyframes player-in { from { opacity: 0.4; transform: translateY(40px) scale(0.94); } }
+
+/* Modo liviano (teléfonos de gama media, ver views/theme.js): sin desenfoque y sin fondo en movimiento. Las
+ * superficies de vidrio pasan a su versión más opaca, la misma que en navegadores sin desenfoque. */
+html.lite *, html.lite *::before, html.lite *::after { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+html.lite .bar, html.lite .sheet-panel, html.lite .toast, html.lite .st-menu, html.lite .p-card, html.lite .dock-btn, html.lite .dock-panel { background: var(--glass-solid); }
+html.lite .st-bar { background: rgba(22, 24, 30, 0.85); }
+html.lite .ambient::before, html.lite .ambient::after { animation: none; will-change: auto; }
+/* pasar entre el reproductor grande y el mini: animar un video es lo que más le cuesta a un teléfono modesto (se veía
+ * trabado); cambia al instante. Y el póster difuminado detrás de la serie (un desenfoque de pantalla entera que se
+ * repinta justo al pasar al mini) no se dibuja: queda el color de la serie en el fondo. */
+html.lite .mini, html.lite .stage-slot.is-from-mini { animation: none; }
+html.lite .series-wash img { display: none; }
+
+/* En pantalla completa lo de detrás del video no se ve: se deja de dibujar (al girar el teléfono y al entrar o salir
+ * el navegador ya no tiene que acomodar la lista de capítulos ni el fondo). */
+html.kai-fs-on .ambient, html:has(.stage:fullscreen) .ambient,
+html.kai-fs-on .watch-info, html:has(.stage:fullscreen) .watch-info,
+html.kai-fs-on .watch-list, html:has(.stage:fullscreen) .watch-list { visibility: hidden; }

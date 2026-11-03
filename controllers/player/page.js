@@ -10,7 +10,7 @@ import { LS, $, esc } from '../../lib/util.js';
 import { app, header } from '../../views/components.js';
 import { go } from '../router.js';
 import { P } from './state.js';
-import { stage, parking } from './dom.js';
+import { stage, parking, mini } from './dom.js';
 import { leaveMini } from './mini.js';
 import { startPlayback } from './engine.js';
 import { route } from '../../lib/route.js';
@@ -34,6 +34,7 @@ export function renderWatch(id) {
   }
   const same = P.playing && P.playing.ep.id === id && stage.isConnected && app.contains(stage);
   if (!same) {
+    const fromMini = !mini.hidden;
     leaveMini();
     parkStage();
     app.innerHTML =
@@ -47,7 +48,10 @@ export function renderWatch(id) {
         <aside class="watch-list" id="watch-list"></aside>
       </div>
     </main>`;
-    $('#stage-slot').appendChild(stage);
+    const slot = $('#stage-slot');
+    slot.appendChild(stage);
+    // desde el mini reproductor, el video entra creciendo (antes aparecía de golpe)
+    if (fromMini) slot.classList.add('is-from-mini');
     stage.hidden = false;
     if (!P.playing || P.playing.ep.id !== id) startPlayback(ctx);
     else P.playing.ctx = ctx;

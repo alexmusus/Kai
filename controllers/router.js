@@ -113,6 +113,77 @@ export function goBack(fallback = '#/') {
   }
 }
 
+/* ── páginas que se reusan ──
+ * Dibujar una página crea de cero sus tarjetas, imágenes y etiquetas, y el iPhone tiene que pintarlas otra vez: al
+ * volver atrás, o cuando una sincronización en segundo plano vuelve a dibujar la misma página, algunas (la etiqueta
+ * SUB, un póster, una fila entera) alcanzaban a parpadear. Por eso, después de dibujar, cada parte que salió idéntica
+ * a la que había antes en esa dirección se cambia por la de antes, ya pintada; lo nuevo se descarta antes de verse.
+ * Se compara parte por parte (la portada que cambió se dibuja nueva, las filas de pósters que no cambiaron se reusan)
+ * con el HTML tal como lo dibujó la vista, así que cualquier cambio de datos dibuja de nuevo esa parte. */
+const REUSABLE = new Set(['home', 'serie', 'pelicula', 'catalogo']);
+const KEPT_MAX = 6;
+const DEPTH = 6; // hasta qué profundidad se compara (más adentro, la parte se reusa entera o no)
+/* Cada parte guarda una copia de cómo la dibujó la vista (después se le agregan miniaturas, clases de las imágenes…,
+ * así que no se puede comparar contra ella misma). Comparar con isEqualNode es del navegador y se detiene en la
+ * primera diferencia: mucho más barato que convertir la página a texto. */
+/** @type {WeakMap<Element, Element>} */
+const drawn = new WeakMap();
+// las copias viven en un documento aparte: ahí las imágenes no se piden ni se decodifican
+const inert = document.implementation.createHTMLDocument('');
+/** @type {{ hash: string, nodes: ChildNode[] } | null} la página que está en pantalla */
+let shown = null;
+/** @type {Map<string, { hash: string, nodes: ChildNode[] }>} páginas dejadas hace poco */
+const kept = new Map();
+
+/** Guarda la copia de cada parte recién dibujada. @param {Element[]} els @param {Element[]} copies @param {number} depth */
+function noteDrawn(els, copies, depth) {
+  els.forEach((el, i) => {
+    drawn.set(el, copies[i]);
+    if (depth < DEPTH && el.childElementCount) noteDrawn([...el.children], [...copies[i].children], depth + 1);
+  });
+}
+/** Cambia las partes nuevas que son iguales a las de antes por las de antes. */
+function reuseParts(/** @type {Element[]} */ fresh, /** @type {Element[]} */ old, depth = 1) {
+  if (fresh.length !== old.length) return;
+  fresh.forEach((el, i) => {
+    const prev = old[i];
+    const was = drawn.get(prev);
+    if (!was || el.tagName !== prev.tagName) return;
+    if (el.isEqualNode(was)) {
+      el.replaceWith(prev);
+      return;
+    }
+    if (depth < DEPTH) reuseParts([...el.children], [...prev.children], depth + 1);
+  });
+}
+/** @param {string} view @param {ChildNode[]} before lo que había en pantalla antes de dibujar */
+function reuseIfSame(view, before) {
+  // si otra pantalla (perfiles, reproductor, entrar) reemplazó lo de la página, ya no hay nada que guardar
+  if (shown && !(before.length && before[0] === shown.nodes[0])) shown = null;
+  if (shown) {
+    // lo que se deja (con lo que se le agregó después: miniaturas, etiquetas de códec) queda guardado
+    shown.nodes = before;
+    kept.delete(shown.hash);
+    kept.set(shown.hash, shown);
+    if (kept.size > KEPT_MAX) kept.delete(/** @type {string} */ (kept.keys().next().value));
+  }
+  shown = null;
+  if (!REUSABLE.has(view) || viewState.picking) return;
+  const hash = location.hash || '#/';
+  const fresh = [...app.children];
+  noteDrawn(fresh, /** @type {Element[]} */ ([.../** @type {Element} */ (inert.importNode(app, true)).children]), 1);
+  const old = kept.get(hash);
+  if (old) {
+    kept.delete(hash);
+    const focused = document.activeElement;
+    reuseParts(fresh, /** @type {Element[]} */ (old.nodes.filter((x) => x.nodeType === 1)));
+    // si la vista enfocó algo (el buscador) y quedó la parte de antes, se enfoca el de antes
+    if (focused && focused.id && !focused.isConnected)
+      /** @type {HTMLElement | null} */ (app.querySelector('#' + CSS.escape(focused.id)))?.focus();
+  }
+  shown = { hash, nodes: [...app.childNodes] };
+}
+
 let lastRouteKey = '';
 /** El reproductor cambió de capítulo sin pasar por render (history.replaceState). @param {string} key */
 export function setRouteKey(key) {
@@ -166,6 +237,7 @@ export function render() {
     if (player.hasMedia()) player.toMini();
     else player.stop();
     setTint(null);
+    const before = [...app.childNodes];
     if (view === 'serie') renderSeries(arg);
     else if (view === 'pelicula') renderMovie(arg);
     else if (view === 'explorar') renderExplorer(arg);
@@ -174,7 +246,9 @@ export function render() {
     else if (view === 'ajustes') renderSettings();
     else if (view === 'descubrir') renderDiscover(arg);
     else renderHome();
+    reuseIfSame(view, before);
   }
+  if (view === 'play') shown = null;
   paintSync();
   paintDock();
   hydrateThumbs(app);
