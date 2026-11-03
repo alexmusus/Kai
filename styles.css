@@ -1453,3 +1453,29 @@ html.lite .dock-bar { background: var(--glass-solid); }
 
 /* el texto de un botón siempre en una línea: si no entra ("Ver Shingeki no Kyojin Kuinaki Sentaku"), termina en … */
 .tv-btn > span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ── tema claro: la portada es una isla oscura (como en las apps de Apple) ──
+ * Fundir la imagen hacia el fondo claro la lavaba y "Kai" se perdía sobre imágenes claras. En el tema claro la
+ * portada es una tarjeta redondeada con su propio degradado oscuro y el texto en blanco; la cabecera queda
+ * arriba, sobre el fondo claro, en texto oscuro. El tema oscuro sigue a sangre. */
+[data-theme='light'] .tv.is-home .tv-top { position: relative; color: var(--text); text-shadow: none; }
+[data-theme='light'] .tv.is-home .tv-greet { color: var(--dim); }
+[data-theme='light'] .tv.is-home .tv-top .tv-icon { background: var(--btn); color: var(--text); }
+[data-theme='light'] .tv.is-home .tv-hero {
+  margin: 6px 0 22px; border-radius: 28px; overflow: hidden; background: #0e0e10; color: #fff;
+  min-height: min(68svh, 600px); padding: 140px 20px 20px;
+}
+[data-theme='light'] .tv.is-home .hero-art::before { display: none; }
+[data-theme='light'] .tv.is-home .hero-art::after { background: linear-gradient(180deg, transparent 0%, transparent 38%, rgba(0, 0, 0, 0.55) 68%, rgba(0, 0, 0, 0.88) 100%); }
+[data-theme='light'] .tv.is-home .tv-hero .tv-alt,
+[data-theme='light'] .tv.is-home .tv-hero .tv-facts,
+[data-theme='light'] .tv.is-home .tv-hero .tv-facts span,
+[data-theme='light'] .tv.is-home .tv-hero .tv-facts .fact { color: rgba(255, 255, 255, 0.72); }
+[data-theme='light'] .tv.is-home .tv-hero .tv-facts > * + *::before { color: rgba(255, 255, 255, 0.4); }
+[data-theme='light'] .tv.is-home .tv-hero .tv-synopsis { color: rgba(255, 255, 255, 0.75); }
+[data-theme='light'] .tv.is-home .tv-hero .tv-btn { background: rgba(255, 255, 255, 0.18); color: #fff; }
+[data-theme='light'] .tv.is-home .tv-hero .tv-btn.is-primary { background: #fff; color: #000; }
+@media (min-width: 900px) {
+  [data-theme='light'] .tv.is-home .tv-hero { margin: 4px 0 24px; padding: 70px 40px 34px; min-height: clamp(440px, 60vh, 600px); }
+  [data-theme='light'] .tv.is-home .hero-art::after { background: linear-gradient(180deg, transparent 0%, transparent 55%, rgba(14, 14, 16, 0.9) 100%); }
+}
