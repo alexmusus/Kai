@@ -11,6 +11,7 @@ import { paintThemeColor } from '../../views/theme.js';
 import { toast } from '../../views/toast.js';
 import { neighbor } from './engine.js';
 import { paintSkip, chapterAt } from './chapters.js';
+import { episodeLabel } from '../../models/collections.js';
 
 // se llama varias veces por segundo: solo toca el DOM cuando algo cambió
 export const painted = {};
@@ -25,6 +26,17 @@ export function paintControls() {
     ui.play.innerHTML = v ? ICON.play : ICON.pause;
     ui.play.setAttribute('aria-label', v ? 'Reproducir' : 'Pausar');
     stage.classList.toggle('is-paused', v);
+    // el botón grande del centro también: sale al tocar el video, con play o pausa según toque
+    ui.big.innerHTML = v ? ICON.play : ICON.pause;
+    ui.big.setAttribute('aria-label', v ? 'Reproducir' : 'Pausar');
+    ui.big.classList.toggle('is-pause', !v);
+  });
+  // en medio de la barra: qué se está viendo
+  const what = P.playing
+    ? [P.playing.ctx && P.playing.ctx.title, episodeLabel(P.playing.ep)].filter(Boolean).join(' · ')
+    : '';
+  setOnce('title', what, (v) => {
+    ui.title.textContent = v;
   });
   const d = isFinite(video.duration) ? video.duration : 0;
   const t = P.seeking ? Number(ui.seek.value) : video.currentTime;
