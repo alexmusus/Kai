@@ -205,11 +205,13 @@ export function buildIndex(lib) {
   const ix = { byId: new Map(), byPath: new Map(), twins: new Map() };
   if (!lib || lib.v !== 2) return ix;
   const heard = LS.get(KEY_HEARD_LANG, {}) || {};
+  // se leen una vez para todas las series (no una vez por serie)
+  const prefs = { own: LS.get(pkey(KEY_LANG), {}) || {}, last: LS.get(pkey(KEY_LANG_LAST), 'sub') };
   lib.series.forEach((s, si) => {
     s.all = [];
     s.full = [];
     s.langs = [];
-    const pref = langPref(s);
+    const pref = langPref(s, prefs);
     s.seasons.forEach((se, ki) => {
       for (const ep of se.full || se.episodes) {
         ep.lang = langOf(ep.name) || heard[ep.id] || null;
@@ -235,10 +237,11 @@ const rebuildIndex = () => setIndex(buildIndex(state.library));
  * Idioma que se muestra de una serie con las dos versiones: el que elegiste aquí; si no, el del último capítulo
  * que viste de ella (así se sigue igual en otro dispositivo); si no, el último que elegiste en cualquier serie.
  * @param {Series} s
+ * @param {{ own: Record<string, Lang>, last: Lang }} [prefs] lo guardado, si ya se leyó
  * @returns {Lang}
  */
-export function langPref(s) {
-  const own = (LS.get(pkey(KEY_LANG), {}) || {})[s.name];
+export function langPref(s, prefs) {
+  const own = (prefs ? prefs.own : LS.get(pkey(KEY_LANG), {}) || {})[s.name];
   if (own) return own;
   /** @type {{ u: number, l: Lang } | null} */
   let best = null;
@@ -249,7 +252,7 @@ export function langPref(s) {
       if (l && (!best || (p.u || 0) > best.u)) best = { u: p.u || 0, l };
     }
   }
-  return best ? best.l : LS.get(pkey(KEY_LANG_LAST), 'sub');
+  return best ? best.l : prefs ? prefs.last : LS.get(pkey(KEY_LANG_LAST), 'sub');
 }
 
 /**

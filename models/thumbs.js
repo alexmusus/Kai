@@ -10,6 +10,8 @@ import { C } from './mega.js';
 
 /** @type {Map<string, Promise<string | null>>} id → URL de la imagen (blob:) */
 const thumbUrls = new Map();
+/** @type {Map<string, string>} id → URL ya lista, para dibujarla sin esperar (al volver a una página) */
+const readyUrls = new Map();
 /** @type {(() => Promise<void>)[]} */
 const thumbQueue = [];
 let thumbActive = 0;
@@ -41,10 +43,14 @@ export function thumbFor(ep) {
   });
   thumbUrls.set(ep.id, p);
   p.then((u) => {
-    if (!u) thumbUrls.delete(ep.id);
+    if (u) readyUrls.set(ep.id, u);
+    else thumbUrls.delete(ep.id);
   });
   return p;
 }
+
+/** La miniatura de un capítulo si ya está lista en esta sesión (sin esperar), o ''. @param {string} id */
+export const thumbReady = (id) => readyUrls.get(id) || '';
 
 function pumpThumbs() {
   while (thumbActive < 3 && thumbQueue.length) {

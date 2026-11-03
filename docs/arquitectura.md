@@ -103,7 +103,8 @@ se cambian sus campos, nunca se reemplazan (`setIndex` cambia el contenido del �
 - Claves de localStorage: con prefijo `kai.` (lo pone `LS`), declaradas como constantes en el módulo dueño.
 - Cada módulo nuevo va en `SHELL` de `sw.js` (para abrir sin conexión) y en un `<link rel="modulepreload">`
   de `index.html` (para pedirlos todos a la vez); `tests/unit/modulos.test.js` revisa las dos listas.
-  Cada entrega sube `VERSION` en `sw.js`.
+- Versiones (`sw.js`): `VERSION` es la de Kai y sube solo al pasar `prueba` a `main`; `ENTREGA` sube en cada
+  subida a `prueba` (sin cambiar `sw.js` el navegador no instala lo nuevo) y vuelve a 1 al subir `VERSION`.
 
 ## Pruebas
 

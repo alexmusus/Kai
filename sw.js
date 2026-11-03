@@ -6,7 +6,12 @@
  */
 importScripts('core.js');
 
-const VERSION = 'kai-v52';
+/* VERSION es la de Kai que se ve en Ajustes: sube solo al pasar algo a main (lo publicado). ENTREGA cuenta las
+ * subidas a prueba dentro de esa versión: sube en cada una (el navegador solo instala de nuevo si este archivo
+ * cambia) y vuelve a 1 cuando sube VERSION. */
+const VERSION = 38;
+const ENTREGA = 1;
+const CACHE = `kai-${VERSION}.${ENTREGA}`;
 const SHELL = [
   './', 'styles.css', 'app.js', 'core.js', 'models/subs.js', 'models/meta-api.js',
   'lib/util.js', 'lib/events.js', 'lib/route.js', 'lib/nav-history.js', 'models/naming.js', 'models/store.js', 'models/mega.js', 'models/library.js',
@@ -45,7 +50,7 @@ async function reportQuota(timeLeft) {
 self.addEventListener('install', (e) => {
   // 'reload' evita que el navegador entregue archivos viejos de su propia caché
   e.waitUntil((async () => {
-    const c = await caches.open(VERSION);
+    const c = await caches.open(CACHE);
     await Promise.all(SHELL.map(async (u) => {
       const res = await fetch(new Request(u, { cache: 'reload' }));
       if (!res.ok) throw new Error('No se pudo guardar ' + u);
@@ -57,13 +62,13 @@ self.addEventListener('install', (e) => {
 
 // la app pregunta qué versión está instalada (Ajustes)
 self.addEventListener('message', (e) => {
-  if ((e.data || {}).type === 'version' && e.source) e.source.postMessage({ type: 'version', version: VERSION });
+  if ((e.data || {}).type === 'version' && e.source) e.source.postMessage({ type: 'version', version: VERSION, entrega: ENTREGA });
 });
 
 self.addEventListener('activate', (e) => {
   e.waitUntil((async () => {
     for (const k of await caches.keys()) {
-      if (k !== VERSION && k !== FONT_CACHE && k !== ART_CACHE) await caches.delete(k);
+      if (k !== CACHE && k !== FONT_CACHE && k !== ART_CACHE) await caches.delete(k);
     }
     await self.clients.claim();
   })());
@@ -116,7 +121,7 @@ async function clean(res) {
 }
 
 async function staleWhileRevalidate(req, e) {
-  const cache = await caches.open(VERSION);
+  const cache = await caches.open(CACHE);
   const key = req.mode === 'navigate' ? './' : req;
   const hit = await cache.match(key, { ignoreSearch: req.mode === 'navigate' });
   const update = fetch(req).then(async (res) => {

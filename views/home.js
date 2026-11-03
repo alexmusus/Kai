@@ -32,16 +32,19 @@ export function greeting() {
   const g = h < 12 ? 'Buenos días' : h < 19 ? 'Buenas tardes' : 'Buenas noches';
   return state.profile ? `${g}, ${state.profile.name}` : g;
 }
+// crear un Intl.DateTimeFormat es caro (carga los datos del idioma): se crean una vez y se reusan
+const HOUR_FMT = new Intl.DateTimeFormat('es', { hour: 'numeric', minute: '2-digit', hour12: true });
+const DATE_FMT = new Intl.DateTimeFormat('es', { weekday: 'long', day: 'numeric', month: 'long' });
 export function clockParts() {
   const d = new Date();
-  const time = new Intl.DateTimeFormat('es', { hour: 'numeric', minute: '2-digit', hour12: true }).formatToParts(d);
+  const time = HOUR_FMT.formatToParts(d);
   const hm = time
     .filter((p) => p.type !== 'dayPeriod')
     .map((p) => p.value)
     .join('')
     .trim();
   const ap = (time.find((p) => p.type === 'dayPeriod') || {}).value || '';
-  const date = new Intl.DateTimeFormat('es', { weekday: 'long', day: 'numeric', month: 'long' }).format(d);
+  const date = DATE_FMT.format(d);
   return { hm, ap, date };
 }
 export function clockHTML() {

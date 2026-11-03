@@ -39,13 +39,23 @@ export function leaveMini() {
   mini.hidden = true;
   document.documentElement.classList.remove('has-mini');
 }
+/** @param {HTMLElement} el @param {string} v */
+function setText(el, v) {
+  if (el.textContent !== v) el.textContent = v;
+}
+
 export function paintMini() {
   if (mini.hidden || !P.playing) return;
-  $('#mini-title').textContent = episodeLabel(P.playing.ep);
-  $('#mini-sub').textContent = P.playing.ctx.title || '';
+  // se llama en cada 'timeupdate' (varias veces por segundo): solo se toca lo que cambió
+  setText($('#mini-title'), episodeLabel(P.playing.ep));
+  setText($('#mini-sub'), P.playing.ctx.title || '');
   const t = $('#mini-toggle');
-  t.innerHTML = video.paused ? ICON.play : ICON.pause;
-  t.setAttribute('aria-label', video.paused ? 'Reproducir' : 'Pausar');
+  const paused = video.paused;
+  if (t.dataset.paused !== String(paused)) {
+    t.dataset.paused = String(paused);
+    t.innerHTML = paused ? ICON.play : ICON.pause;
+    t.setAttribute('aria-label', paused ? 'Reproducir' : 'Pausar');
+  }
   const d = isFinite(video.duration) ? video.duration : 0;
   mini.style.setProperty('--mp', d ? (video.currentTime / d) * 100 + '%' : '0%');
 }
