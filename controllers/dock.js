@@ -42,7 +42,7 @@ export function paintDock() {
 }
 
 /* ── la barra se achica al bajar ──
- * En el teléfono, al bajar queda solo la pestaña en la que estás (con el punto de sincronización), y se queda así
+ * En el teléfono, al bajar queda solo la casita (con el punto de sincronización), y se queda así
  * hasta que la tocas: ese toque solo la agranda (no navega). Mientras estás lejos del principio, al lado aparece
  * una burbuja con una flecha para subir. */
 const COMPACT_ON = matchMedia('(max-width: 899px)');

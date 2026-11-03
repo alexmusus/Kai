@@ -441,7 +441,7 @@ test('la barra flotante se achica al bajar, se queda así hasta tocarla y la bur
   const dock = page.locator('#dock');
   await page.evaluate(() => window.scrollTo(0, 600));
   await expect(dock).toHaveClass(/is-compact/);
-  await expect(page.locator('#dock .dock-btn')).toHaveCSS('opacity', '0'); // sin tu perfil, solo la pestaña
+  await expect(page.locator('#dock .dock-btn')).toHaveCSS('opacity', '0'); // sin tu perfil, solo la casita
   // tocarla achicada solo la agranda: no navega
   await page.locator('#dock .dock-tab.is-on').click();
   await expect(dock).not.toHaveClass(/is-compact/);
@@ -461,6 +461,18 @@ test('la barra flotante se achica al bajar, se queda así hasta tocarla y la bur
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
   await expect(dock).not.toHaveClass(/is-compact/);
   await expect(up).toHaveCSS('opacity', '0');
+  // en otra pestaña, achicada también queda la casita (y tocarla solo la agranda)
+  await go(page, '#/ajustes');
+  await page.waitForTimeout(700);
+  await page.evaluate(() => window.scrollTo(0, 700));
+  await expect(dock).toHaveClass(/is-compact/);
+  await expect(page.locator('#dock .dock-tab[data-tab="home"]')).toHaveCSS('width', '48px');
+  await expect(page.locator('#dock .dock-tab[data-tab="ajustes"]')).toHaveCSS('opacity', '0');
+  await page.waitForTimeout(500);
+  await page.screenshot({ path: '/tmp/claude-0/-home-user-Kai/2a50527b-117a-5251-8346-343e47b047cb/scratchpad/new/compact-ajustes.png', clip: { x: 0, y: 700, width: 390, height: 144 } });
+  await page.locator('#dock .dock-tab[data-tab="home"]').click();
+  await expect(dock).not.toHaveClass(/is-compact/);
+  await expect(page).toHaveURL(/#\/ajustes$/);
   expect(k.errors).toEqual([]);
 });
 
