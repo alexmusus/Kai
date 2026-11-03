@@ -126,6 +126,22 @@ export function catHTML(where) {
   return `<span class="kcat-sit is-${where}" aria-hidden="true"><img src="gato/sentado.webp" alt="" decoding="async"><img class="is-blink" src="gato/sentado-cierra.webp" alt="" decoding="async"></span>`;
 }
 
+/**
+ * La imagen grande de una portada (inicio, serie, película): el póster en el teléfono (vertical) y el banner en la
+ * PC (ancho); el navegador pide solo la que va a mostrar. Sin ficha, la miniatura de un capítulo.
+ * @param {any} m la ficha
+ * @param {string} [thumbId] capítulo con miniatura, si no hay ficha
+ */
+export function heroArtHTML(m, thumbId) {
+  const tall = m && ((m.collage && m.collage[0]) || m.cover);
+  const wide = m && m.banner;
+  if (tall || wide)
+    return `<div class="hero-art" aria-hidden="true"><picture>${wide ? `<source media="(min-width: 900px)" srcset="${esc(wide)}">` : ''}<img src="${esc(tall || wide)}" alt="" decoding="async"></picture></div>`;
+  return thumbId
+    ? `<div class="hero-art is-thumb" aria-hidden="true"><span data-thumb="${esc(thumbId)}"></span></div>`
+    : '';
+}
+
 // nombres largos: letra más chica en la portada para no pasar de ~2 líneas
 export function titleSize(name) {
   const n = (name || '').length;

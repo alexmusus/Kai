@@ -8,7 +8,16 @@ import { app } from './components.js';
 import { movieHref } from '../lib/route.js';
 import { state } from '../models/store.js';
 import { esc, $, fmtLeft, plural, fmtTime } from '../lib/util.js';
-import { catHTML, titleSize, factsHTML, setTint, tileHTML, seriesPosterHTML, moviePosterHTML } from './components.js';
+import {
+  catHTML,
+  titleSize,
+  heroArtHTML,
+  factsHTML,
+  setTint,
+  tileHTML,
+  seriesPosterHTML,
+  moviePosterHTML,
+} from './components.js';
 import { ICON } from './icons.js';
 import { displayMeta, synopsisOf, seriesColor } from '../models/fichas.js';
 import { heroPlan, shelfItems } from '../models/plans.js';
@@ -77,24 +86,13 @@ export function tvTop() {
   </div>`;
 }
 
-/** La imagen grande de la portada: el póster en el teléfono (vertical) y el banner en la PC (ancho). */
-function heroArtHTML(s, m) {
-  const tall = m && ((m.collage && m.collage[0]) || m.cover);
-  const wide = m && m.banner;
-  if (tall || wide)
-    return `<div class="hero-art" aria-hidden="true"><picture>${wide ? `<source media="(min-width: 900px)" srcset="${esc(wide)}">` : ''}<img src="${esc(tall || wide)}" alt="" decoding="async"></picture></div>`;
-  const coverEp = s.all.find((e) => e.fa);
-  return coverEp
-    ? `<div class="hero-art is-thumb" aria-hidden="true"><span data-thumb="${esc(coverEp.id)}"></span></div>`
-    : '';
-}
-
 export function heroInnerHTML(s, si) {
   const m = displayMeta(s);
   const plan = heroPlan(s);
   const fresh = newEpisodes(s).length;
   const syn = synopsisOf(m);
-  return `${heroArtHTML(s, m)}<div class="tvh-text"><h2 class="tv-title${titleSize(s.name)}"><span class="tvt">${esc(s.name)}${catHTML('title')}</span></h2>
+  const coverEp = s.all.find((e) => e.fa);
+  return `${heroArtHTML(m, coverEp && coverEp.id)}<div class="tvh-text"><h2 class="tv-title${titleSize(s.name)}"><span class="tvt">${esc(s.name)}${catHTML('title')}</span></h2>
     ${m && m.title && m.title.toLowerCase() !== s.name.toLowerCase() ? `<p class="tv-alt">${esc(m.title)}</p>` : ''}
     <p class="tv-facts">${factsHTML(s, m, fresh ? `<span class="tv-new">${fresh === 1 ? '1 nuevo' : `${fresh} nuevos`}</span>` : '')}</p>
     ${syn ? `<p class="tv-synopsis">${esc(syn.replace(/\s*\n+\s*/g, ' '))}</p>` : ''}

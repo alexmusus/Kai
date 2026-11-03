@@ -40,7 +40,7 @@ test('serie con varias temporadas: menú con nombres uniformes', async ({ page }
   expect(k.errors).toEqual([]);
 });
 
-test('temporada: Sub/Doblado, anterior, siguiente y volver al menú', async ({ page }, info) => {
+test('temporada: Sub/Doblado, pestañas de temporadas y volver al menú', async ({ page }, info) => {
   const k = await openKai(page, '#/');
   const si = k.si(k.yah);
   await go(page, `#/serie/${si}/2`);
@@ -55,9 +55,10 @@ test('temporada: Sub/Doblado, anterior, siguiente y volver al menú', async ({ p
   await page.reload();
   await page.waitForTimeout(400);
   expect(await hrefs(page, '.episodes .ep-main')).toEqual(dub); // el perfil recuerda el idioma
-  await page.locator('.step-btn.is-next').click();
+  await expect(page.locator('.season-tab.is-on')).toHaveAttribute('href', `#/serie/${si}/2`);
+  await page.locator(`.season-tab[href="#/serie/${si}/3"]`).click();
   await expect(page).toHaveURL(new RegExp(`#/serie/${si}/3$`));
-  await page.locator('.season-step >> text=Temporadas').click();
+  await page.locator('.season-tab.is-all').click();
   await expect(page).toHaveURL(new RegExp(`#/serie/${si}$`));
   expect(k.errors).toEqual([]);
 });
@@ -319,8 +320,9 @@ test('volver: Anterior/Siguiente no dejan entradas de más, y el menú lleva a l
   const si = k.si(k.yah);
   await page.locator(`.shelf a[href="#/serie/${si}"]`).click();
   await page.locator(`.season-grid a[href="#/serie/${si}/0"]`).click();
-  await page.locator('.step-btn.is-next').click();
-  await page.locator('.step-btn.is-next').click();
+  // las temporadas son pestañas: cambiar de una a otra no deja entradas de más en el historial
+  await page.locator(`.season-tab[href="#/serie/${si}/1"]`).click();
+  await page.locator(`.season-tab[href="#/serie/${si}/2"]`).click();
   await expect(page).toHaveURL(new RegExp(`#/serie/${si}/2$`));
   await page.locator('.bar [data-act="back"]').click();
   await expect(page).toHaveURL(new RegExp(`#/serie/${si}$`)); // directo al menú, sin pasar por la 1 y la 0
