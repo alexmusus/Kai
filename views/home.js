@@ -74,7 +74,7 @@ setInterval(() => {
 export function tvTop() {
   // cabecera compacta: el nombre de la app (con Kai, el gatito, echado encima en la PC), el saludo y la búsqueda
   return `<header class="tv-top">
-    <div class="tv-brand"><span class="tv-word">Kai${catHTML('top')}</span><p class="tv-greet" id="tv-greet">${esc(greeting())}</p></div>
+    <div class="tv-brand"><span class="tv-word">Kai</span><p class="tv-greet" id="tv-greet">${esc(greeting())}</p></div>
     <div class="tv-top-tools">
       <button class="tv-icon" data-act="home-search" aria-label="Buscar" aria-expanded="false">${ICON.search}</button>
     </div>
@@ -92,7 +92,7 @@ export function heroInnerHTML(s, si) {
   const fresh = newEpisodes(s).length;
   const syn = synopsisOf(m);
   const coverEp = s.all.find((e) => e.fa);
-  return `${heroArtHTML(m, coverEp && coverEp.id)}<div class="tvh-text"><h2 class="tv-title${titleSize(s.name)}"><span class="tvt">${esc(s.name)}${catHTML('title')}</span></h2>
+  return `${heroArtHTML(m, coverEp && coverEp.id)}<div class="tvh-text"><h2 class="tv-title${titleSize(s.name)}"><span class="tvt">${esc(s.name)}</span></h2>
     ${m && m.title && m.title.toLowerCase() !== s.name.toLowerCase() ? `<p class="tv-alt">${esc(m.title)}</p>` : ''}
     <p class="tv-facts">${factsHTML(s, m, fresh ? `<span class="tv-new">${fresh === 1 ? '1 nuevo' : `${fresh} nuevos`}</span>` : '')}</p>
     ${syn ? `<p class="tv-synopsis">${esc(syn.replace(/\s*\n+\s*/g, ' '))}</p>` : ''}
@@ -208,14 +208,25 @@ export function renderHome() {
           .join('')}</ul>
 </section>
       ${homeMoviesHTML(lib)}
-      <nav class="discover-links" aria-label="Descubrir">
-        ${lib.series.some(isCine) ? `<a class="tv-more" href="#/serie/${lib.series.findIndex(isCine)}">${ICON.grid}<span>${esc(lib.series.find(isCine).name)}</span></a>` : ''}
-        <a class="tv-more" href="#/descubrir/porque">${ICON.grid}<span>Porque viste…</span></a>
-        <a class="tv-more" href="#/descubrir/emision">${ICON.grid}<span>En emisión</span></a>
-      </nav>
+      ${homeFootHTML(lib)}
     </main>
   </div>`;
 }
+/** El final del inicio: Kai, el gatito, sentado a la izquierda y, a su lado, Cine y Descubrir en una lista. */
+function homeFootHTML(lib) {
+  const cine = lib.series.findIndex(isCine);
+  const link = (href, icon, title, sub, tone) =>
+    `<a class="home-link" href="${href}" data-tone="${tone}"><span class="home-link-ic">${icon}</span><span class="home-link-text"><b>${esc(title)}</b><span>${esc(sub)}</span></span>${ICON.chev}</a>`;
+  return `<footer class="home-foot">
+    ${catHTML('foot')}
+    <nav class="home-links" aria-label="Descubrir">
+      ${cine >= 0 ? link(`#/serie/${cine}`, ICON.film, lib.series[cine].name, 'Películas que no son anime', 'cine') : ''}
+      ${link('#/descubrir/porque', ICON.spark, 'Porque viste…', 'Recomendaciones según lo que tienes', 'porque')}
+      ${link('#/descubrir/emision', ICON.live, 'En emisión', 'Lo que está saliendo ahora', 'emision')}
+    </nav>
+  </footer>`;
+}
+
 /** Fila "Películas" del inicio: las 10 primeras en orden alfabético y el enlace al estante completo. */
 export function homeMoviesHTML(lib) {
   const si = lib.series.findIndex((x) => isCollection(x) && !isCine(x));
