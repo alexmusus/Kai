@@ -10,7 +10,7 @@ importScripts('core.js');
  * subidas a prueba dentro de esa versión: sube en cada una (el navegador solo instala de nuevo si este archivo
  * cambia) y vuelve a 1 cuando sube VERSION. */
 const VERSION = 39;
-const ENTREGA = 12;
+const ENTREGA = 13;
 const CACHE = `kai-${VERSION}.${ENTREGA}`;
 const SHELL = [
   './', 'styles.css', 'app.js', 'core.js', 'models/subs.js', 'models/meta-api.js',
@@ -24,7 +24,7 @@ const SHELL = [
   'controllers/player/engine.js', 'controllers/player/page.js', 'controllers/player/gestures.js',
   'controllers/player/events.js', 'views/watch.js',
   'vendor/mega.js', 'manifest.webmanifest', 'icon-32.png', 'icon-180.png', 'icon-192.png', 'icon-512.png',
-  'gato/sentado.webp', 'gato/sentado-cierra.webp',
+  'gato/sentado.webp', 'gato/sentado-cierra.webp', 'gato/echado.webp',
 ];
 const FONT_CACHE = 'kai-fonts';
 const ART_CACHE = 'kai-art';

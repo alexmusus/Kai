@@ -1778,3 +1778,23 @@ main > .empty, .downloads .empty, section.empty {
 section.empty p:first-child { font-weight: 600; font-size: 16px; }
 section.empty .btn { margin-top: 10px; }
 .tv-empty { background: none; box-shadow: none; }
+
+/* ── PC: Kai acostado sobre el nombre de la app (como antes), y Descubrir en horizontal con Kai sentado a la derecha ── */
+.kcat-sit.is-top { display: none; }
+@media (min-width: 900px) {
+  .tv.is-home .tv-top { padding-top: calc(env(safe-area-inset-top) + 40px); }
+  .tv-word .kcat-sit.is-top {
+    display: block; left: 50%; bottom: calc(100% - 7px); width: 92px; height: auto; aspect-ratio: 520 / 224; transform: translateX(-50%);
+  }
+  .home-foot { max-width: none; }
+  .home-shelf { display: flex; align-items: flex-end; gap: 18px; }
+  .home-links { flex: 1; grid-template-columns: repeat(3, minmax(0, 1fr)); max-width: 1080px; }
+  .home-link + .home-link::before { top: 14px; bottom: 14px; left: 0; right: auto; width: 1px; height: auto; }
+  .home-shelf .kcat-sit.is-foot { position: relative; right: auto; bottom: auto; order: 2; --kh: 112px; margin-bottom: -4px; }
+}
+
+/* ── PC: la tarjeta de la portada a la altura del banner de AniList (~1900 × 400 px como máximo): más alta, el
+ * navegador lo agrandaba y se veía pixelado ── */
+@media (min-width: 900px) {
+  .hero-card, .tv.is-home .tv-hero { min-height: 400px; padding-top: 44px; padding-bottom: 32px; }
+}

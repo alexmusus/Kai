@@ -336,6 +336,7 @@ const ACTIONS = {
   'pick-all': () => pickAction('pick-all'),
   'pick-unseen': () => pickAction('pick-unseen'),
   'pick-dl': () => pickAction('pick-dl'),
+  'pick-seen': () => pickAction('pick-seen'),
   translate: translateSynopsis,
   'tmdb-del': () => {
     setTmdbKey('');

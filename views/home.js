@@ -41,7 +41,7 @@ setInterval(() => {
 export function tvTop() {
   // cabecera compacta: el nombre de la app (con Kai, el gatito, echado encima en la PC), el saludo y la búsqueda
   return `<header class="tv-top">
-    <div class="tv-brand"><span class="tv-word">Kai</span><p class="tv-greet" id="tv-greet">${esc(greeting())}</p></div>
+    <div class="tv-brand"><span class="tv-word">Kai${catHTML('top')}</span><p class="tv-greet" id="tv-greet">${esc(greeting())}</p></div>
     <div class="tv-top-tools">
       <button class="tv-icon" data-act="home-search" aria-label="Buscar" aria-expanded="false">${ICON.search}</button>
     </div>

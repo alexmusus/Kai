@@ -162,6 +162,7 @@ export function renderSeries(arg) {
       <span class="pick-count" id="pick-count" aria-live="polite"></span>
       <button class="pick-btn" data-act="pick-all">Todos</button>
       <button class="pick-btn" data-act="pick-unseen">Sin ver</button>
+      <button class="pick-btn" data-act="pick-seen" disabled>${ICON.check}<span>Marcar vistos</span></button>
       <button class="pick-btn is-primary" data-act="pick-dl" disabled>${ICON.down}<span>Descargar</span></button>
     </div>
   </div>`;
@@ -382,10 +383,8 @@ export function paintPick() {
   }
   bar.hidden = !on;
   list.querySelectorAll('.ep').forEach((li) => {
-    const ep = epById(li.dataset.id);
     const picked = on && viewState.picking.ids.has(li.dataset.id);
     li.classList.toggle('is-picked', picked);
-    li.classList.toggle('is-unpickable', on && !!ep && !pickable(ep));
     const a = li.querySelector('.ep-main');
     if (on) {
       a.setAttribute('role', 'checkbox');
@@ -397,13 +396,18 @@ export function paintPick() {
   });
   if (!on) return;
   const eps = [...viewState.picking.ids].map(epById).filter(Boolean);
-  const size = eps.reduce((a, e) => a + (e.size || 0), 0);
+  const toGet = eps.filter(pickable);
+  const size = toGet.reduce((a, e) => a + (e.size || 0), 0);
   $('#pick-count').textContent = eps.length
-    ? `${plural(eps.length, 'capítulo', 'capítulos')}, ${fmtSize(size)}`
+    ? `${plural(eps.length, 'capítulo', 'capítulos')}${toGet.length ? `, ${fmtSize(size)} por descargar` : ''}`
     : 'Toca los capítulos que quieras';
-  bar.querySelector('[data-act="pick-dl"]').disabled = !eps.length;
+  bar.querySelector('[data-act="pick-dl"]').disabled = !toGet.length;
+  const seenBtn = bar.querySelector('[data-act="pick-seen"]');
+  seenBtn.disabled = !eps.length;
+  seenBtn.querySelector('span').textContent =
+    eps.length && eps.every((e) => (prog(e) || {}).w) ? 'Marcar no vistos' : 'Marcar vistos';
   const season = pickSeason();
-  const all = season ? season.episodes.filter(pickable) : [];
+  const all = season ? season.episodes : [];
   bar.querySelector('[data-act="pick-all"]').textContent =
     all.length && all.every((e) => viewState.picking.ids.has(e.id)) ? 'Ninguno' : 'Todos';
 }

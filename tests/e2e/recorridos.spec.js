@@ -225,15 +225,30 @@ test('Seleccionar capítulos de una temporada', async ({ page }, info) => {
   await eps.nth(0).click();
   await eps.nth(4).click();
   await expect(page).toHaveURL(new RegExp(`#/serie/${k.si('Dorohedoro')}$`)); // no abrió el capítulo
-  await expect(page.locator('#pick-count')).toHaveText('2 capítulos, 500 MB');
+  await expect(page.locator('#pick-count')).toHaveText('2 capítulos, 500 MB por descargar');
   await page.locator('[data-act="pick-unseen"]').click(); // Dorohedoro: ninguno visto del todo
-  await expect(page.locator('#pick-count')).toHaveText('12 capítulos, 3.0 GB');
+  await expect(page.locator('#pick-count')).toHaveText('12 capítulos, 3.0 GB por descargar');
   await expect(page.locator('[data-act="pick-all"]')).toHaveText('Ninguno');
   await shot(page, 'seleccionar', info);
   await page.locator('[data-act="pick-dl"]').click(); // sin conexión: avisa y no sale del modo
   await expect(page.locator('#pick-bar')).toBeVisible();
   await page.locator('[data-act="pick-mode"]').click();
   await expect(page.locator('#pick-bar')).toBeHidden();
+  // marcar como vistos varios a la vez (y volver a marcarlos como no vistos)
+  await page.locator('[data-act="pick-mode"]').click();
+  await eps.nth(1).click();
+  await eps.nth(2).click();
+  await expect(page.locator('[data-act="pick-seen"]')).toHaveText('Marcar vistos');
+  await page.locator('[data-act="pick-seen"]').click();
+  await expect(page.locator('#toast')).toHaveText('2 capítulos marcados como vistos.');
+  await expect(page.locator('#pick-bar')).toBeHidden();
+  await expect(page.locator('#season-eps .ep').nth(1)).toHaveClass(/is-seen/);
+  await expect(page.locator('#season-eps .ep').nth(2)).toHaveClass(/is-seen/);
+  await page.locator('[data-act="pick-mode"]').click();
+  await eps.nth(1).click();
+  await expect(page.locator('[data-act="pick-seen"]')).toHaveText('Marcar no vistos');
+  await page.locator('[data-act="pick-seen"]').click();
+  await expect(page.locator('#season-eps .ep').nth(1)).not.toHaveClass(/is-seen/);
   await eps.nth(1).click();
   await expect(page).toHaveURL(/#\/play\//); // fuera del modo, tocar abre el capítulo
   expect(k.errors).toEqual([]);
