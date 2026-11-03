@@ -1276,7 +1276,7 @@ html.kai-fs-on .watch-list, html:has(.stage:fullscreen) .watch-list { visibility
 @media (hover: hover) { .tv-facts .fact:hover { color: var(--text); background: none; transform: none; } }
 
 /* ── cabecera del inicio: "Kai", el saludo y la búsqueda ── */
-.tv-top { align-items: center; padding: calc(env(safe-area-inset-top) + 12px) clamp(16px, 4vw, 56px) 6px; }
+.tv-top { align-items: center; padding: calc(env(safe-area-inset-top) + 2px) clamp(16px, 4vw, 56px) 4px; }
 .tv-brand { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
 .tv-word { position: relative; font: 700 26px/1 var(--font-display); letter-spacing: -0.035em; }
 .tv-greet { margin: 0; font-size: 13px; font-weight: 500; letter-spacing: 0; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
