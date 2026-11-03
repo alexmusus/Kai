@@ -283,9 +283,32 @@ document.addEventListener('pointerdown', (e) => {
     closeMenu();
 });
 
+/* Al salir, lo de detrás sigue sin calcularse hasta que el teléfono termina de girar (styles.css, html.fs-leaving):
+ * se espera a que el tamaño de la pantalla se quede quieto, como mucho 900 ms. */
+let leaveTimer = 0;
+let leaveCap = 0;
+function endLeaving() {
+  clearTimeout(leaveTimer);
+  clearTimeout(leaveCap);
+  removeEventListener('resize', onLeaveResize);
+  document.documentElement.classList.remove('fs-leaving');
+}
+function onLeaveResize() {
+  clearTimeout(leaveTimer);
+  leaveTimer = setTimeout(endLeaving, 150);
+}
 ['fullscreenchange', 'webkitfullscreenchange'].forEach((ev) =>
   document.addEventListener(ev, () => {
-    document.documentElement.classList.toggle('kai-fs-on', isFullscreen());
+    const on = isFullscreen();
+    const html = document.documentElement;
+    if (!on && html.classList.contains('kai-fs-on')) {
+      html.classList.add('fs-leaving');
+      addEventListener('resize', onLeaveResize);
+      onLeaveResize();
+      clearTimeout(leaveCap);
+      leaveCap = setTimeout(endLeaving, 900);
+    } else if (on) endLeaving();
+    html.classList.toggle('kai-fs-on', on);
     paintThemeColor();
     paintControls();
     wake();

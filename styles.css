@@ -1174,11 +1174,12 @@ html.lite .ambient::before, html.lite .ambient::after { animation: none; will-ch
 html.lite .mini { animation: none; }
 html.lite #app { transition: none; }
 
-/* En pantalla completa lo de detrás del video no se ve: se deja de dibujar (al girar el teléfono y al entrar o salir
- * el navegador ya no tiene que acomodar la lista de capítulos ni el fondo). */
-html.kai-fs-on .ambient, html:has(.stage:fullscreen) .ambient,
-html.kai-fs-on .watch-info, html:has(.stage:fullscreen) .watch-info,
-html.kai-fs-on .watch-list, html:has(.stage:fullscreen) .watch-list { visibility: hidden; }
+/* En pantalla completa lo de detrás del video no se ve: no se calcula ni se dibuja. Con solo ocultarlo (visibility)
+ * el navegador igual lo acomodaba al girar el teléfono, y además en horizontal con el diseño de PC (la barra de
+ * arriba, la lista al lado): en Android se entrecortaba al entrar y salir. Sigue así un momento después de salir
+ * (html.fs-leaving), mientras el teléfono termina de girar, para acomodarlo una sola vez, ya en vertical. */
+html:is(.kai-fs-on, .fs-leaving) :is(.watch-info, .watch-list), html:has(.stage:fullscreen) :is(.watch-info, .watch-list) { content-visibility: hidden; }
+html:is(.kai-fs-on, .fs-leaving) :is(.ambient, .dock, .toast), html:has(.stage:fullscreen) :is(.ambient, .dock, .toast) { display: none; }
 
 /* ═════════════════════════ Kai 39 · diseño A (estilo Apple TV) ═════════════════════════
  * Fondo neutro con un solo brillo del color de la serie, la imagen manda, datos en una línea sin pastillas,

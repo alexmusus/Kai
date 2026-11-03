@@ -177,3 +177,20 @@ test('deslizar hacia abajo en el video pasa al mini reproductor, y tocar el mini
   await expect(page.locator('#mini')).toBeHidden();
   expect(k.errors).toEqual([]);
 });
+
+test('pantalla completa: lo de detrás no se calcula, y sigue así un momento al salir', async ({ page }, info) => {
+  test.skip(info.project.name !== 'pc', 'en la PC el navegador deja entrar a pantalla completa en la prueba');
+  const k = await openWithDownloads(page);
+  await page.evaluate((id) => { location.hash = '#/play/' + id; }, k.eps[0].id);
+  await expect.poll(() => page.evaluate(() => document.querySelector('#video').readyState), { timeout: 10000 }).toBeGreaterThan(1);
+  const cv = () => page.evaluate(() => getComputedStyle(document.querySelector('#watch-list')).contentVisibility);
+  expect(await cv()).toBe('visible');
+  await page.evaluate(() => document.querySelector('#stage').requestFullscreen());
+  await expect.poll(() => page.evaluate(() => document.documentElement.classList.contains('kai-fs-on'))).toBe(true);
+  expect(await cv()).toBe('hidden');
+  await page.evaluate(() => document.exitFullscreen());
+  await expect.poll(() => page.evaluate(() => !!document.fullscreenElement)).toBe(false);
+  await expect.poll(cv, { timeout: 3000 }).toBe('visible');
+  await expect(page.locator('html')).not.toHaveClass(/fs-leaving|kai-fs-on/);
+  expect(k.errors).toEqual([]);
+});
