@@ -25,11 +25,19 @@ export const LANG_LABEL = { sub: 'Sub', dob: 'Doblado' };
  * @returns {Lang | null}
  */
 export function langOf(name) {
-  const base = String(name || '').replace(/\.[^.]+$/, '');
-  const all = [...base.matchAll(LANG_RE)];
-  if (!all.length) return null;
-  return /^(sub|vose)/i.test(all[all.length - 1][1]) ? 'sub' : 'dob';
+  const key = String(name || '');
+  let l = langMemo.get(key);
+  if (l === undefined) {
+    const all = [...key.replace(/\.[^.]+$/, '').matchAll(LANG_RE)];
+    l = !all.length ? null : /^(sub|vose)/i.test(all[all.length - 1][1]) ? 'sub' : 'dob';
+    langMemo.set(key, l);
+  }
+  return l;
 }
+/* Se pregunta por el mismo nombre muchas veces (al armar el índice, al elegir idioma de cada serie): se recuerda.
+ * Son nombres de archivo de la biblioteca, así que la lista no crece sin límite. */
+/** @type {Map<string, Lang | null>} */
+const langMemo = new Map();
 
 /**
  * El nombre sin la marca de idioma: "472_0_SUB" y "472_0_DOB" son el mismo capítulo; "Howl [Latino]" → "Howl".
@@ -44,7 +52,16 @@ export function stripLang(name) {
 }
 
 /** Clave que comparten las dos versiones de un capítulo. @param {{ name: string }} ep */
-export const twinKey = (ep) => stripLang(ep.name.replace(/\.[^.]+$/, '')).toLowerCase();
+export function twinKey(ep) {
+  let k = twinMemo.get(ep.name);
+  if (k === undefined) {
+    k = stripLang(ep.name.replace(/\.[^.]+$/, '')).toLowerCase();
+    twinMemo.set(ep.name, k);
+  }
+  return k;
+}
+/** @type {Map<string, string>} */
+const twinMemo = new Map();
 
 /** "Sub y doblado", "Sub", "Doblado" o "". @param {Lang[]} langs */
 export const langText = (langs) => (langs.length > 1 ? 'Sub y doblado' : langs.length ? LANG_LABEL[langs[0]] : '');

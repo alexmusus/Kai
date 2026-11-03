@@ -84,6 +84,11 @@ export function onHashChange() {
   navWasBack = r.back;
   mark(r.pos);
 }
+/** ¿Kai ya está en esta entrada del historial (la misma posición y dirección)? Así un cambio que avisan
+ * 'popstate' y 'hashchange' a la vez se atiende una sola vez. */
+export function alreadyArrived() {
+  return markedPos() === nav.pos && nav.current === (location.hash || '#/');
+}
 export function go(hash) {
   if (location.hash !== hash) location.hash = hash;
   else render();

@@ -21,7 +21,8 @@ export function setRegistration(r) {
   swReg = r;
 }
 
-/** La versión instalada ("kai-v45"), o '' si no hay service worker o no responde en 2 s. @returns {Promise<string>} */
+/** La versión instalada ("Kai 38", y "· entrega 3" si es una prueba posterior a la primera), o '' si no hay service
+ * worker o no responde en 2 s. @returns {Promise<string>} */
 export function swVersion() {
   const sw = navigator.serviceWorker && navigator.serviceWorker.controller;
   if (!sw) return Promise.resolve('');
@@ -29,7 +30,9 @@ export function swVersion() {
     const done = (/** @type {MessageEvent} */ e) => {
       if (e.data && e.data.type === 'version') {
         navigator.serviceWorker.removeEventListener('message', done);
-        res(e.data.version);
+        const { version: v, entrega: n } = e.data;
+        // las de antes mandaban "kai-v52"
+        res(typeof v === 'number' ? `Kai ${v}${n > 1 ? ` · entrega ${n}` : ''}` : String(v).replace('kai-v', 'Kai '));
       }
     };
     navigator.serviceWorker.addEventListener('message', done);

@@ -1190,3 +1190,13 @@ img.no-fade { animation: none !important; }
  * (parpadeaban las etiquetas SUB/DUB, "Nuevo" y los títulos grandes). Estas piezas pequeñas van sin desenfoque. */
 .lang-chip, .tile-badge { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgba(0, 0, 0, 0.55); }
 .tv-title { text-shadow: 0 1px 12px color-mix(in srgb, var(--bg) 45%, transparent); }
+/* Lo mismo para lo que se repite en cada capítulo (Descargado, Visto, el botón de play y el círculo de Seleccionar):
+ * con decenas de tarjetas eran decenas de capas de desenfoque que el iPhone redibujaba al deslizar y al volver.
+ * Sin desenfoque, con un fondo un poco más opaco, se ven igual. */
+.ep-flag { -webkit-backdrop-filter: none; backdrop-filter: none; }
+.ep-flag:not(.is-seen) { background: rgba(0, 0, 0, 0.6); }
+.episodes.is-picking .ep-thumb::before { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgba(0, 0, 0, 0.4); }
+@media (hover: none) {
+  /* en el teléfono el botón de play de cada capítulo nunca se ve (sale al pasar el mouse) */
+  .ep-play { -webkit-backdrop-filter: none; backdrop-filter: none; }
+}

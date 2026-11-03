@@ -106,6 +106,27 @@ test('catálogo: tipos, filtros y búsqueda', async ({ page }, info) => {
   expect(k.errors).toEqual([]);
 });
 
+test('volver atrás dibuja la página en popstate, sin esperar a hashchange (gesto de iPhone sin parpadeo)', async ({ page }) => {
+  const k = await openKai(page, '#/');
+  const dor = k.si('Dorohedoro');
+  await go(page, `#/serie/${dor}`);
+  await expect(page).toHaveURL(new RegExp(`#/serie/${dor}$`));
+  // lo que hay en pantalla justo después de popstate (este oyente corre después del de Kai): tiene que ser ya el
+  // inicio, no la serie que se deja. Si Kai esperara a hashchange, en ese instante seguiría la serie.
+  await page.evaluate(() => {
+    addEventListener('popstate', () => (window.__atPop = !!document.querySelector('.tv.is-home')), { once: true });
+  });
+  await page.evaluate(() => history.back());
+  await expect(page.locator('.tv.is-home')).toBeVisible();
+  expect(await page.evaluate(() => window.__atPop)).toBe(true);
+  // y se dibuja una sola vez: ir y volver otra vez sigue funcionando igual
+  await go(page, `#/serie/${dor}`);
+  await expect(page).toHaveURL(new RegExp(`#/serie/${dor}$`));
+  await page.evaluate(() => history.back());
+  await expect(page.locator('.tv.is-home')).toBeVisible();
+  expect(k.errors).toEqual([]);
+});
+
 test('volver atrás conserva el scroll', async ({ page }) => {
   const k = await openKai(page, '#/');
   await page.evaluate(() => window.scrollTo(0, 500));

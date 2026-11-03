@@ -6,7 +6,7 @@
  */
 
 import { epById } from '../models/library.js';
-import { thumbFor } from '../models/thumbs.js';
+import { thumbFor, thumbReady } from '../models/thumbs.js';
 import { knownCodec, formatProblem, readCodec } from '../models/media.js';
 import { esc } from '../lib/util.js';
 
@@ -30,6 +30,16 @@ function watcher(margin, onSeen) {
 
 const thumbObserver = watcher('300px', loadThumb);
 
+/** @param {HTMLElement} el @param {string} u */
+function putThumb(el, u) {
+  const img = new Image();
+  img.alt = '';
+  img.className = 'no-fade';
+  img.src = u;
+  el.prepend(img);
+  el.classList.add('has-img');
+}
+
 /** @param {HTMLElement} el */
 function loadThumb(el) {
   const ep = epById(el.dataset.thumb || '');
@@ -51,7 +61,10 @@ function loadThumb(el) {
 export function hydrateThumbs(scope = document) {
   scope.querySelectorAll('[data-thumb]:not(.thumb-seen)').forEach((el) => {
     el.classList.add('thumb-seen');
-    if (thumbObserver) thumbObserver.observe(el);
+    // ya vista en esta sesión: se pone de una vez, sin el cuadro vacío al volver a la página
+    const ready = thumbReady(/** @type {HTMLElement} */ (el).dataset.thumb || '');
+    if (ready) putThumb(/** @type {HTMLElement} */ (el), ready);
+    else if (thumbObserver) thumbObserver.observe(el);
     else loadThumb(/** @type {HTMLElement} */ (el));
   });
   hydrateCodecs(scope);

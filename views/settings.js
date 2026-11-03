@@ -208,7 +208,7 @@ export function renderSettings() {
   bindCineKey();
   swVersion().then((v) => {
     const el = $('#app-version');
-    if (el) el.textContent = v ? v.replace('kai-v', 'Kai ') : 'Sin instalar';
+    if (el) el.textContent = v || 'Sin instalar';
   });
 }
 
