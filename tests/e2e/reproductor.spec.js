@@ -128,6 +128,7 @@ test('quitar un capítulo y quitar todas las descargas preguntan con la hoja de 
 
 test('deslizar hacia abajo en el video pasa al mini reproductor, y tocar el mini vuelve al reproductor', async ({ page }, info) => {
   test.skip(info.project.name !== 'iphone', 'gesto táctil');
+  await page.emulateMedia({ reducedMotion: 'no-preference' }); // para ver las animaciones entre grande y mini
   const k = await openWithDownloads(page, '#/serie/' + 0);
   const dor = k.si('Dorohedoro');
   await page.evaluate((h) => { location.hash = h; }, `#/serie/${dor}`);
@@ -148,16 +149,31 @@ test('deslizar hacia abajo en el video pasa al mini reproductor, y tocar el mini
       await new Promise((res) => requestAnimationFrame(res));
     }
     ev('pointerup', y0 + 160);
+    // al soltar: el mini ya está a la vista y volando, sin esperar a que el navegador vuelva atrás
+    window.__atRelease = {
+      mini: !document.querySelector('#mini').hidden,
+      flying: document.querySelector('#mini').getAnimations().length > 0,
+      leaving: document.querySelector('#app').classList.contains('is-leaving'),
+    };
   });
+  expect(await page.evaluate(() => window.__atRelease)).toEqual({ mini: true, flying: true, leaving: true });
   await expect(page).toHaveURL(new RegExp(`#/serie/${dor}$`));
   await expect(page.locator('#mini')).toBeVisible();
   // sin restos del gesto en el video
   expect(await page.evaluate(() => document.querySelector('#stage').style.transform)).toBe('');
   expect(await page.evaluate(() => document.querySelector('#video').paused)).toBe(false);
   // tocar el mini vuelve al reproductor grande, entrando con su animación
+  await expect(page.locator('#app.is-leaving')).toHaveCount(0);
+  await page.evaluate(() => {
+    // lo que se anima justo después de llegar al reproductor
+    addEventListener('hashchange', () => {
+      const slot = document.querySelector('#stage-slot');
+      window.__grow = !!slot && slot.getAnimations().length > 0;
+    }, { once: true });
+  });
   await page.locator('#mini .mini-open').click();
   await expect(page).toHaveURL(/#\/play\//);
-  await expect(page.locator('#stage-slot.is-from-mini')).toHaveCount(1);
+  expect(await page.evaluate(() => window.__grow)).toBe(true);
   await expect(page.locator('#mini')).toBeHidden();
   expect(k.errors).toEqual([]);
 });

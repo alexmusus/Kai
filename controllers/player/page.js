@@ -11,7 +11,7 @@ import { app, header } from '../../views/components.js';
 import { go } from '../router.js';
 import { P } from './state.js';
 import { stage, parking, mini } from './dom.js';
-import { leaveMini } from './mini.js';
+import { leaveMini, flyFrom, calmMotion } from './mini.js';
 import { startPlayback } from './engine.js';
 import { route } from '../../lib/route.js';
 import { nextUnseen, prog } from '../../models/progress.js';
@@ -34,7 +34,8 @@ export function renderWatch(id) {
   }
   const same = P.playing && P.playing.ep.id === id && stage.isConnected && app.contains(stage);
   if (!same) {
-    const fromMini = !mini.hidden;
+    // desde el mini, el video crece desde donde estaba el mini hasta su lugar
+    const from = !mini.hidden ? /** @type {HTMLElement} */ ($('#mini-slot')).getBoundingClientRect() : null;
     leaveMini();
     parkStage();
     app.innerHTML =
@@ -50,8 +51,18 @@ export function renderWatch(id) {
     </main>`;
     const slot = $('#stage-slot');
     slot.appendChild(stage);
-    // desde el mini reproductor, el video entra creciendo (antes aparecía de golpe)
-    if (fromMini) slot.classList.add('is-from-mini');
+    if (from) {
+      flyFrom(slot, from, slot.getBoundingClientRect());
+      // lo demás de la página aparece un poco después, cuando el video ya va llegando
+      if (!calmMotion())
+        for (const el of app.querySelectorAll('.watch-info, .watch-list'))
+          /** @type {HTMLElement} */ (el).animate([{ opacity: 0 }, { opacity: 1 }], {
+            duration: 220,
+            delay: 90,
+            easing: 'ease-out',
+            fill: 'backwards',
+          });
+    }
     stage.hidden = false;
     if (!P.playing || P.playing.ep.id !== id) startPlayback(ctx);
     else P.playing.ctx = ctx;

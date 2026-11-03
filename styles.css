@@ -1202,11 +1202,11 @@ img.no-fade { animation: none !important; }
 }
 
 /* Mini reproductor: su fondo ya es casi opaco, así que el desenfoque no se notaba, pero el iPhone lo recalculaba en
- * cada cuadro de la animación de entrada (se veía con tirones). Y al volver al reproductor grande, el video crece
- * desde abajo en vez de aparecer de golpe. */
+ * cada cuadro de la animación de entrada (se veía con tirones). Las animaciones entre grande y mini están en
+ * controllers/player/mini.js (flyFrom). */
 .mini { -webkit-backdrop-filter: none; backdrop-filter: none; }
-.stage-slot.is-from-mini { animation: player-in 0.26s cubic-bezier(0.2, 0.8, 0.2, 1); }
-@keyframes player-in { from { opacity: 0.4; transform: translateY(40px) scale(0.94); } }
+#app { transition: opacity 0.15s ease-out; }
+#app.is-leaving { opacity: 0; pointer-events: none; }
 
 /* Modo liviano (teléfonos de gama media, ver views/theme.js): sin desenfoque y sin fondo en movimiento. Las
  * superficies de vidrio pasan a su versión más opaca, la misma que en navegadores sin desenfoque. */
@@ -1217,7 +1217,8 @@ html.lite .ambient::before, html.lite .ambient::after { animation: none; will-ch
 /* pasar entre el reproductor grande y el mini: animar un video es lo que más le cuesta a un teléfono modesto (se veía
  * trabado); cambia al instante. Y el póster difuminado detrás de la serie (un desenfoque de pantalla entera que se
  * repinta justo al pasar al mini) no se dibuja: queda el color de la serie en el fondo. */
-html.lite .mini, html.lite .stage-slot.is-from-mini { animation: none; }
+html.lite .mini { animation: none; }
+html.lite #app { transition: none; }
 html.lite .series-wash img { display: none; }
 
 /* En pantalla completa lo de detrás del video no se ve: se deja de dibujar (al girar el teléfono y al entrar o salir
