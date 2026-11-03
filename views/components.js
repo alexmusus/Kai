@@ -5,7 +5,7 @@
 
 import { ICON } from './icons.js';
 import { $, esc, hue, plural } from '../lib/util.js';
-import { displayMeta } from '../models/fichas.js';
+import { displayMeta, seasonMeta, isFranchise } from '../models/fichas.js';
 import { state } from '../models/store.js';
 import { newEpisodes } from '../models/news.js';
 import { prog } from '../models/progress.js';
@@ -91,7 +91,11 @@ export function factRows(info, m, links) {
   return `<div class="facts-rows">${info || score ? `<p class="tv-facts is-info">${info}${score}</p>` : ''}${links ? `<p class="tv-facts">${links}</p>` : ''}</div>`;
 }
 export function countLabel(s, m) {
-  return m && m.collection ? plural(m.count, 'película', 'películas') : plural(s.all.length, 'capítulo', 'capítulos');
+  if (m && m.collection) return plural(m.count, 'película', 'películas');
+  // si la ficha que se muestra es la de una temporada u OVA (en una franquicia como "Attack on Titan"), se cuentan
+  // los capítulos de esa temporada, no los de toda la serie ("OVA · 97 capítulos" no tenía sentido)
+  const own = m && isFranchise(s) ? s.seasons.find((se) => seasonMeta(s, se) === m) : null;
+  return plural(own ? own.episodes.length : s.all.length, 'capítulo', 'capítulos');
 }
 // Kai parpadea de vez en cuando (el que está sentado al final del inicio)
 (function blinkLoop() {
