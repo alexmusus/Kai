@@ -32,9 +32,93 @@ export function paintDock() {
     dockHtml = html;
   }
   btn.dataset.name = p.name;
+  paintTabs(v);
+  // al cambiar de página la barra vuelve a su tamaño (y el scroll de volver a donde estabas no la achica)
+  setCompact(false);
+  compactHold = performance.now() + 500;
   paintSync();
   paintNewsDot();
   if (!dock.querySelector('.dock-panel').hidden) fillDock();
+}
+
+/* ── la barra se achica al bajar ──
+ * En el teléfono, al bajar queda solo la pestaña en la que estás y tu perfil, más chicos, para que se vea más
+ * contenido; al subir vuelve a su tamaño. Si la tocas achicada, ese toque solo la agranda (no navega). */
+const COMPACT_ON = matchMedia('(max-width: 899px)');
+let compactY = window.scrollY;
+let compactFrame = 0;
+let compactHold = 0;
+/** @param {boolean} on */
+function setCompact(on) {
+  if (dock.classList.contains('is-compact') !== on) dock.classList.toggle('is-compact', on);
+}
+function checkCompact() {
+  compactFrame = 0;
+  const y = window.scrollY;
+  const dy = y - compactY;
+  if (Math.abs(dy) < 8) return; // movimientos mínimos no cuentan
+  compactY = y;
+  if (performance.now() < compactHold) return;
+  if (!COMPACT_ON.matches || dock.classList.contains('is-open')) return setCompact(false);
+  setCompact(dy > 0 && y > 140);
+}
+addEventListener(
+  'scroll',
+  () => {
+    if (!compactFrame) compactFrame = requestAnimationFrame(checkCompact);
+  },
+  { passive: true },
+);
+dock.addEventListener(
+  'click',
+  (e) => {
+    if (!dock.classList.contains('is-compact')) return;
+    if (!(/** @type {Element} */ (e.target).closest('.dock-bar'))) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setCompact(false);
+    compactHold = performance.now() + 1200; // que el siguiente movimiento no la vuelva a achicar enseguida
+  },
+  true,
+);
+
+/* ── pestañas de la barra ── */
+const TABS = [
+  { id: 'home', label: 'Inicio', icon: 'home', act: 'home' },
+  { id: 'catalogo', label: 'Catálogo', icon: 'grid', href: '#/catalogo' },
+  { id: 'descargas', label: 'Descargas', icon: 'down', href: '#/descargas' },
+  { id: 'ajustes', label: 'Ajustes', icon: 'gear', href: '#/ajustes' },
+];
+/** De qué pestaña es cada página (la serie, la película y el reproductor siguen siendo "Inicio"). */
+const TAB_OF = {
+  home: 'home',
+  serie: 'home',
+  pelicula: 'home',
+  play: 'home',
+  descubrir: 'home',
+  catalogo: 'catalogo',
+  descargas: 'descargas',
+  ajustes: 'ajustes',
+};
+/** @param {string} view */
+function paintTabs(view) {
+  const box = dock.querySelector('.dock-tabs');
+  if (!box) return;
+  if (!box.firstElementChild) {
+    box.innerHTML = TABS.map(
+      (t) =>
+        `${t.href ? `<a href="${t.href}"` : `<button data-act="${t.act}"`} class="dock-tab" data-tab="${t.id}">${ICON[t.icon]}<span>${t.label}</span>${t.id === 'descargas' ? '<b class="dock-badge" id="dock-count"></b>' : ''}${t.href ? '</a>' : '</button>'}`,
+    ).join('');
+  }
+  const on = TAB_OF[view] || '';
+  for (const el of box.children) {
+    const is = /** @type {HTMLElement} */ (el).dataset.tab === on;
+    el.classList.toggle('is-on', is);
+    if (is) el.setAttribute('aria-current', 'page');
+    else el.removeAttribute('aria-current');
+  }
+  const count = $('#dock-count');
+  if (count) count.textContent = state.saved.size ? String(state.saved.size) : '';
 }
 
 export function fillDock() {
@@ -45,10 +129,9 @@ export function fillDock() {
   const dark = resolvedTheme() === 'dark';
   dock.querySelector('.dock-panel').innerHTML = `
     <a class="dock-profile" href="#/perfiles" role="menuitem">${avatarHTML(p)}<span><span class="dock-pname">${esc(p.name)}</span><span class="dock-psub">Cambiar perfil</span></span></a>
-    ${item('#/', ICON.home, 'Inicio', view === 'home' || view === 'serie')}
     ${item('#/explorar', ICON.folder, 'Explorar MEGA', view === 'explorar')}
-    ${item('#/descargas', ICON.saved, 'Descargados', view === 'descargas', `<span class="dock-count" id="dock-count">${state.saved.size || ''}</span>`)}
-    ${item('#/ajustes', ICON.gear, 'Ajustes', view === 'ajustes', hasUnreadNews() ? '<span class="dock-news">Novedades</span>' : '')}
+    ${item('#/descubrir/porque', ICON.grid, 'Descubrir', view === 'descubrir')}
+    ${hasUnreadNews() ? item('#/ajustes', ICON.gear, 'Novedades', false, '<span class="dock-news">Nuevo</span>') : ''}
     <div class="dock-row">
       <button class="dock-chip" data-act="refresh" role="menuitem">${ICON.refresh}<span>Actualizar</span></button>
       <button class="dock-chip" data-act="theme" role="menuitem">${dark ? ICON.sun : ICON.moon}<span>${dark ? 'Claro' : 'Oscuro'}</span></button>

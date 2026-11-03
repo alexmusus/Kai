@@ -152,9 +152,13 @@
     </div>
   </div>
 
+  <!-- Barra flotante: las páginas principales y, a la derecha, tu perfil (abre el menú y muestra la sincronización). -->
   <nav id="dock" class="dock" aria-label="Menú" hidden>
     <div class="dock-panel" role="menu" hidden></div>
-    <button class="dock-btn" data-act="dock" aria-expanded="false" aria-haspopup="menu" aria-label="Menú"></button>
+    <div class="dock-bar">
+      <div class="dock-tabs"></div>
+      <button class="dock-btn" data-act="dock" aria-expanded="false" aria-haspopup="menu" aria-label="Menú"></button>
+    </div>
   </nav>
   <!-- Mini reproductor: el mismo video sigue aquí mientras navegas por Kai. -->
   <div id="mini" class="mini" role="region" aria-label="Mini reproductor" hidden>

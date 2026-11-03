@@ -321,12 +321,16 @@ test('volver: Anterior/Siguiente no dejan entradas de más, y el menú lleva a l
   await expect(page).toHaveURL(new RegExp(`#/serie/${si}$`)); // directo al menú, sin pasar por la 1 y la 0
   await page.locator('.bar [data-act="back"]').click();
   await expect(page).toHaveURL(/#\/$/);
-  // el botón flotante: abre el menú, lleva a Ajustes y vuelve al inicio
-  await page.locator('#dock .dock-btn').click();
-  await page.locator('#dock .dock-item[href="#/ajustes"]').click();
+  // la barra flotante: lleva a Ajustes (y la marca), vuelve al inicio, y tu perfil abre el menú
+  await page.locator('#dock .dock-tab[data-tab="ajustes"]').click();
   await expect(page).toHaveURL(/#\/ajustes$/);
-  await page.locator('.bar [data-act="home"]').click();
+  await expect(page.locator('#dock .dock-tab.is-on')).toHaveAttribute('data-tab', 'ajustes');
+  await page.locator('#dock .dock-tab[data-tab="home"]').click();
   await expect(page).toHaveURL(/#\/$/);
+  await expect(page.locator('#dock .dock-tab.is-on')).toHaveAttribute('data-tab', 'home');
+  await page.locator('#dock .dock-btn').click();
+  await expect(page.locator('#dock .dock-panel')).toContainText('Explorar MEGA');
+  await page.locator('#dock .dock-btn').click();
   // la hoja de opciones pone en cola con el nombre de la serie (sin conexión: avisa)
   await go(page, '#/serie/' + k.si('Dorohedoro'));
   await page.locator('#season-eps .ep').nth(0).locator('[data-act="more"]').click();
@@ -398,5 +402,41 @@ test('abrir Kai sin # (como la app instalada) deja el inicio en "#/", igual que 
   await page.evaluate(() => history.back());
   await expect(page).toHaveURL(/\/#\/$/);
   await expect(page.locator('.tv.is-home')).toBeVisible();
+  expect(k.errors).toEqual([]);
+});
+
+test('la barra flotante se achica al bajar y vuelve al subir o al tocarla', async ({ page }, info) => {
+  test.skip(info.project.name !== 'iphone', 'solo en el teléfono');
+  const k = await openKai(page, '#/');
+  await page.waitForTimeout(600);
+  const dock = page.locator('#dock');
+  await page.mouse.wheel(0, 0); // nada
+  await page.evaluate(() => window.scrollTo(0, 600));
+  await expect(dock).toHaveClass(/is-compact/);
+  await page.screenshot({ path: '/tmp/claude-0/-home-user-Kai/2a50527b-117a-5251-8346-343e47b047cb/scratchpad/new/compact.jpg', type: 'jpeg', quality: 80 });
+  // tocarla achicada solo la agranda: no navega
+  await page.locator('#dock .dock-tab.is-on').click();
+  await expect(dock).not.toHaveClass(/is-compact/);
+  await expect(page).toHaveURL(/#\/$/);
+  // bajar otra vez la achica; subir la agranda
+  await page.waitForTimeout(1300);
+  await page.evaluate(() => window.scrollTo(0, 1200));
+  await expect(dock).toHaveClass(/is-compact/);
+  await page.evaluate(() => window.scrollTo(0, 300));
+  await expect(dock).not.toHaveClass(/is-compact/);
+  expect(k.errors).toEqual([]);
+});
+
+test('tema claro: el inicio y una serie se ven con fondo claro y sin errores', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'light' });
+  const k = await openKai(page, '#/', { extraLS: { settings: { root: 'Anime', autoplay: true, autoSkip: true, theme: 'light', cat: false } } });
+  const bg = () => page.evaluate(() => getComputedStyle(document.documentElement).backgroundColor);
+  const light = (c) => (c.match(/\d+/g) || []).slice(0, 3).every((n) => Number(n) > 180);
+  expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBe('light');
+  expect(light(await bg())).toBe(true);
+  await expect(page.locator('.tv-hero .tv-title')).toContainText('Yahari');
+  await go(page, '#/serie/' + k.si('Dorohedoro'));
+  await expect(page.locator('#app')).toContainText('Dorohedoro');
+  expect(light(await bg())).toBe(true);
   expect(k.errors).toEqual([]);
 });
