@@ -93,15 +93,14 @@ export function factRows(info, m, links) {
 export function countLabel(s, m) {
   return m && m.collection ? plural(m.count, 'película', 'películas') : plural(s.all.length, 'capítulo', 'capítulos');
 }
-// Kai parpadea de vez en cuando (en el teléfono, el del título)
+// Kai parpadea de vez en cuando (el que está sentado al final del inicio)
 (function blinkLoop() {
   setTimeout(
     () => {
-      // en el teléfono parpadea el del título; en la PC, el echado sobre la fecha todavía no tiene dibujo con ojos cerrados
       const el =
         !document.hidden &&
         !matchMedia('(prefers-reduced-motion: reduce)').matches &&
-        [...document.querySelectorAll('.kcat-sit.is-title')].find((x) => x.offsetParent);
+        [...document.querySelectorAll('.kcat-sit.is-foot')].find((x) => x.offsetParent);
       if (el) {
         const blink = (then) => {
           el.classList.add('is-closed');
