@@ -1720,3 +1720,24 @@ body:has(.tv.is-series) .ambient { display: none; }
 .st-skip { z-index: 2; bottom: 108px; }
 @media (max-width: 600px) { .st-skip { bottom: 92px; } }
 .stage.kai-fs .st-skip { bottom: calc(112px + env(safe-area-inset-bottom, 0px)); }
+
+/* ── reproductor, segunda pasada ──
+ * Los botones más anchos (no más altos) para tocarlos sin errar, más separados del borde; en medio de la barra,
+ * qué se está viendo; y el play/pausa del centro sale cada vez que se tocan los controles (no solo en pausa). */
+.st-bar { padding-left: 16px; padding-right: 16px; }
+.stage.kai-fs .st-bar, .stage.kai-fs:not(:fullscreen) .st-bar { padding-left: max(22px, env(safe-area-inset-left)); padding-right: max(22px, env(safe-area-inset-right)); }
+@media (orientation: portrait) {
+  .stage.kai-fs.kai-rot .st-bar, .stage.kai-fs.kai-rot:not(:fullscreen) .st-bar { padding-left: max(22px, env(safe-area-inset-top)); padding-right: max(22px, env(safe-area-inset-bottom)); }
+}
+.st-row { gap: 4px; }
+.st-btn { min-width: 46px; height: 40px; padding: 0 10px; }
+.stage.kai-fs .st-btn, .stage.is-fs .st-btn { min-width: 54px; }
+@media (max-width: 600px) { .st-bar { padding: 26px 8px 2px; } .st-btn { min-width: 44px; padding: 0 8px; } }
+/* en el teléfono el "hover" se queda pegado después de tocar: era el cuadro oscuro detrás del play */
+@media (hover: none) { .st-btn:hover { background: none; } }
+.st-gap { display: flex; justify-content: center; min-width: 8px; overflow: hidden; }
+.st-title { max-width: 100%; padding: 0 12px; font-size: 14px; font-weight: 600; color: rgba(255, 255, 255, 0.92); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 600px) { .stage:not(.kai-fs):not(.is-fs) .st-title { display: none; } }
+.stage:not(.is-idle):not(.is-loading):not(.is-ended) .st-big { opacity: 1; pointer-events: auto; transform: none; }
+.stage.is-mini .st-big { display: none; }
+.st-big.is-pause svg { margin-left: 0; }
