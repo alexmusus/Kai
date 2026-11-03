@@ -19,8 +19,43 @@ video.addEventListener('webkitpresentationmodechanged', () => {
   if (video.webkitPresentationMode === 'inline') backFromSystemPip();
 });
 
-export function enterMini() {
+/** ¿Sin animaciones? (modo liviano o "reducir movimiento" del sistema) */
+export const calmMotion = () =>
+  document.documentElement.classList.contains('lite') || matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/**
+ * Hace que `el` parezca salir de `from` y llegar a donde ya está (la técnica FLIP: se mueve primero y se anima
+ * desde donde estaba). Solo transform y opacity: el teléfono lo anima sin volver a dibujar la página.
+ * @param {HTMLElement} el lo que se anima
+ * @param {DOMRect} from dónde se veía antes
+ * @param {DOMRect} to dónde se ve ahora la parte de `el` que tiene que coincidir con `from`
+ * @param {number} [opacity] con qué opacidad empieza
+ */
+export function flyFrom(el, from, to, opacity = 1) {
+  if (calmMotion() || !from.width || !to.width || !el.animate) return;
+  const box = el.getBoundingClientRect();
+  const s = from.width / to.width;
+  el.animate(
+    [
+      {
+        transformOrigin: `${to.left - box.left}px ${to.top - box.top}px`,
+        transform: `translate(${from.left - to.left}px, ${from.top - to.top}px) scale(${s})`,
+        opacity,
+      },
+      { transformOrigin: `${to.left - box.left}px ${to.top - box.top}px`, transform: 'none', opacity: 1 },
+    ],
+    { duration: 300, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' },
+  );
+}
+
+/**
+ * Pasa al mini reproductor. Con `from` (deslizar hacia abajo), el mini sale volando desde donde quedó el video bajo el
+ * dedo, sin esperar a que el navegador termine de volver atrás (en iPhone eso tarda y el video se quedaba congelado).
+ * @param {{ from?: DOMRect, opacity?: number }} [opts]
+ */
+export function enterMini({ from, opacity } = {}) {
   if (!P.playing) return;
+  const wasHidden = mini.hidden;
   if (stage.classList.contains('kai-fs')) setKaiFullscreen(false);
   else if (isFullscreen()) exitFullscreen();
   if (document.body.classList.contains('lights-off')) setLights(false);
@@ -36,11 +71,16 @@ export function enterMini() {
   mini.hidden = false;
   document.documentElement.classList.add('has-mini');
   paintMini();
+  if (from && wasHidden && !calmMotion()) {
+    mini.style.animation = 'none'; // la entrada de siempre (CSS) no se suma al vuelo
+    flyFrom(mini, from, /** @type {HTMLElement} */ ($('#mini-slot')).getBoundingClientRect(), opacity);
+  }
 }
 export function leaveMini() {
   stage.classList.remove('is-mini');
   if (mini.hidden) return;
   mini.hidden = true;
+  mini.style.animation = '';
   document.documentElement.classList.remove('has-mini');
 }
 /** @param {HTMLElement} el @param {string} v */

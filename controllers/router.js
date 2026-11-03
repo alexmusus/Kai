@@ -199,7 +199,15 @@ export function softRender() {
   render();
 }
 
+/** La página actual se desvanece mientras llega la siguiente (al pasar al mini deslizando). */
+export function leavePage() {
+  app.classList.add('is-leaving');
+  // por si la siguiente no llega a dibujarse
+  setTimeout(() => app.classList.remove('is-leaving'), 800);
+}
+
 export function render() {
+  app.classList.remove('is-leaving');
   closeDrawer();
   if (!LS.get('session', null)) {
     player.stop();

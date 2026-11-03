@@ -5,7 +5,8 @@
 
 import { stage, video, holdEl, ui } from './dom.js';
 import { P } from './state.js';
-import { goBack } from '../router.js';
+import { goBack, leavePage } from '../router.js';
+import { enterMini } from './mini.js';
 import { LS } from '../../lib/util.js';
 import { isFullscreen, togglePlay, wake, toggleFullscreen, seekBy, exitFullscreen } from './controls.js';
 LS.del('bright'); // la barra de brillo se quitó en v16
@@ -165,8 +166,16 @@ export function touchEnd(e, cancelled) {
     const far = !cancelled && (t.dist || 0) > SWIPE_DOWN;
     const toMini = far && t.mode === 'down' && !!P.playing;
     if (toMini) {
-      // pasa al mini reproductor desde donde lo dejó el dedo: sin regresar antes a su lugar (las dos animaciones a la
-      // vez se veían trabadas). Al llegar al mini se le quita lo que le puso el dedo (enterMini).
+      /* pasa al mini en este mismo instante, volando desde donde lo dejó el dedo, y la página del reproductor se
+       * desvanece; la de la serie aparece debajo cuando el navegador termina de volver atrás (en iPhone tarda unos
+       * 150 ms, y antes el video se quedaba congelado a medio camino todo ese rato) */
+      const from = stage.getBoundingClientRect();
+      const opacity = Number(stage.style.opacity) || 1;
+      // el hueco del video se queda mientras la página se desvanece (si no, lo de abajo subía de golpe)
+      const slot = stage.parentElement;
+      if (slot && slot.id === 'stage-slot') slot.style.height = slot.offsetHeight + 'px';
+      enterMini({ from, opacity });
+      leavePage();
       if (P.playing) goBack(P.playing.ctx.back);
     } else {
       stage.style.transition = 'transform 0.2s, opacity 0.2s';
