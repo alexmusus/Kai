@@ -243,12 +243,19 @@ export function resumeCardHTML() {
   const mins = Math.round((Date.now() - o.n.u) / 60000);
   const when = mins < 2 ? 'hace un momento' : mins < 60 ? `hace ${mins} min` : `hace ${Math.round(mins / 60)} h`;
   const title = isCollection(o.s) ? episodeLabel(o.ep) : `${o.s.name} · ${episodeLabel(o.ep)}`;
-  return `<section class="resume-card" aria-label="Seguir en este dispositivo">
-    <div class="resume-text"><p class="resume-kicker">En tu ${esc(o.n.dn || 'otro dispositivo')}, ${when}</p>
-      <p class="resume-title">${esc(title)}</p></div>
-    <button class="tv-btn is-primary" data-act="resume-here">${ICON.play}<span>Seguir aquí en ${fmtTime(o.n.t)}</span></button>
-    <button class="icon-btn resume-x" data-act="resume-dismiss" aria-label="Descartar">${ICON.close}</button>
-  </section>`;
+  const dn = o.n.dn || 'otro dispositivo';
+  // una burbuja flotante, como una notificación: tocarla la abre con el detalle y "Seguir aquí"
+  return `<aside class="resume-card" aria-label="Seguir en este dispositivo">
+    <button class="resume-pill" data-act="resume-toggle" aria-expanded="false">${ICON.play}<span>Seguir de tu ${esc(dn)} · ${fmtTime(o.n.t)}</span></button>
+    <div class="resume-more"><div class="resume-in">
+      <p class="resume-kicker">En tu ${esc(dn)}, ${when}</p>
+      <p class="resume-title">${esc(title)}</p>
+      <div class="resume-actions">
+        <button class="tv-btn is-primary" data-act="resume-here">${ICON.play}<span>Seguir aquí en ${fmtTime(o.n.t)}</span></button>
+        <button class="tv-btn is-square resume-x" data-act="resume-dismiss" aria-label="Descartar">${ICON.close}</button>
+      </div>
+    </div></div>
+  </aside>`;
 }
 
 export const HOME_RECENT = 10;
