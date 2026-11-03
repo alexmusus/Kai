@@ -22,6 +22,76 @@
   <link rel="apple-touch-icon" href="icon-180.png">
   <link rel="stylesheet" href="styles.css">
   <script src="core.js"></script>
+  <!-- los módulos de Kai, pedidos todos a la vez (si no, el navegador los descubre uno tras otro);
+       la lista la revisa tests/unit/modulos.test.js -->
+  <link rel="modulepreload" href="app.js">
+  <link rel="modulepreload" href="lib/util.js">
+  <link rel="modulepreload" href="lib/events.js">
+  <link rel="modulepreload" href="lib/route.js">
+  <link rel="modulepreload" href="lib/nav-history.js">
+  <link rel="modulepreload" href="models/store.js">
+  <link rel="modulepreload" href="models/naming.js">
+  <link rel="modulepreload" href="models/mega.js">
+  <link rel="modulepreload" href="models/library.js">
+  <link rel="modulepreload" href="models/quota.js">
+  <link rel="modulepreload" href="models/collections.js">
+  <link rel="modulepreload" href="models/progress.js">
+  <link rel="modulepreload" href="models/profiles.js">
+  <link rel="modulepreload" href="models/sync.js">
+  <link rel="modulepreload" href="models/fichas.js">
+  <link rel="modulepreload" href="models/fichas-sync.js">
+  <link rel="modulepreload" href="models/idb.js">
+  <link rel="modulepreload" href="models/news.js">
+  <link rel="modulepreload" href="models/thumbs.js">
+  <link rel="modulepreload" href="models/downloads.js">
+  <link rel="modulepreload" href="models/media.js">
+  <link rel="modulepreload" href="models/plans.js">
+  <link rel="modulepreload" href="models/context.js">
+  <link rel="modulepreload" href="models/updates.js">
+  <link rel="modulepreload" href="models/discover.js">
+  <link rel="modulepreload" href="views/icons.js">
+  <link rel="modulepreload" href="views/quota.js">
+  <link rel="modulepreload" href="views/thumbs.js">
+  <link rel="modulepreload" href="views/view-state.js">
+  <link rel="modulepreload" href="views/components.js">
+  <link rel="modulepreload" href="views/home.js">
+  <link rel="modulepreload" href="views/episodes.js">
+  <link rel="modulepreload" href="views/series.js">
+  <link rel="modulepreload" href="views/dock.js">
+  <link rel="modulepreload" href="views/catalog.js">
+  <link rel="modulepreload" href="views/explorer.js">
+  <link rel="modulepreload" href="views/downloads.js">
+  <link rel="modulepreload" href="views/settings.js">
+  <link rel="modulepreload" href="views/discover.js">
+  <link rel="modulepreload" href="views/account.js">
+  <link rel="modulepreload" href="views/sheet.js">
+  <link rel="modulepreload" href="views/toast.js">
+  <link rel="modulepreload" href="views/theme.js">
+  <link rel="modulepreload" href="views/images.js">
+  <link rel="modulepreload" href="controllers/picking.js">
+  <link rel="modulepreload" href="controllers/router.js">
+  <link rel="modulepreload" href="controllers/dock.js">
+  <link rel="modulepreload" href="controllers/sync.js">
+  <link rel="modulepreload" href="controllers/actions.js">
+  <link rel="modulepreload" href="controllers/home.js">
+  <link rel="modulepreload" href="controllers/lifecycle.js">
+  <link rel="modulepreload" href="controllers/updates.js">
+  <link rel="modulepreload" href="controllers/account.js">
+  <link rel="modulepreload" href="controllers/downloads.js">
+  <link rel="modulepreload" href="controllers/sheet.js">
+  <link rel="modulepreload" href="controllers/player/state.js">
+  <link rel="modulepreload" href="controllers/player/dom.js">
+  <link rel="modulepreload" href="controllers/player/mini.js">
+  <link rel="modulepreload" href="controllers/player/controls.js">
+  <link rel="modulepreload" href="controllers/player/chapters.js">
+  <link rel="modulepreload" href="controllers/player/engine.js">
+  <link rel="modulepreload" href="controllers/player/page.js">
+  <link rel="modulepreload" href="controllers/player/gestures.js">
+  <link rel="modulepreload" href="controllers/player/events.js">
+  <link rel="modulepreload" href="views/watch.js">
+  <link rel="modulepreload" href="models/meta-api.js">
+  <link rel="modulepreload" href="models/subs.js">
+  <link rel="modulepreload" href="vendor/mega.js">
   <script type="module" src="app.js"></script>
 </head>
 <body>

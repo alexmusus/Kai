@@ -1,0 +1,18 @@
+{
+  // Chequeo de tipos sin compilar: TypeScript solo lee los comentarios JSDoc de los archivos que dicen // @ts-check.
+  // Kai sigue siendo JavaScript tal cual; esto solo avisa de errores (propiedades mal escritas, argumentos que faltan, null sin revisar).
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true,
+    "target": "es2022",
+    "module": "es2022",
+    "moduleResolution": "bundler",
+    "lib": ["es2023", "dom", "dom.iterable"],
+    "strict": true,
+    "noImplicitAny": false,
+    "skipLibCheck": true
+  },
+  "include": ["../*.js", "../lib/**/*.js", "../models/**/*.js", "../views/**/*.js", "../controllers/**/*.js", "types.d.ts"],
+  "exclude": ["../vendor/**", "../sw.js", "node_modules"]
+}

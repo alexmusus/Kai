@@ -37,7 +37,7 @@ Reproductor web para ver las series y películas de anime guardadas en una cuent
 - **Gestos en el teléfono:** doble toque a los lados para ±10 s, mantener presionado para 2×, deslizar arriba para pantalla completa y abajo para salir de ella o pasar al mini reproductor. En iPhone el video se gira solo, aunque tengas el bloqueo de rotación.
 - **Mini reproductor:** el video sigue sonando mientras navegas por Kai.
 - **Rápido:** lo ya visto queda en memoria (retroceder no gasta cuota de MEGA) y prepara el inicio del siguiente capítulo.
-- **Descargas sin conexión,** de uno en uno o varios a la vez. En Chrome y Edge de computadora se pueden guardar en una carpeta como MP4. Nada se borra solo: lo descargado se quita a mano desde Descargados.
+- **Descargas sin conexión,** de uno en uno o varios a la vez. En Chrome y Edge de computadora se pueden guardar en una carpeta como MP4. Nada se borra solo: lo descargado se quita a mano desde Descargados, y Kai pregunta antes de quitar algo o cerrar sesión.
 - **Tema:** automático, claro u oscuro. El modo claro tiene cuatro tonos para que no canse la vista (Blanco, Gris, Celeste y Arena) y el oscuro dos (Negro y Gris Culero, un gris medio como el de Lightroom). Se eligen en Ajustes.
 - **Sincronización en el botón del menú:** una ruedita azul gira mientras sincroniza; un puntito verde abajo a la derecha indica que todo está al día (azul: falta por sincronizar; gris: sin conexión).
 - **Novedades** en Ajustes con lo que se agrega a MEGA (un puntito en el menú avisa que hay algo nuevo). Aviso del uso de la cuota de MEGA y de cuando hay una versión nueva de Kai (también se puede buscar en Ajustes).

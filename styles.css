@@ -137,19 +137,9 @@ body.is-playing .ambient::before, body.is-playing .ambient::after { animation-pl
 @keyframes drift-a { to { transform: translate3d(6vmax, 4vmax, 0) scale(1.08); } }
 @keyframes drift-b { to { transform: translate3d(-5vmax, -3vmax, 0) scale(1.06); } }
 
-/* Logo: una esfera de vidrio */
-.orb {
-  display: inline-block; width: 1em; height: 1em; border-radius: 50%; flex: none;
-  background:
-    radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.95) 0 8%, rgba(255, 255, 255, 0.25) 22%, transparent 46%),
-    radial-gradient(circle at 70% 78%, rgba(169, 205, 250, 0.9), transparent 60%),
-    linear-gradient(145deg, #c9d3e3, #6f7a90 55%, #2c313d);
-  box-shadow: inset 0 -0.06em 0.12em rgba(0, 0, 0, 0.35), inset 0 0.04em 0.06em rgba(255, 255, 255, 0.7), 0 0.08em 0.3em rgba(0, 0, 0, 0.25);
-}
-
 /* ───────── superficies de vidrio ───────── */
 
-.bar, .drawer-panel, .sheet-panel, .toast, .st-menu, .p-card, .btn, .series-row, .file-icon, .segmented {
+.bar, .sheet-panel, .toast, .st-menu, .p-card, .btn, .file-icon, .segmented {
   -webkit-backdrop-filter: var(--blur);
   backdrop-filter: var(--blur);
 }
@@ -186,103 +176,26 @@ main { padding: 6px var(--gutter) calc(48px + env(safe-area-inset-bottom)); max-
 
 /* ───────── portadas ───────── */
 
-.cover {
-  position: relative; overflow: hidden; aspect-ratio: 16 / 9; border-radius: var(--r-md);
-  background:
-    radial-gradient(120% 90% at 85% 8%, hsl(var(--h) 30% 62% / 0.55), transparent 60%),
-    radial-gradient(90% 80% at 0% 100%, hsl(calc(var(--h) + 50) 22% 40% / 0.6), transparent 70%),
-    linear-gradient(160deg, hsl(var(--h) 12% 30%), hsl(var(--h) 10% 16%));
-}
-.cover::after { content: ''; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08); pointer-events: none; }
-.cover img, .ep-thumb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; animation: fade 0.35s ease-out; }
+.ep-thumb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; animation: fade 0.35s ease-out; }
 @keyframes fade { from { opacity: 0; } }
 .cover-glyph {
   position: absolute; right: 6%; bottom: -14%;
   font: 800 clamp(64px, 18vw, 180px)/1 var(--font-display); letter-spacing: -0.04em;
   color: rgba(255, 255, 255, 0.14);
 }
-.cover.has-img .cover-glyph { display: none; }
-
-/* ───────── continuar (héroe) ───────── */
-
-.hero { margin: 10px 0 30px; }
-.hero-link { position: relative; display: block; border-radius: var(--r-xl); overflow: hidden; isolation: isolate; box-shadow: 0 20px 50px var(--shadow); }
-.cover-hero { border-radius: 0; aspect-ratio: 16 / 10; }
-@media (min-width: 720px) { .cover-hero { aspect-ratio: 21 / 9; } }
-.hero-link::after { content: ''; position: absolute; inset: 0; z-index: 0; background: linear-gradient(180deg, rgba(0, 0, 0, 0) 35%, rgba(0, 0, 0, 0.72) 100%); }
-.hero-text { position: absolute; z-index: 1; left: 22px; right: 150px; bottom: 26px; color: #fff; }
-.hero-title { margin: 0 0 6px; font: 700 clamp(30px, 7vw, 54px)/1.04 var(--font-display); letter-spacing: -0.03em; text-wrap: balance; }
-.hero-meta { margin: 0; display: flex; gap: 12px; font-size: 15px; color: rgba(255, 255, 255, 0.9); }
-.hero-meta span + span { color: rgba(255, 255, 255, 0.62); }
-.hero-play {
-  position: absolute; z-index: 1; right: 18px; bottom: 22px;
-  display: inline-flex; align-items: center; gap: 8px; height: 50px; padding: 0 22px 0 18px; border-radius: 999px;
-  color: #fff; font-weight: 600;
-  background: rgba(255, 255, 255, 0.18); border: 1px solid rgba(255, 255, 255, 0.35);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 10px 30px rgba(0, 0, 0, 0.25);
-  -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur);
-}
-.hero-play svg { width: 20px; height: 20px; }
-.hero-bar { position: absolute; z-index: 1; left: 0; right: 0; bottom: 0; height: 4px; background: rgba(255, 255, 255, 0.2); }
-.hero-bar span { display: block; height: 100%; background: #fff; }
-.hero-link:hover .hero-play { background: rgba(255, 255, 255, 0.26); }
-@media (max-width: 520px) {
-  .hero-text { right: 22px; bottom: 86px; }
-  .hero-play { left: 20px; right: auto; bottom: 22px; }
-}
 
 /* ───────── bloques ───────── */
 
 .block { margin: 0 0 30px; }
-.block-title { margin: 0 0 12px; font: 600 14px/1.3 var(--font); color: var(--dim); }
-.hint { color: var(--dim); margin: 12px 0 24px; }
 
-.strip { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(170px, 36%); gap: 14px; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 4px; scrollbar-width: none; }
-.strip::-webkit-scrollbar { display: none; }
-.strip-item { scroll-snap-align: start; display: grid; gap: 2px; }
-.strip-item .cover { margin-bottom: 8px; }
-.strip-name { font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.strip-ep { color: var(--dim); font-size: 13px; }
 .mini-bar { display: block; height: 3px; border-radius: 3px; background: var(--line); overflow: hidden; margin-top: 6px; }
 .mini-bar span { display: block; height: 100%; background: var(--accent); }
 
-.series-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
-.series-row {
-  display: grid; grid-template-columns: 132px 1fr; gap: 16px; align-items: center;
-  padding: 10px; border-radius: var(--r-lg);
-  background: var(--glass); border: 1px solid var(--glass-edge);
-  box-shadow: inset 0 1px 0 var(--glass-hi);
-  transition: transform 0.15s, background-color 0.15s;
-}
-@media (hover: hover) { .series-row:hover { background: var(--glass-strong); } }
-.series-row:active { transform: scale(0.99); }
-.series-text { display: grid; gap: 2px; min-width: 0; }
-.series-name { font: 700 19px/1.2 var(--font-display); letter-spacing: -0.015em; }
-.series-meta { color: var(--dim); font-size: 14px; }
-.series-saved { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; color: var(--accent); }
-.series-saved svg { width: 16px; height: 16px; }
 .empty { padding: 48px 0; max-width: 48ch; }
 .empty p { margin: 0 0 12px; }
 
 /* ───────── serie ───────── */
 
-.series { padding-top: 0; }
-.series-head { position: relative; margin: 0 calc(-1 * var(--gutter)) 20px; }
-.cover-head { border-radius: 0; aspect-ratio: 16 / 9; max-height: 48vh; width: 100%; }
-.series-head::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 30%, var(--bg) 100%); pointer-events: none; }
-.series-head-text { position: absolute; z-index: 1; left: var(--gutter); right: var(--gutter); bottom: 6px; display: grid; gap: 14px; justify-items: start; }
-.series-title { margin: 0; font: 700 clamp(32px, 8vw, 58px)/1.04 var(--font-display); letter-spacing: -0.03em; text-wrap: balance; }
-@media (min-width: 720px) {
-  .series { padding-top: calc(env(safe-area-inset-top) + 64px); }
-  .series-head { margin: 0 0 24px; }
-  .cover-head { border-radius: var(--r-xl); aspect-ratio: 21 / 9; }
-  .series-head::after { border-radius: var(--r-xl); }
-  .series-head-text { left: 26px; bottom: 24px; }
-}
-
-.seasons { display: flex; gap: 8px; overflow-x: auto; margin: 0 0 12px; scrollbar-width: none; }
-.season { padding: 8px 15px; border-radius: 999px; background: var(--glass); border: 1px solid var(--glass-edge); color: var(--dim); white-space: nowrap; }
-.season.is-on { background: var(--primary); border-color: var(--primary); color: var(--primary-ink); font-weight: 600; }
 .season-title { margin: 0 0 8px; color: var(--dim); font-size: 14px; }
 
 .dl { position: relative; display: grid; place-items: center; width: 42px; height: 42px; border-radius: 50%; color: var(--dim); }
@@ -474,7 +387,6 @@ body.lights-off .bar { z-index: 1; }
 .st-flash.is-on { animation: flash 0.6s ease-out; }
 @keyframes flash { 0% { opacity: 0; } 20% { opacity: 1; } 100% { opacity: 0; } }
 
-
 /* mantener presionado: 2× mientras no se suelte */
 .st-hold {
   position: absolute; top: 14px; left: 50%; transform: translate(-50%, -6px);
@@ -543,7 +455,6 @@ html.kai-fs-on .dock { display: none; }
 .menu-item.is-on { font-weight: 600; }
 .menu-item.is-on::after { content: '✓'; color: var(--accent); }
 
-
 .p-card {
   position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 3;
   width: min(calc(100% - 32px), 420px); padding: 20px; border-radius: var(--r-xl);
@@ -609,14 +520,12 @@ html.kai-fs-on .dock { display: none; }
 .toast.is-on { opacity: 1; transform: translate(-50%, 0); }
 
 @media (min-width: 720px) {
-  .series-row { grid-template-columns: 180px 1fr; }
   .ep-main { grid-template-columns: 150px 1fr; }
-  .strip { grid-auto-columns: 240px; }
 }
 
 /* Sin desenfoque disponible: superficies más opacas para que se lea bien */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .bar, .drawer-panel, .sheet-panel, .toast, .st-menu, .p-card { background: var(--glass-solid); }
+  .bar, .sheet-panel, .toast, .st-menu, .p-card { background: var(--glass-solid); }
   .st-bar { background: rgba(22, 24, 30, 0.85); }
 }
 
@@ -722,19 +631,6 @@ html.kai-fs-on .dock { display: none; }
 .tv-empty { padding: 12vh 0; }
 .tv-empty .tv-btn { margin-top: 10px; }
 
-/* buscador de imagen */
-.picker { max-width: 760px; max-height: min(86dvh, 760px); overflow-y: auto; gap: 12px; padding-bottom: 14px; }
-.picker-search { display: flex; gap: 8px; margin-top: 6px; }
-.picker-search input { flex: 1; font: inherit; font-size: 16px; color: var(--text); min-height: 44px; padding: 0 14px; border-radius: 999px; background: var(--glass); border: 1px solid var(--glass-edge); }
-.picker-results { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
-.pick { display: grid; gap: 2px; text-align: left; padding: 6px; border-radius: 16px; }
-@media (hover: hover) { .pick:hover { background: var(--glass); } }
-.pick-img { position: relative; aspect-ratio: 16 / 9; border-radius: 12px; overflow: hidden; background: var(--thumb-bg); margin-bottom: 4px; }
-.pick-img img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.pick-title { font-weight: 600; font-size: 14px; line-height: 1.25; }
-.pick-sub { font-size: 12px; color: var(--dim); }
-.picker-foot { justify-content: space-between; align-items: center; border-top: 1px solid var(--line); padding-top: 10px; }
-
 /* perfiles */
 .avatar {
   display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; flex: none;
@@ -761,13 +657,6 @@ html.kai-fs-on .dock { display: none; }
 .profile-tile.is-editing .avatar { opacity: 0.6; }
 .profile-new { display: grid; gap: 10px; justify-items: center; padding: 10px; }
 .profile-new input { font: inherit; font-size: 17px; text-align: center; color: var(--text); width: 200px; min-height: 48px; border-radius: 999px; background: var(--glass); border: 1px solid var(--glass-edge); padding: 0 16px; }
-
-/* perfil en el menú lateral */
-.drawer-profile { display: flex; align-items: center; gap: 12px; padding: 10px 12px; margin: -6px 0 12px; border-radius: var(--r-md); }
-@media (hover: hover) { .drawer-profile:hover { background: var(--glass); } }
-.drawer-profile > span:last-child { display: grid; }
-.drawer-pname { font-weight: 600; }
-.drawer-psub { font-size: 12px; color: var(--dim); }
 
 /* ───────────────────────── v5: botón flotante, portadas, serie y episodios ───────────────────────── */
 
@@ -832,8 +721,6 @@ body.quota-hit .dock-quota { color: var(--dim); }
 body.quota-hit .dock-quota::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #e6a23c; margin-right: 6px; vertical-align: 1px; }
 body.quota-hit .dock-btn::after { content: ''; position: absolute; top: 2px; right: 2px; width: 9px; height: 9px; border-radius: 50%; background: #e6a23c; border: 2px solid var(--bg); }
 
-.tv-top .sync { margin-top: 0; }
-
 /* portada: el anime solo vive en su póster y en los mosaicos */
 .tv-hero { display: grid; grid-template-columns: 1fr; gap: 34px; align-items: end; max-width: 1180px; padding: clamp(24px, 7vh, 80px) 0 26px; }
 .tvh-text { min-width: 0; max-width: 760px; }
@@ -887,7 +774,7 @@ body.quota-hit .dock-btn::after { content: ''; position: absolute; top: 2px; rig
 .ep-section { margin-top: 6px; }
 .ep-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
 .ep-heading { margin: 0; font: 700 26px/1.1 var(--font-display); letter-spacing: -0.025em; }
-.ep-head .seasons { margin: 0; }
+
 .tv-kicker { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; margin: 0 0 6px; font-size: 14px; color: var(--dim); font-weight: 600; }
 .tv-kicker a { color: var(--text); text-decoration: none; }
 .tv-kicker a:hover { text-decoration: underline; }
@@ -1142,7 +1029,6 @@ html.has-mini body { padding-bottom: var(--mini-space); }
 .update-x { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; color: var(--dim); }
 .update-x svg { width: 16px; height: 16px; }
 
-
 /* etiquetas que filtran el catálogo */
 .tv-facts .fact { color: var(--text); transition: background-color 0.15s, transform 0.15s; }
 @media (hover: hover) { .tv-facts .fact:hover { background: var(--glass-strong); transform: translateY(-1px); } }
@@ -1304,3 +1190,39 @@ img.no-fade { animation: none !important; }
  * (parpadeaban las etiquetas SUB/DUB, "Nuevo" y los títulos grandes). Estas piezas pequeñas van sin desenfoque. */
 .lang-chip, .tile-badge { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgba(0, 0, 0, 0.55); }
 .tv-title { text-shadow: 0 1px 12px color-mix(in srgb, var(--bg) 45%, transparent); }
+/* Lo mismo para lo que se repite en cada capítulo (Descargado, Visto, el botón de play y el círculo de Seleccionar):
+ * con decenas de tarjetas eran decenas de capas de desenfoque que el iPhone redibujaba al deslizar y al volver.
+ * Sin desenfoque, con un fondo un poco más opaco, se ven igual. */
+.ep-flag { -webkit-backdrop-filter: none; backdrop-filter: none; }
+.ep-flag:not(.is-seen) { background: rgba(0, 0, 0, 0.6); }
+.episodes.is-picking .ep-thumb::before { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgba(0, 0, 0, 0.4); }
+@media (hover: none) {
+  /* en el teléfono el botón de play de cada capítulo nunca se ve (sale al pasar el mouse) */
+  .ep-play { -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+
+/* Mini reproductor: su fondo ya es casi opaco, así que el desenfoque no se notaba, pero el iPhone lo recalculaba en
+ * cada cuadro de la animación de entrada (se veía con tirones). Las animaciones entre grande y mini están en
+ * controllers/player/mini.js (flyFrom). */
+.mini { -webkit-backdrop-filter: none; backdrop-filter: none; }
+#app { transition: opacity 0.15s ease-out; }
+#app.is-leaving { opacity: 0; pointer-events: none; }
+
+/* Modo liviano (teléfonos de gama media, ver views/theme.js): sin desenfoque y sin fondo en movimiento. Las
+ * superficies de vidrio pasan a su versión más opaca, la misma que en navegadores sin desenfoque. */
+html.lite *, html.lite *::before, html.lite *::after { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+html.lite .bar, html.lite .sheet-panel, html.lite .toast, html.lite .st-menu, html.lite .p-card, html.lite .dock-btn, html.lite .dock-panel { background: var(--glass-solid); }
+html.lite .st-bar { background: rgba(22, 24, 30, 0.85); }
+html.lite .ambient::before, html.lite .ambient::after { animation: none; will-change: auto; }
+/* pasar entre el reproductor grande y el mini: animar un video es lo que más le cuesta a un teléfono modesto (se veía
+ * trabado); cambia al instante. Y el póster difuminado detrás de la serie (un desenfoque de pantalla entera que se
+ * repinta justo al pasar al mini) no se dibuja: queda el color de la serie en el fondo. */
+html.lite .mini { animation: none; }
+html.lite #app { transition: none; }
+html.lite .series-wash img { display: none; }
+
+/* En pantalla completa lo de detrás del video no se ve: se deja de dibujar (al girar el teléfono y al entrar o salir
+ * el navegador ya no tiene que acomodar la lista de capítulos ni el fondo). */
+html.kai-fs-on .ambient, html:has(.stage:fullscreen) .ambient,
+html.kai-fs-on .watch-info, html:has(.stage:fullscreen) .watch-info,
+html.kai-fs-on .watch-list, html:has(.stage:fullscreen) .watch-list { visibility: hidden; }

@@ -1,3 +1,4 @@
+// @ts-check
 /*
  * subs.js — subtítulos y capítulos para Kai.
  *  - Pistas de texto incrustadas en MP4 (mov_text/tx3g y WebVTT), leídas por rangos:
@@ -11,9 +12,28 @@ export const isSubtitleName = (name) => SUB_EXT.test(name || '');
 /* ───────── nombres de idioma ───────── */
 
 const LANGS = {
-  spa: 'Español', es: 'Español', esp: 'Español', eng: 'Inglés', en: 'Inglés', jpn: 'Japonés', ja: 'Japonés',
-  por: 'Portugués', pt: 'Portugués', fre: 'Francés', fra: 'Francés', fr: 'Francés', ger: 'Alemán', deu: 'Alemán',
-  de: 'Alemán', ita: 'Italiano', it: 'Italiano', kor: 'Coreano', ko: 'Coreano', chi: 'Chino', zho: 'Chino', zh: 'Chino',
+  spa: 'Español',
+  es: 'Español',
+  esp: 'Español',
+  eng: 'Inglés',
+  en: 'Inglés',
+  jpn: 'Japonés',
+  ja: 'Japonés',
+  por: 'Portugués',
+  pt: 'Portugués',
+  fre: 'Francés',
+  fra: 'Francés',
+  fr: 'Francés',
+  ger: 'Alemán',
+  deu: 'Alemán',
+  de: 'Alemán',
+  ita: 'Italiano',
+  it: 'Italiano',
+  kor: 'Coreano',
+  ko: 'Coreano',
+  chi: 'Chino',
+  zho: 'Chino',
+  zh: 'Chino',
 };
 export function langName(code) {
   if (!code) return '';
@@ -29,22 +49,26 @@ function ts(h, m, s, frac) {
 
 function cleanVttText(t) {
   return t
-    .replace(/\{\\[^}]*\}/g, '')                    // {\an8} que vienen de ASS
-    .replace(/<(?!\/?(i|b|u)\b)[^>]+>/gi, '')       // deja solo <i>, <b>, <u>
+    .replace(/\{\\[^}]*\}/g, '') // {\an8} que vienen de ASS
+    .replace(/<(?!\/?(i|b|u)\b)[^>]+>/gi, '') // deja solo <i>, <b>, <u>
     .replace(/\r/g, '')
     .trim();
 }
 
 /** SRT y WebVTT → [[inicio, fin, texto]] */
 export function parseSrtVtt(text) {
+  /** @type {[number, number, string][]} */
   const out = [];
-  const blocks = String(text).replace(/^﻿/, '').replace(/\r\n?/g, '\n').split(/\n{2,}/);
+  const blocks = String(text)
+    .replace(/^﻿/, '')
+    .replace(/\r\n?/g, '\n')
+    .split(/\n{2,}/);
   const re = /(?:(\d+):)?(\d{1,2}):(\d{2})[,.](\d{1,3})\s*-->\s*(?:(\d+):)?(\d{1,2}):(\d{2})[,.](\d{1,3})/;
   for (const b of blocks) {
     const lines = b.split('\n');
     const i = lines.findIndex((l) => re.test(l));
     if (i < 0) continue;
-    const m = re.exec(lines[i]);
+    const m = /** @type {RegExpExecArray} */ (re.exec(lines[i])); // la línea ya pasó re.test
     const start = ts(m[1], m[2], m[3], m[4].padEnd(3, '0'));
     const end = ts(m[5], m[6], m[7], m[8].padEnd(3, '0'));
     const body = cleanVttText(lines.slice(i + 1).join('\n'));
@@ -55,16 +79,26 @@ export function parseSrtVtt(text) {
 
 /** ASS/SSA → [[inicio, fin, texto]] (sin estilos: posición y colores se pierden) */
 export function parseAss(text) {
+  /** @type {[number, number, string][]} */
   const out = [];
   let format = null;
   let inEvents = false;
   for (const raw of String(text).replace(/^﻿/, '').split(/\r?\n/)) {
     const line = raw.trim();
-    if (/^\[events\]/i.test(line)) { inEvents = true; continue; }
-    if (/^\[/.test(line)) { inEvents = false; continue; }
+    if (/^\[events\]/i.test(line)) {
+      inEvents = true;
+      continue;
+    }
+    if (/^\[/.test(line)) {
+      inEvents = false;
+      continue;
+    }
     if (!inEvents) continue;
     if (/^format\s*:/i.test(line)) {
-      format = line.replace(/^format\s*:/i, '').split(',').map((s) => s.trim().toLowerCase());
+      format = line
+        .replace(/^format\s*:/i, '')
+        .split(',')
+        .map((s) => s.trim().toLowerCase());
       continue;
     }
     if (!/^dialogue\s*:/i.test(line) || !format) continue;
@@ -106,7 +140,10 @@ function* boxes(b, start, end) {
     let size = u32(b, p);
     const type = fourcc(b, p + 4);
     let hdr = 8;
-    if (size === 1) { size = u64(b, p + 8); hdr = 16; } else if (size === 0) size = end - p;
+    if (size === 1) {
+      size = u64(b, p + 8);
+      hdr = 16;
+    } else if (size === 0) size = end - p;
     if (size < hdr || p + size > end) return;
     yield { type, start: p + hdr, end: p + size };
     p += size;
@@ -118,7 +155,9 @@ function child(b, box, type) {
 }
 function path(b, box, ...types) {
   let cur = box;
-  for (const t of types) { cur = cur && child(b, cur, t); }
+  for (const t of types) {
+    cur = cur && child(b, cur, t);
+  }
   return cur;
 }
 
@@ -160,8 +199,14 @@ function sampleTable(b, stbl) {
   for (let i = 0; i < count; i++) sizes[i] = fixed || u32(b, stsz.start + 12 + i * 4);
 
   const chunks = [];
-  if (stco) { const n = u32(b, stco.start + 4); for (let i = 0; i < n; i++) chunks.push(u32(b, stco.start + 8 + i * 4)); }
-  else { const n = u32(b, co64.start + 4); for (let i = 0; i < n; i++) chunks.push(u64(b, co64.start + 8 + i * 8)); }
+  if (stco) {
+    const n = u32(b, stco.start + 4);
+    for (let i = 0; i < n; i++) chunks.push(u32(b, stco.start + 8 + i * 4));
+  } else {
+    const box = /** @type {NonNullable<typeof co64>} */ (co64); // sin stco, hay co64 (se revisó arriba)
+    const n = u32(b, box.start + 4);
+    for (let i = 0; i < n; i++) chunks.push(u64(b, box.start + 8 + i * 8));
+  }
 
   const sc = [];
   const nsc = u32(b, stsc.start + 4);
@@ -180,7 +225,11 @@ function sampleTable(b, stbl) {
   let t = 0;
   for (let ci = 0; ci < chunks.length && s < count; ci++) {
     let per = 0;
-    for (let k = sc.length - 1; k >= 0; k--) if (ci + 1 >= sc[k][0]) { per = sc[k][1]; break; }
+    for (let k = sc.length - 1; k >= 0; k--)
+      if (ci + 1 >= sc[k][0]) {
+        per = sc[k][1];
+        break;
+      }
     let off = chunks[ci];
     for (let k = 0; k < per && s < count; k++, s++) {
       out.push({ off, size: sizes[s], t, d: durs[s] || 0 });
@@ -241,8 +290,10 @@ export async function mp4Info(read, size) {
     const mdhd = mdia && child(moov, mdia, 'mdhd');
     if (!hdlr || !mdhd) continue;
     const handler = fourcc(moov, hdlr.start + 8);
-    if (handler === 'soun') { // idioma del primer audio (sirve para saber si está doblado)
-      if (!audioLang) audioLang = lang3(moov[mdhd.start] === 1 ? u16(moov, mdhd.start + 32) : u16(moov, mdhd.start + 20));
+    if (handler === 'soun') {
+      // idioma del primer audio (sirve para saber si está doblado)
+      if (!audioLang)
+        audioLang = lang3(moov[mdhd.start] === 1 ? u16(moov, mdhd.start + 32) : u16(moov, mdhd.start + 20));
       continue;
     }
     if (!['text', 'sbtl', 'subt'].includes(handler)) continue;
@@ -256,8 +307,13 @@ export async function mp4Info(read, size) {
     const lang = lang3(v === 1 ? u16(moov, mdhd.start + 32) : u16(moov, mdhd.start + 20));
     let name = '';
     try {
-      name = new TextDecoder().decode(moov.subarray(hdlr.start + 24, hdlr.end)).replace(/\0/g, '').trim();
-    } catch { /* nada */ }
+      name = new TextDecoder()
+        .decode(moov.subarray(hdlr.start + 24, hdlr.end))
+        .replace(/\0/g, '')
+        .trim();
+    } catch {
+      /* nada */
+    }
     if (/handler|core media|^text$|subtitle ?media/i.test(name)) name = '';
     const samples = sampleTable(moov, stbl).filter((s) => s.size > 2);
     const track = { codec, lang, name, timescale: timescale || 1000, samples };
@@ -271,6 +327,7 @@ export async function mp4Info(read, size) {
 export async function mp4Formats(read, size) {
   const moov = await readMoov(read, size);
   if (!moov) return null;
+  /** @type {{ video: any, audio: any }} */
   const out = { video: null, audio: null };
   for (const trak of boxes(moov, 8, moov.length)) {
     if (trak.type !== 'trak') continue;
@@ -282,19 +339,28 @@ export async function mp4Formats(read, size) {
     const entry = stsd.start + 8; // versión/banderas (4) y número de entradas (4)
     const entryEnd = Math.min(stsd.end, entry + u32(moov, entry));
     const codec = fourcc(moov, entry + 4);
-    const find = (type, from) => { for (const c of boxes(moov, from, entryEnd)) if (c.type === type) return c; return null; };
+    const find = (type, from) => {
+      for (const c of boxes(moov, from, entryEnd)) if (c.type === type) return c;
+      return null;
+    };
     if (handler === 'vide' && !out.video) {
       const v = { codec, bits: 8, profile: 0 };
       const kids = entry + 8 + 78; // la entrada de video tiene 78 bytes fijos antes de sus cajas
       if (/^avc[13]$/.test(codec)) {
         const c = find('avcC', kids);
-        if (c) { v.profile = moov[c.start + 1]; if ([110, 122, 244].includes(v.profile)) v.bits = 10; }
+        if (c) {
+          v.profile = moov[c.start + 1];
+          if ([110, 122, 244].includes(v.profile)) v.bits = 10;
+        }
       } else if (/^(hev1|hvc1)$/.test(codec)) {
         const c = find('hvcC', kids);
-        if (c) { v.profile = moov[c.start + 1] & 0x1f; v.bits = (moov[c.start + 17] & 7) + 8; }
+        if (c) {
+          v.profile = moov[c.start + 1] & 0x1f;
+          v.bits = (moov[c.start + 17] & 7) + 8;
+        }
       } else if (codec === 'av01') {
         const c = find('av1C', kids);
-        if (c) v.bits = (moov[c.start + 2] & 0x40) ? ((moov[c.start + 2] & 0x20) ? 12 : 10) : 8;
+        if (c) v.bits = moov[c.start + 2] & 0x40 ? (moov[c.start + 2] & 0x20 ? 12 : 10) : 8;
       }
       out.video = v;
     } else if (handler === 'soun' && !out.audio) {
@@ -317,12 +383,17 @@ export async function mp4QuickFormats(read, size, limit = 256 * 1024) {
     const type = fourcc(h, 4);
     if (boxSize === 1) boxSize = u64(h, 8);
     else if (boxSize === 0) boxSize = size - pos;
-    if (type === 'moov') { moovPos = pos; moovSize = boxSize; break; }
+    if (type === 'moov') {
+      moovPos = pos;
+      moovSize = boxSize;
+      break;
+    }
     if (boxSize < 8) break;
     pos += boxSize;
   }
   if (moovPos < 0) return null;
   const b = await read(moovPos, moovPos + Math.min(moovSize, limit) - 1);
+  /** @type {{ video: any, audio: any }} */
   const out = { video: null, audio: null };
   // recorre cajas sin exigir que quepan completas en lo que se bajó
   const walk = (start, end, depth) => {
@@ -331,7 +402,10 @@ export async function mp4QuickFormats(read, size, limit = 256 * 1024) {
       let sz = u32(b, p);
       const type = fourcc(b, p + 4);
       let hdr = 8;
-      if (sz === 1) { sz = u64(b, p + 8); hdr = 16; } else if (sz === 0) sz = end - p;
+      if (sz === 1) {
+        sz = u64(b, p + 8);
+        hdr = 16;
+      } else if (sz === 0) sz = end - p;
       if (sz < hdr) return;
       const box = { type, start: p + hdr, end: Math.min(p + sz, end, b.length) };
       if (['moov', 'trak', 'mdia', 'minf', 'stbl'].includes(type) && depth < 6) {
@@ -345,10 +419,31 @@ export async function mp4QuickFormats(read, size, limit = 256 * 1024) {
         if (cur.handler === 'vide' && !out.video) {
           const v = { codec, bits: 8, profile: 0 };
           const kids = entry + 8 + 78;
-          const find = (t) => { for (let q = kids; q + 8 <= Math.min(box.end, b.length); ) { const n = u32(b, q); if (fourcc(b, q + 4) === t) return q + 8; if (n < 8) break; q += n; } return -1; };
-          if (/^avc[13]$/.test(codec)) { const c = find('avcC'); if (c > 0) { v.profile = b[c + 1]; if ([110, 122, 244].includes(v.profile)) v.bits = 10; } }
-          else if (/^(hev1|hvc1)$/.test(codec)) { const c = find('hvcC'); if (c > 0) { v.profile = b[c + 1] & 0x1f; v.bits = (b[c + 17] & 7) + 8; } }
-          else if (codec === 'av01') { const c = find('av1C'); if (c > 0) v.bits = (b[c + 2] & 0x40) ? ((b[c + 2] & 0x20) ? 12 : 10) : 8; }
+          const find = (t) => {
+            for (let q = kids; q + 8 <= Math.min(box.end, b.length);) {
+              const n = u32(b, q);
+              if (fourcc(b, q + 4) === t) return q + 8;
+              if (n < 8) break;
+              q += n;
+            }
+            return -1;
+          };
+          if (/^avc[13]$/.test(codec)) {
+            const c = find('avcC');
+            if (c > 0) {
+              v.profile = b[c + 1];
+              if ([110, 122, 244].includes(v.profile)) v.bits = 10;
+            }
+          } else if (/^(hev1|hvc1)$/.test(codec)) {
+            const c = find('hvcC');
+            if (c > 0) {
+              v.profile = b[c + 1] & 0x1f;
+              v.bits = (b[c + 17] & 7) + 8;
+            }
+          } else if (codec === 'av01') {
+            const c = find('av1C');
+            if (c > 0) v.bits = b[c + 2] & 0x40 ? (b[c + 2] & 0x20 ? 12 : 10) : 8;
+          }
           out.video = v;
         } else if (cur.handler === 'soun' && !out.audio) out.audio = { codec };
       }
@@ -375,7 +470,11 @@ export async function mp4Chapters(info, read, duration) {
   }
   if (!list || !list.length) return [];
   list.sort((a, b) => a.t - b.t);
-  return list.map((c, i) => ({ start: c.t, end: i + 1 < list.length ? list[i + 1].t : (duration || Infinity), title: c.title }));
+  return list.map((c, i) => ({
+    start: c.t,
+    end: i + 1 < list.length ? list[i + 1].t : duration || Infinity,
+    title: c.title,
+  }));
 }
 
 /* ───────── cuál capítulo es el opening ───────── */
@@ -388,7 +487,10 @@ const OPENING_RE = /^\s*(opening|op\b|apertura)/i;
  * anime que va antes del opening, así que no basta el nombre: un opening dura más o menos 1 a 2½ minutos.
  * Se prefiere el que se llama Opening/OP/Apertura; si hay varios, el de duración más cercana a 1:30. */
 export function pickIntro(chapters) {
-  const fits = (c) => { const len = c.end - c.start; return isFinite(len) && len >= 45 && len <= 150; };
+  const fits = (c) => {
+    const len = c.end - c.start;
+    return isFinite(len) && len >= 45 && len <= 150;
+  };
   const named = (chapters || []).filter((c) => INTRO_RE.test(c.title || ''));
   if (!named.length) return null;
   const rank = (c) => (OPENING_RE.test(c.title) ? 0 : 1) * 1000 + Math.abs(c.end - c.start - 90);
@@ -411,9 +513,10 @@ export function decodeSample(codec, bytes) {
   }
   const len = u16(bytes, 0);
   const body = bytes.subarray(2, 2 + len);
-  const text = body[0] === 0xfe && body[1] === 0xff
-    ? new TextDecoder('utf-16be').decode(body.subarray(2))
-    : new TextDecoder().decode(body);
+  const text =
+    body[0] === 0xfe && body[1] === 0xff
+      ? new TextDecoder('utf-16be').decode(body.subarray(2))
+      : new TextDecoder().decode(body);
   return cleanVttText(text.replace(/\r\n?/g, '\n'));
 }
 
@@ -421,13 +524,19 @@ export function decodeSample(codec, bytes) {
  * Descarga las muestras de una pista (las cercanas a `near` primero) y entrega
  * cada subtítulo apenas llega mediante onCue(inicio, fin, texto).
  */
-export async function loadTrackCues(track, read, { near = 0, parallel = 6, onCue, signal } = {}) {
+/**
+ * @param {any} track
+ * @param {(start: number, end: number) => Promise<Uint8Array>} read
+ * @param {{ near?: number, parallel?: number, onCue: (start: number, end: number, text: string) => void, signal?: AbortSignal }} opts
+ */
+export async function loadTrackCues(track, read, { near = 0, parallel = 6, onCue, signal }) {
   const ts = track.timescale;
   const groups = [];
   for (const s of track.samples) {
     const g = groups[groups.length - 1];
     if (g && s.off >= g.end && s.off - g.end < 16 * 1024 && s.off + s.size - g.start < 512 * 1024) {
-      g.items.push(s); g.end = s.off + s.size;
+      g.items.push(s);
+      g.end = s.off + s.size;
     } else {
       groups.push({ start: s.off, end: s.off + s.size, items: [s], t: s.t / ts });
     }
@@ -440,7 +549,10 @@ export async function loadTrackCues(track, read, { near = 0, parallel = 6, onCue
       const g = groups[i++];
       let data;
       for (let tries = 0; ; tries++) {
-        try { data = await read(g.start, g.end - 1); break; } catch (err) {
+        try {
+          data = await read(g.start, g.end - 1);
+          break;
+        } catch (err) {
           if ((signal && signal.aborted) || tries >= 2) throw err;
         }
       }

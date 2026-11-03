@@ -6,9 +6,23 @@
  */
 importScripts('core.js');
 
-const VERSION = 'kai-v37';
+/* VERSION es la de Kai que se ve en Ajustes: sube solo al pasar algo a main (lo publicado). ENTREGA cuenta las
+ * subidas a prueba dentro de esa versión: sube en cada una (el navegador solo instala de nuevo si este archivo
+ * cambia) y vuelve a 1 cuando sube VERSION. */
+const VERSION = 38;
+const ENTREGA = 1;
+const CACHE = `kai-${VERSION}.${ENTREGA}`;
 const SHELL = [
-  './', 'styles.css', 'app.js', 'subs.js', 'meta.js', 'core.js',
+  './', 'styles.css', 'app.js', 'core.js', 'models/subs.js', 'models/meta-api.js',
+  'lib/util.js', 'lib/events.js', 'lib/route.js', 'lib/nav-history.js', 'models/naming.js', 'models/store.js', 'models/mega.js', 'models/library.js',
+  'models/quota.js', 'models/collections.js', 'models/progress.js', 'models/profiles.js', 'models/sync.js', 'models/fichas.js', 'models/fichas-sync.js', 'models/idb.js', 'models/news.js', 'models/thumbs.js', 'models/downloads.js', 'models/media.js', 'models/plans.js', 'models/context.js', 'models/updates.js', 'models/discover.js', 'views/icons.js', 'views/quota.js', 'views/thumbs.js', 'views/view-state.js', 'views/components.js', 'views/home.js', 'views/episodes.js', 'views/series.js', 'views/dock.js', 'views/catalog.js', 'views/explorer.js', 'views/downloads.js',
+  'views/settings.js', 'views/discover.js', 'views/account.js', 'views/sheet.js', 'views/toast.js', 'views/theme.js', 'views/images.js',
+  'controllers/picking.js', 'controllers/router.js', 'controllers/dock.js', 'controllers/sync.js',
+  'controllers/actions.js', 'controllers/home.js', 'controllers/lifecycle.js', 'controllers/updates.js',
+  'controllers/account.js', 'controllers/downloads.js', 'controllers/sheet.js', 'controllers/player/state.js', 'controllers/player/dom.js',
+  'controllers/player/mini.js', 'controllers/player/controls.js', 'controllers/player/chapters.js',
+  'controllers/player/engine.js', 'controllers/player/page.js', 'controllers/player/gestures.js',
+  'controllers/player/events.js', 'views/watch.js',
   'vendor/mega.js', 'manifest.webmanifest', 'icon-32.png', 'icon-180.png', 'icon-192.png', 'icon-512.png',
   'gato/sentado.webp', 'gato/sentado-cierra.webp', 'gato/echado.webp',
 ];
@@ -36,7 +50,7 @@ async function reportQuota(timeLeft) {
 self.addEventListener('install', (e) => {
   // 'reload' evita que el navegador entregue archivos viejos de su propia caché
   e.waitUntil((async () => {
-    const c = await caches.open(VERSION);
+    const c = await caches.open(CACHE);
     await Promise.all(SHELL.map(async (u) => {
       const res = await fetch(new Request(u, { cache: 'reload' }));
       if (!res.ok) throw new Error('No se pudo guardar ' + u);
@@ -48,13 +62,13 @@ self.addEventListener('install', (e) => {
 
 // la app pregunta qué versión está instalada (Ajustes)
 self.addEventListener('message', (e) => {
-  if ((e.data || {}).type === 'version' && e.source) e.source.postMessage({ type: 'version', version: VERSION });
+  if ((e.data || {}).type === 'version' && e.source) e.source.postMessage({ type: 'version', version: VERSION, entrega: ENTREGA });
 });
 
 self.addEventListener('activate', (e) => {
   e.waitUntil((async () => {
     for (const k of await caches.keys()) {
-      if (k !== VERSION && k !== FONT_CACHE && k !== ART_CACHE) await caches.delete(k);
+      if (k !== CACHE && k !== FONT_CACHE && k !== ART_CACHE) await caches.delete(k);
     }
     await self.clients.claim();
   })());
@@ -107,7 +121,7 @@ async function clean(res) {
 }
 
 async function staleWhileRevalidate(req, e) {
-  const cache = await caches.open(VERSION);
+  const cache = await caches.open(CACHE);
   const key = req.mode === 'navigate' ? './' : req;
   const hit = await cache.match(key, { ignoreSearch: req.mode === 'navigate' });
   const update = fetch(req).then(async (res) => {
