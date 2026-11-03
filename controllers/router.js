@@ -62,6 +62,10 @@ const markedPos = () => {
 const mark = (pos) => {
   if (markedPos() !== pos) history.replaceState({ ...(history.state || {}), [KEY]: pos }, '');
 };
+/* La app instalada abre en "kai.musus.dev/" (sin #): era la única entrada del historial sin #, y al volver a ella
+ * deslizando, Safari no tenía su foto y mostraba la pantalla en negro hasta dibujar el inicio. Con "#/" queda igual
+ * que todas las demás. */
+if (!location.hash) history.replaceState(history.state, '', '#/');
 const nav = createNavHistory(location.hash || '#/', markedPos() ?? 0);
 mark(nav.pos);
 let navReplacing = false;

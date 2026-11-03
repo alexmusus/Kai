@@ -10,7 +10,7 @@ importScripts('core.js');
  * subidas a prueba dentro de esa versión: sube en cada una (el navegador solo instala de nuevo si este archivo
  * cambia) y vuelve a 1 cuando sube VERSION. */
 const VERSION = 38;
-const ENTREGA = 3;
+const ENTREGA = 4;
 const CACHE = `kai-${VERSION}.${ENTREGA}`;
 const SHELL = [
   './', 'styles.css', 'app.js', 'core.js', 'models/subs.js', 'models/meta-api.js',

@@ -388,3 +388,15 @@ test('teléfono de gama alta: sin modo liviano', async ({ page }) => {
   await openKai(page, '#/');
   await expect(page.locator('html.lite')).toHaveCount(0);
 });
+
+test('abrir Kai sin # (como la app instalada) deja el inicio en "#/", igual que las demás páginas', async ({ page }) => {
+  const k = await openKai(page, '');
+  await expect(page).toHaveURL(/\/#\/$/);
+  await expect(page.locator('.tv.is-home')).toBeVisible();
+  await page.evaluate((h) => { location.hash = h; }, `#/serie/${k.si('Dorohedoro')}`);
+  await page.waitForTimeout(200);
+  await page.evaluate(() => history.back());
+  await expect(page).toHaveURL(/\/#\/$/);
+  await expect(page.locator('.tv.is-home')).toBeVisible();
+  expect(k.errors).toEqual([]);
+});
