@@ -1,0 +1,47 @@
+// Revisa que un cambio en la app venga con VERSION o ENTREGA nuevas en sw.js.
+// Kai sale de la caché sin preguntar al servidor: si la app cambia y sw.js no, nadie recibe el cambio.
+// Uso: node tests/version-check.mjs <commit base>   (GitHub Actions le pasa la base del PR o el push anterior)
+import { execFileSync } from 'node:child_process';
+
+const base = process.argv[2];
+if (!base || /^0+$/.test(base)) {
+  console.log('Sin base con qué comparar: no se revisa.');
+  process.exit(0);
+}
+const git = (...args) => execFileSync('git', args, { encoding: 'utf8' });
+
+// lo que no se publica como parte de la app (o no cambia lo que corre en el teléfono)
+const OUTSIDE = [/^tests\//, /^docs\//, /^\.github\//, /^README\.md$/, /^\.gitignore$/];
+const changed = git('diff', '--name-only', `${base}...HEAD`)
+  .split('\n')
+  .filter(Boolean)
+  .filter((f) => !OUTSIDE.some((re) => re.test(f)));
+
+if (!changed.length) {
+  console.log('No cambió nada de la app.');
+  process.exit(0);
+}
+
+/** VERSION y ENTREGA de sw.js en un commit. */
+function versionAt(ref) {
+  let src = '';
+  try {
+    src = git('show', `${ref}:sw.js`);
+  } catch {
+    return null;
+  }
+  const num = (name) => (src.match(new RegExp(`const ${name} = (\\d+);`)) || [])[1];
+  return { version: num('VERSION'), entrega: num('ENTREGA') };
+}
+const before = versionAt(git('merge-base', base, 'HEAD').trim());
+const now = versionAt('HEAD');
+
+if (before && now && before.version === now.version && before.entrega === now.entrega) {
+  console.error(
+    `Cambió la app (${changed.slice(0, 8).join(', ')}${changed.length > 8 ? '…' : ''}) pero sw.js sigue en ` +
+      `Kai ${now.version} · entrega ${now.entrega}.\n` +
+      'Sube ENTREGA en sw.js (o VERSION si va a main): si no, los teléfonos siguen con la versión de su caché.',
+  );
+  process.exit(1);
+}
+console.log(`Bien: la app cambió y la versión pasó de ${before ? `${before.version}.${before.entrega}` : '—'} a ${now ? `${now.version}.${now.entrega}` : '—'}.`);

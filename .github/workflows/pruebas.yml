@@ -12,6 +12,14 @@ jobs:
         working-directory: tests
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # para comparar con la versión anterior
+      # un cambio en la app tiene que subir VERSION o ENTREGA en sw.js (si no, los teléfonos no lo reciben);
+      # en los PR se compara con la rama de destino, y en main y prueba con lo que había antes del push
+      - name: Versión nueva si cambió la app
+        if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/prueba'
+        working-directory: .
+        run: node tests/version-check.mjs "${{ github.event.pull_request.base.sha || github.event.before }}"
       - uses: actions/setup-node@v4
         with:
           node-version: 22

@@ -5,7 +5,7 @@
 
 import { ICON } from './icons.js';
 import { $, esc, hue, plural } from '../lib/util.js';
-import { displayMeta } from '../models/fichas.js';
+import { displayMeta, seasonMeta, isFranchise } from '../models/fichas.js';
 import { state } from '../models/store.js';
 import { newEpisodes } from '../models/news.js';
 import { prog } from '../models/progress.js';
@@ -91,17 +91,20 @@ export function factRows(info, m, links) {
   return `<div class="facts-rows">${info || score ? `<p class="tv-facts is-info">${info}${score}</p>` : ''}${links ? `<p class="tv-facts">${links}</p>` : ''}</div>`;
 }
 export function countLabel(s, m) {
-  return m && m.collection ? plural(m.count, 'película', 'películas') : plural(s.all.length, 'capítulo', 'capítulos');
+  if (m && m.collection) return plural(m.count, 'película', 'películas');
+  // si la ficha que se muestra es la de una temporada u OVA (en una franquicia como "Attack on Titan"), se cuentan
+  // los capítulos de esa temporada, no los de toda la serie ("OVA · 97 capítulos" no tenía sentido)
+  const own = m && isFranchise(s) ? s.seasons.find((se) => seasonMeta(s, se) === m) : null;
+  return plural(own ? own.episodes.length : s.all.length, 'capítulo', 'capítulos');
 }
-// Kai parpadea de vez en cuando (en el teléfono, el del título)
+// Kai parpadea de vez en cuando (el que está sentado al final del inicio)
 (function blinkLoop() {
   setTimeout(
     () => {
-      // en el teléfono parpadea el del título; en la PC, el echado sobre la fecha todavía no tiene dibujo con ojos cerrados
       const el =
         !document.hidden &&
         !matchMedia('(prefers-reduced-motion: reduce)').matches &&
-        [...document.querySelectorAll('.kcat-sit.is-title')].find((x) => x.offsetParent);
+        [...document.querySelectorAll('.kcat-sit.is-foot')].find((x) => x.offsetParent);
       if (el) {
         const blink = (then) => {
           el.classList.add('is-closed');
@@ -118,12 +121,32 @@ export function countLabel(s, m) {
   );
 })();
 
-/** Kai, el gatito: sentado detrás del título de la portada, parpadeando de vez en cuando. */
+/**
+ * Kai, el gatito: sentado al final del inicio (parpadea de vez en cuando) o, en la PC, acostado sobre el nombre de la
+ * app arriba ('top').
+ * @param {string} where
+ */
 export function catHTML(where) {
   if (state.settings.cat === false) return '';
   if (where === 'top')
     return '<span class="kcat-sit is-top" aria-hidden="true"><img src="gato/echado.webp" alt="" decoding="async"></span>';
   return `<span class="kcat-sit is-${where}" aria-hidden="true"><img src="gato/sentado.webp" alt="" decoding="async"><img class="is-blink" src="gato/sentado-cierra.webp" alt="" decoding="async"></span>`;
+}
+
+/**
+ * La imagen grande de una portada (inicio, serie, película): el póster en el teléfono (vertical) y el banner en la
+ * PC (ancho); el navegador pide solo la que va a mostrar. Sin ficha, la miniatura de un capítulo.
+ * @param {any} m la ficha
+ * @param {string} [thumbId] capítulo con miniatura, si no hay ficha
+ */
+export function heroArtHTML(m, thumbId) {
+  const tall = m && ((m.collage && m.collage[0]) || m.cover);
+  const wide = m && m.banner;
+  if (tall || wide)
+    return `<div class="hero-art" aria-hidden="true"><picture>${wide ? `<source media="(min-width: 900px)" srcset="${esc(wide)}">` : ''}<img src="${esc(tall || wide)}" alt="" decoding="async"></picture></div>`;
+  return thumbId
+    ? `<div class="hero-art is-thumb" aria-hidden="true"><span data-thumb="${esc(thumbId)}"></span></div>`
+    : '';
 }
 
 // nombres largos: letra más chica en la portada para no pasar de ~2 líneas

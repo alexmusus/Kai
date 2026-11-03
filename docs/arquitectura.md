@@ -57,7 +57,7 @@ decide. ESLint lo revisa (`no-restricted-imports`).
 | `home.js` | portada estilo TV: destacado al pasar o enfocar un mosaico, flechas como control remoto |
 | `lifecycle.js` | dirección, conexión, segundo plano y cierre: guardar y sincronizar a tiempo |
 | `updates.js` | registrar el service worker, aviso de versión nueva, "Buscar actualización" |
-| `dock.js` | botón flotante: menú, flecha para subir, tocar fuera solo cierra |
+| `dock.js` | barra flotante: pestañas, menú del perfil, se achica al bajar (hasta tocarla) con la burbuja para subir, tocar fuera solo cierra |
 | `sync.js` | cuándo sincronizar y qué redibujar después |
 | `account.js` | entrar a MEGA, crear y elegir perfil |
 | `downloads.js` | elegir carpeta, copia aparte, poner en cola con el nombre de la serie |
@@ -74,7 +74,7 @@ Fuera de las capas:
 | Archivo | Por qué está aparte |
 |---|---|
 | `core.js` | Descifrado de MEGA. Script clásico: lo comparten la página y el service worker. |
-| `sw.js` | Service worker: funciona sin conexión y sirve el video descifrado por rangos (`/__stream`). |
+| `sw.js` | Service worker: los archivos de la app salen de su caché sin preguntar al servidor (la caché lleva la versión), funciona sin conexión y sirve el video descifrado por rangos (`/__stream`). |
 | `vendor/mega.js` | megajs empaquetado. No se edita a mano. |
 
 ## Estado
@@ -91,6 +91,16 @@ se cambian sus campos, nunca se reemplazan (`setIndex` cambia el contenido del �
   (`reuseIfSame` en `router.js`): lo ya pintado no se vuelve a pintar.
 - Nada de desenfoque (`backdrop-filter`) en lo que se repite en listas (cada capítulo, cada póster).
 - `html.lite` (teléfonos con 4 GB o menos, `views/theme.js`): sin desenfoques ni fondo en movimiento.
+- Ningún desenfoque sobre el video ni en listas: el único que queda es el de la barra flotante (y el modo liviano
+  lo quita).
+
+## Diseño (Kai 39)
+
+Estilo de las apps de Apple: fondo neutro, la imagen manda, datos en una línea sin pastillas, botones lisos
+(`--btn`), tarjetas sólidas (`--card`) y un solo acento. La portada del inicio y de cada serie es una tarjeta
+oscura igual en los dos temas (`hero-card`, `heroArtHTML` en `views/components.js`). En `styles.css`, los bloques
+"Kai 39 · …" del final son el diseño actual; las reglas de arriba son la base que comparten. Al agregar algo, que
+use los mismos tokens (`--btn`, `--card`, `--text`, `--dim`) para que se vea en los dos temas.
 - Los gestos miden el video una vez al tocar y lo mueven una vez por cuadro (`requestAnimationFrame`).
 
 ## Reglas que no se rompen
@@ -115,6 +125,7 @@ se cambian sus campos, nunca se reemplazan (`setIndex` cambia el contenido del �
   de `index.html` (para pedirlos todos a la vez); `tests/unit/modulos.test.js` revisa las dos listas.
 - Versiones (`sw.js`): `VERSION` es la de Kai y sube solo al pasar `prueba` a `main`; `ENTREGA` sube en cada
   subida a `prueba` (sin cambiar `sw.js` el navegador no instala lo nuevo) y vuelve a 1 al subir `VERSION`.
+  GitHub Actions falla si cambia algo de la app sin que cambie una de las dos (`tests/version-check.mjs`).
 
 ## Pruebas
 

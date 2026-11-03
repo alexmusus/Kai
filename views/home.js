@@ -10,8 +10,8 @@ import { state } from '../models/store.js';
 import { esc, $, fmtLeft, plural, fmtTime } from '../lib/util.js';
 import {
   catHTML,
-  collageHTML,
   titleSize,
+  heroArtHTML,
   factsHTML,
   setTint,
   tileHTML,
@@ -32,51 +32,16 @@ export function greeting() {
   const g = h < 12 ? 'Buenos días' : h < 19 ? 'Buenas tardes' : 'Buenas noches';
   return state.profile ? `${g}, ${state.profile.name}` : g;
 }
-// crear un Intl.DateTimeFormat es caro (carga los datos del idioma): se crean una vez y se reusan
-const HOUR_FMT = new Intl.DateTimeFormat('es', { hour: 'numeric', minute: '2-digit', hour12: true });
-const DATE_FMT = new Intl.DateTimeFormat('es', { weekday: 'long', day: 'numeric', month: 'long' });
-export function clockParts() {
-  const d = new Date();
-  const time = HOUR_FMT.formatToParts(d);
-  const hm = time
-    .filter((p) => p.type !== 'dayPeriod')
-    .map((p) => p.value)
-    .join('')
-    .trim();
-  const ap = (time.find((p) => p.type === 'dayPeriod') || {}).value || '';
-  const date = DATE_FMT.format(d);
-  return { hm, ap, date };
-}
-export function clockHTML() {
-  const { hm, ap, date } = clockParts();
-  // en la PC, Kai va echado encima de la fecha
-  return `<span class="tv-hm">${esc(hm)}</span><span class="tv-ap">${esc(ap)}</span><span class="tv-sep" aria-hidden="true"></span><span class="tv-date"><span class="tv-date-t">${esc(date)}</span>${catHTML('top')}</span>`;
-}
-
+// el saludo cambia con la hora del día: se revisa de vez en cuando (solo cambia el texto)
 setInterval(() => {
-  // solo cambia el texto (así Kai no se vuelve a cargar cada vez)
-  const el = $('#tv-clock');
-  if (el) {
-    const p = clockParts();
-    for (const [sel, v] of [
-      ['.tv-hm', p.hm],
-      ['.tv-ap', p.ap],
-      ['.tv-date-t', p.date],
-    ]) {
-      const x = el.querySelector(sel);
-      if (x && x.textContent !== v) x.textContent = v;
-    }
-  }
   const g = $('#tv-greet');
-  if (g) g.textContent = greeting();
-}, 20000);
+  if (g && g.textContent !== greeting()) g.textContent = greeting();
+}, 60000);
 
 export function tvTop() {
+  // cabecera compacta: el nombre de la app (con Kai, el gatito, echado encima en la PC), el saludo y la búsqueda
   return `<header class="tv-top">
-    <div class="tv-when">
-      <p class="tv-greet" id="tv-greet">${esc(greeting())}</p>
-      <p class="tv-clock" id="tv-clock">${clockHTML()}</p>
-    </div>
+    <div class="tv-brand"><span class="tv-word">Kai${catHTML('top')}</span><p class="tv-greet" id="tv-greet">${esc(greeting())}</p></div>
     <div class="tv-top-tools">
       <button class="tv-icon" data-act="home-search" aria-label="Buscar" aria-expanded="false">${ICON.search}</button>
     </div>
@@ -94,21 +59,13 @@ export function heroInnerHTML(s, si) {
   const fresh = newEpisodes(s).length;
   const syn = synopsisOf(m);
   const coverEp = s.all.find((e) => e.fa);
-  const poster =
-    m && m.collage && m.collage.length
-      ? `<a class="hero-poster is-collage" href="#/serie/${si}" aria-hidden="true" tabindex="-1">${collageHTML(m.collage)}</a>`
-      : m && m.cover
-        ? `<a class="hero-poster" href="#/serie/${si}" aria-hidden="true" tabindex="-1"><img src="${esc(m.cover)}" alt="" decoding="async"></a>`
-        : coverEp
-          ? `<a class="hero-poster is-thumb" href="#/serie/${si}" aria-hidden="true" tabindex="-1"><span data-thumb="${esc(coverEp.id)}"></span></a>`
-          : '';
-  return `${poster}<div class="tvh-text"><h2 class="tv-title${titleSize(s.name)}"><span class="tvt">${esc(s.name)}${catHTML('title')}</span></h2>
+  return `${heroArtHTML(m, coverEp && coverEp.id)}<div class="tvh-text"><h2 class="tv-title${titleSize(s.name)}"><span class="tvt">${esc(s.name)}</span></h2>
     ${m && m.title && m.title.toLowerCase() !== s.name.toLowerCase() ? `<p class="tv-alt">${esc(m.title)}</p>` : ''}
     <p class="tv-facts">${factsHTML(s, m, fresh ? `<span class="tv-new">${fresh === 1 ? '1 nuevo' : `${fresh} nuevos`}</span>` : '')}</p>
     ${syn ? `<p class="tv-synopsis">${esc(syn.replace(/\s*\n+\s*/g, ' '))}</p>` : ''}
     <div class="tv-actions">
       ${plan.next ? `<a class="tv-btn is-primary" href="#/play/${encodeURIComponent(plan.next.id)}">${ICON.play}<span>${esc(plan.label)}</span></a>` : ''}
-      <a class="tv-btn" href="#/serie/${si}">${ICON.menu}<span>Episodios</span></a>
+      <a class="tv-btn is-square" href="#/serie/${si}" aria-label="Episodios" title="Episodios">${ICON.menu}</a>
     </div></div>`;
 }
 
@@ -169,8 +126,8 @@ export function renderHome() {
   app.innerHTML = `<div class="tv is-home">
     ${tvTop()}
     <main class="tv-main">
-      ${resumeCardHTML()}
       <section class="tv-hero" id="tv-hero">${heroInnerHTML(hs, viewState.heroSi)}</section>
+      ${resumeCardHTML()}
       <section class="tv-row" id="home-results" hidden></section>
       ${
         cont.length
@@ -218,14 +175,28 @@ export function renderHome() {
           .join('')}</ul>
 </section>
       ${homeMoviesHTML(lib)}
-      <nav class="discover-links" aria-label="Descubrir">
-        ${lib.series.some(isCine) ? `<a class="tv-more" href="#/serie/${lib.series.findIndex(isCine)}">${ICON.grid}<span>${esc(lib.series.find(isCine).name)}</span></a>` : ''}
-        <a class="tv-more" href="#/descubrir/porque">${ICON.grid}<span>Porque viste…</span></a>
-        <a class="tv-more" href="#/descubrir/emision">${ICON.grid}<span>En emisión</span></a>
-      </nav>
+      ${homeFootHTML(lib)}
     </main>
   </div>`;
 }
+/** El final del inicio: "Descubrir" (Cine, Porque viste…, En emisión) y Kai, el gatito, sentado encima. */
+function homeFootHTML(lib) {
+  const cine = lib.series.findIndex(isCine);
+  const link = (href, icon, title, sub, tone) =>
+    `<a class="home-link" href="${href}" data-tone="${tone}"><span class="home-link-ic">${icon}</span><span class="home-link-text"><b>${esc(title)}</b><span>${esc(sub)}</span></span>${ICON.chev}</a>`;
+  return `<section class="tv-row home-foot" aria-labelledby="home-disc">
+    <h3 class="tv-row-title" id="home-disc">Descubrir</h3>
+    <div class="home-shelf">
+      ${catHTML('foot')}
+      <nav class="home-links" aria-label="Descubrir">
+        ${cine >= 0 ? link(`#/serie/${cine}`, ICON.film, lib.series[cine].name, 'Películas que no son anime', 'cine') : ''}
+        ${link('#/descubrir/porque', ICON.spark, 'Porque viste…', 'Recomendaciones según lo que tienes', 'porque')}
+        ${link('#/descubrir/emision', ICON.live, 'En emisión', 'Lo que está saliendo ahora', 'emision')}
+      </nav>
+    </div>
+  </section>`;
+}
+
 /** Fila "Películas" del inicio: las 10 primeras en orden alfabético y el enlace al estante completo. */
 export function homeMoviesHTML(lib) {
   const si = lib.series.findIndex((x) => isCollection(x) && !isCine(x));
@@ -251,12 +222,20 @@ export function resumeCardHTML() {
   const mins = Math.round((Date.now() - o.n.u) / 60000);
   const when = mins < 2 ? 'hace un momento' : mins < 60 ? `hace ${mins} min` : `hace ${Math.round(mins / 60)} h`;
   const title = isCollection(o.s) ? episodeLabel(o.ep) : `${o.s.name} · ${episodeLabel(o.ep)}`;
-  return `<section class="resume-card" aria-label="Seguir en este dispositivo">
-    <div class="resume-text"><p class="resume-kicker">En tu ${esc(o.n.dn || 'otro dispositivo')}, ${when}</p>
-      <p class="resume-title">${esc(title)}</p></div>
-    <button class="tv-btn is-primary" data-act="resume-here">${ICON.play}<span>Seguir aquí en ${fmtTime(o.n.t)}</span></button>
-    <button class="icon-btn resume-x" data-act="resume-dismiss" aria-label="Descartar">${ICON.close}</button>
-  </section>`;
+  const dn = o.n.dn || 'otro dispositivo';
+  // una burbuja flotante, como una notificación: tocarla la abre con el detalle y "Seguir aquí"
+  // toda la burbuja se toca (no solo el texto): abre o cierra el detalle; los botones de adentro hacen lo suyo
+  return `<aside class="resume-card" data-act="resume-toggle" aria-label="Seguir en este dispositivo">
+    <button class="resume-pill" data-act="resume-toggle" aria-expanded="false">${ICON.play}<span>Seguir de tu ${esc(dn)} · ${fmtTime(o.n.t)}</span></button>
+    <div class="resume-more"><div class="resume-in">
+      <p class="resume-kicker">En tu ${esc(dn)}, ${when}</p>
+      <p class="resume-title">${esc(title)}</p>
+      <div class="resume-actions">
+        <button class="tv-btn is-primary" data-act="resume-here">${ICON.play}<span>Seguir aquí en ${fmtTime(o.n.t)}</span></button>
+        <button class="tv-btn is-square resume-x" data-act="resume-dismiss" aria-label="Descartar">${ICON.close}</button>
+      </div>
+    </div></div>
+  </aside>`;
 }
 
 export const HOME_RECENT = 10;

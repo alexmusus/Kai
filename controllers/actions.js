@@ -28,7 +28,7 @@ import { newsHTML, paintSeenByAll, renderSettings, paintCineKey, paintDownloadsW
 import { openDiscoverSheet } from '../views/discover.js';
 import { startPicking, endPicking, pickAction } from './picking.js';
 import { go, goHome, goBack, render, softRender } from './router.js';
-import { paintDock, toggleDock } from './dock.js';
+import { paintDock, toggleDock, dockUp } from './dock.js';
 import { sync, syncing, refreshLibrary, setLater } from './sync.js';
 import { selectProfile } from './account.js';
 import { queueDownload, pickFolder, dropFolder } from './downloads.js';
@@ -286,6 +286,7 @@ const ACTIONS = {
 
   // navegación
   dock: () => toggleDock(),
+  'dock-up': () => dockUp(),
   back: () => goBack(P.playing ? P.playing.ctx.back : '#/'),
   home: () => goHome(),
   'home-search': () => {
@@ -315,6 +316,12 @@ const ACTIONS = {
   'news-clear': clearNews,
   'seen-all': (el) => paintSeenByAll(el),
   'resume-here': resumeHere,
+  'resume-toggle': (el) => {
+    const box = el.closest('.resume-card');
+    const open = !box.classList.contains('is-open');
+    box.classList.toggle('is-open', open);
+    box.querySelector('.resume-pill')?.setAttribute('aria-expanded', String(open));
+  },
   'resume-dismiss': dismissResume,
 
   // series, temporadas y películas
@@ -327,7 +334,7 @@ const ACTIONS = {
   'movie-dl': (el) => movieAction(el, false),
   'series-dl': downloadNextOfSeries,
   'pick-mode': () => (viewState.picking ? endPicking() : startPicking(Number(route().arg.split('/')[1]) || 0)),
-  'pick-all': () => pickAction('pick-all'),
+  'pick-seen': () => pickAction('pick-seen'),
   'pick-unseen': () => pickAction('pick-unseen'),
   'pick-dl': () => pickAction('pick-dl'),
   translate: translateSynopsis,

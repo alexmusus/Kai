@@ -131,9 +131,6 @@ body.is-playing .ambient::before, body.is-playing .ambient::after { animation-pl
     radial-gradient(26vmax 22vmax at 8% 75%, var(--blob-3), transparent 70%);
   animation: drift-b 46s ease-in-out infinite alternate;
 }
-[data-theme='light'] .ambient::before { background:
-    radial-gradient(36vmax 30vmax at 22% 18%, color-mix(in srgb, var(--tint, var(--blob-1)) 32%, transparent), transparent 70%),
-    radial-gradient(30vmax 28vmax at 85% 28%, var(--blob-2), transparent 70%); }
 @keyframes drift-a { to { transform: translate3d(6vmax, 4vmax, 0) scale(1.08); } }
 @keyframes drift-b { to { transform: translate3d(-5vmax, -3vmax, 0) scale(1.06); } }
 
@@ -147,11 +144,13 @@ body.is-playing .ambient::before, body.is-playing .ambient::after { animation-pl
 /* ───────── barra superior ───────── */
 
 .bar {
-  position: sticky; top: 0; z-index: 5;
-  display: flex; align-items: center; gap: 4px;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 4px;
   padding: calc(env(safe-area-inset-top) + 8px) var(--gutter) 8px;
-  background: color-mix(in srgb, var(--bg) 62%, transparent);
-  border-bottom: 1px solid var(--line);
 }
 .bar-title { margin: 0 auto 0 6px; font: 700 22px/1 var(--font-display); letter-spacing: -0.02em; }
 .icon-btn {
@@ -165,8 +164,9 @@ body.is-playing .ambient::before, body.is-playing .ambient::after { animation-pl
 
 .bar.is-overlay { position: fixed; left: 0; right: 0; background: none; border: 0; -webkit-backdrop-filter: none; backdrop-filter: none; }
 .bar.is-overlay .icon-btn {
-  background: var(--glass-strong); border: 1px solid var(--glass-edge);
-  -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur);
+  border: 1px solid var(--glass-edge);
+  -webkit-backdrop-filter: var(--blur);
+  backdrop-filter: var(--blur);
 }
 .bar.is-overlay .bar-title { margin: 0 auto 0 0; }
 
@@ -176,7 +176,7 @@ main { padding: 6px var(--gutter) calc(48px + env(safe-area-inset-bottom)); max-
 
 /* ───────── portadas ───────── */
 
-.ep-thumb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; animation: fade 0.35s ease-out; }
+.ep-thumb img { animation: fade 0.35s ease-out; }
 @keyframes fade { from { opacity: 0; } }
 .cover-glyph {
   position: absolute; right: 6%; bottom: -14%;
@@ -209,35 +209,37 @@ main { padding: 6px var(--gutter) calc(48px + env(safe-area-inset-bottom)); max-
 /* ───────── botones y formularios ───────── */
 
 .btn {
-  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-  min-height: 44px; padding: 0 18px; border-radius: 999px;
-  background: var(--glass); border: 1px solid var(--glass-edge); color: var(--text); font-weight: 500;
-  box-shadow: inset 0 1px 0 var(--glass-hi);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--text);
   transition: background-color 0.15s, transform 0.1s;
 }
-@media (hover: hover) { .btn:hover { background: var(--glass-strong); } }
+@media (hover: hover) {  }
 .btn:active { transform: scale(0.98); }
 .btn:disabled { opacity: 0.6; cursor: default; }
 .btn svg { width: 18px; height: 18px; }
 .btn.is-saved { color: var(--accent); }
-.btn-lamp { background: var(--primary); border-color: transparent; color: var(--primary-ink); font-weight: 600; box-shadow: 0 8px 24px var(--shadow); }
+.btn-lamp { border-color: transparent; font-weight: 600; }
 .btn-lamp:hover { background: var(--primary); filter: brightness(0.95); }
-.btn-quiet { background: none; border-color: transparent; box-shadow: none; color: var(--danger); padding: 0; -webkit-backdrop-filter: none; backdrop-filter: none; }
+.btn-quiet { border-color: transparent; box-shadow: none; color: var(--danger); padding: 0; -webkit-backdrop-filter: none; backdrop-filter: none; }
 .btn-row { display: flex; flex-wrap: wrap; gap: 10px; }
 
 .form { display: grid; gap: 16px; }
 .form label { display: grid; gap: 6px; font-size: 14px; color: var(--dim); }
 .form input:not([type='checkbox']) {
-  font: inherit; color: var(--text); font-size: 16px;
-  background: var(--glass); border: 1px solid var(--glass-edge); border-radius: var(--r-md);
-  padding: 12px 14px; min-height: 48px; box-shadow: inset 0 1px 0 var(--glass-hi);
-  -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur);
+  font: inherit;
+  color: var(--text);
+  font-size: 16px;
+  padding: 12px 14px;
+  min-height: 48px;
 }
 .form input:focus { outline: none; border-color: var(--accent); }
 .form-error { margin: 0; color: var(--danger); font-size: 14px; }
 .form-note { margin: 0; font-size: 13px; color: var(--dim); }
 .switch { grid-template-columns: auto 1fr !important; align-items: center; gap: 12px !important; color: var(--text) !important; font-size: 15px !important; }
-.switch input { appearance: none; -webkit-appearance: none; width: 46px; height: 28px; border-radius: 999px; background: var(--line); position: relative; margin: 0; cursor: pointer; transition: background 0.2s; box-shadow: inset 0 0 0 1px var(--glass-edge); }
+.switch input { appearance: none; -webkit-appearance: none; width: 46px; height: 28px; border-radius: 999px; position: relative; margin: 0; cursor: pointer; transition: background 0.2s; }
 .switch input::after { content: ''; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; transition: transform 0.2s; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25); }
 .switch input:checked { background: var(--ok); }
 .switch input:checked::after { transform: translateX(18px); }
@@ -246,13 +248,11 @@ main { padding: 6px var(--gutter) calc(48px + env(safe-area-inset-bottom)); max-
 .seg { padding: 8px 16px; border-radius: 999px; font-size: 14px; color: var(--dim); }
 .seg.is-on { background: var(--primary); color: var(--primary-ink); font-weight: 600; }
 
-.settings { max-width: 580px; display: grid; gap: 26px; padding-top: 14px; }
+.settings { display: grid; }
 .settings-group { display: grid; gap: 12px; border-top: 1px solid var(--line); padding-top: 20px; justify-items: start; }
 .settings-group.is-first { border-top: 0; padding-top: 0; }
 .settings-group p { margin: 0; }
 .settings .form { justify-items: stretch; }
-.settings-label { color: var(--dim); font-size: 14px; }
-.settings-value { font: 700 19px/1.2 var(--font-display); }
 .settings-value svg { width: 20px; height: 20px; vertical-align: -3px; margin-right: 2px; }
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.92em; overflow-wrap: anywhere; }
 
@@ -274,12 +274,11 @@ main { padding: 6px var(--gutter) calc(48px + env(safe-area-inset-bottom)); max-
 }
 .stage-slot { margin: 0 calc(-1 * var(--gutter)); position: relative; z-index: 20; }
 @media (min-width: 720px) { .stage-slot { margin: 0; } .stage { border-radius: var(--r-xl); overflow: hidden; box-shadow: 0 24px 60px var(--shadow); } }
-.watch-info { display: grid; gap: 14px; padding-top: 16px; }
-.watch-series { color: var(--accent); font-weight: 600; font-size: 15px; }
+.watch-info { display: grid; }
 .watch-series:hover { text-decoration: underline; }
-.watch-title { margin: 2px 0 0; font: 700 clamp(26px, 5vw, 36px)/1.1 var(--font-display); letter-spacing: -0.025em; }
+.watch-title { margin: 2px 0 0; }
 .watch-sub { margin: 2px 0 0; color: var(--dim); font-size: 14px; }
-.watch-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.watch-actions { display: flex; flex-wrap: wrap; align-items: center; }
 
 /* modo luz apagada: todo se oscurece menos el video */
 .lights { position: fixed; inset: 0; z-index: 19; background: rgba(0, 0, 0, 0.92); border: 0; cursor: default; animation: dim 0.4s ease-out; }
@@ -304,68 +303,62 @@ body.lights-off .bar { z-index: 1; }
 
 /* barra de controles: una cápsula de vidrio flotando sobre el video */
 .st-bar {
-  position: absolute; left: 12px; right: 12px; bottom: calc(10px + env(safe-area-inset-bottom, 0px));
-  padding: 4px 8px 4px; border-radius: 22px;
-  background: rgba(22, 24, 30, 0.42); border: 1px solid rgba(255, 255, 255, 0.14);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 10px 30px rgba(0, 0, 0, 0.3);
-  -webkit-backdrop-filter: blur(22px) saturate(160%); backdrop-filter: blur(22px) saturate(160%);
+  position: absolute;
   transition: opacity 0.25s, transform 0.25s;
 }
-.stage:not(:fullscreen) .st-bar { bottom: 10px; }
-.stage.is-idle .st-bar { opacity: 0; transform: translateY(8px); pointer-events: none; visibility: hidden; transition: opacity 0.25s, transform 0.25s, visibility 0s 0.25s; }
+.stage.is-idle .st-bar { opacity: 0; pointer-events: none; visibility: hidden; transition: opacity 0.25s, transform 0.25s, visibility 0s 0.25s; }
 /* oculta de verdad (no solo transparente) para que el desenfoque del vidrio no se calcule sobre el video en movimiento */
 .stage.is-idle .st-skip:not(.is-sticky) { opacity: 0; pointer-events: none; }
-.st-row { display: flex; align-items: center; gap: 0; }
-.st-gap { flex: 1; min-width: 4px; }
-.st-btn { display: inline-grid; place-items: center; min-width: 38px; height: 38px; padding: 0 6px; border-radius: 12px; color: #fff; }
+.st-row { display: flex; align-items: center; }
+.st-gap { flex: 1; }
+.st-btn { display: inline-grid; place-items: center; color: #fff; }
 .st-btn:hover { background: rgba(255, 255, 255, 0.14); }
 .st-btn svg { width: 22px; height: 22px; }
-.st-btn.is-on { color: var(--accent); }
 .st-num { font: 700 7px var(--font); fill: currentColor; stroke: none; }
-.st-time { font-size: 13px; font-variant-numeric: tabular-nums; color: rgba(255, 255, 255, 0.92); margin-left: 6px; white-space: nowrap; }
+.st-time { font-variant-numeric: tabular-nums; margin-left: 6px; white-space: nowrap; }
 .st-chapter { font-size: 13px; color: rgba(255, 255, 255, 0.6); margin-left: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 22ch; }
 .st-chapter:empty { display: none; }
-.st-speed { font-size: 13px; font-weight: 700; min-width: 42px; }
+.st-speed { font-size: 13px; min-width: 42px; }
 #st-fs .ic-exit, .stage.is-fs #st-fs .ic-enter { display: none; }
 .stage.is-fs #st-fs .ic-exit { display: block; }
 @media (hover: none) { .st-desktop { display: none; } }
 @media (max-width: 600px) {
-  .st-bar { left: 8px; right: 8px; bottom: 8px; padding: 2px 4px; border-radius: 18px; }
-  .stage:not(:fullscreen) .st-bar { bottom: 8px; }
-  .st-btn { min-width: 34px; padding: 0 3px; }
-  .st-time { font-size: 12px; margin-left: 2px; }
+        .st-time { margin-left: 2px; }
   .st-chapter, .st-desktop-ish { display: none; }
   .st-row [data-act='back10'], .st-row [data-act='fwd10'] { display: none; }
   .stage.is-fs .st-row [data-act='back10'], .stage.is-fs .st-row [data-act='fwd10'] { display: inline-grid; }
 }
 
-.st-seek-wrap { position: relative; margin: 0 6px; }
-.st-marks { position: absolute; left: 7px; right: 7px; top: 50%; height: 4px; margin-top: -2px; pointer-events: none; z-index: 1; }
-.st-marks span { position: absolute; top: 0; width: 3px; height: 4px; margin-left: -1.5px; background: rgba(20, 22, 28, 0.85); }
+.st-seek-wrap { position: relative; }
+.st-marks { position: absolute; left: 7px; right: 7px; top: 50%; pointer-events: none; z-index: 1; }
+.st-marks span { position: absolute; top: 0; }
 .st-seek { -webkit-appearance: none; appearance: none; display: block; width: 100%; height: 22px; margin: 0; background: transparent; cursor: pointer; position: relative; }
 .st-seek::-webkit-slider-runnable-track {
-  height: 4px; border-radius: 4px;
+  border-radius: 4px;
   background: linear-gradient(to right, #fff var(--played), rgba(255, 255, 255, 0.42) var(--played), rgba(255, 255, 255, 0.42) var(--buffered), rgba(255, 255, 255, 0.18) var(--buffered));
 }
 .st-seek::-moz-range-track {
-  height: 4px; border-radius: 4px;
+  border-radius: 4px;
   background: linear-gradient(to right, #fff var(--played), rgba(255, 255, 255, 0.42) var(--played), rgba(255, 255, 255, 0.42) var(--buffered), rgba(255, 255, 255, 0.18) var(--buffered));
 }
-.st-seek::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; margin-top: -5px; border-radius: 50%; background: #fff; border: 0; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4); transition: transform 0.1s; }
+.st-seek::-webkit-slider-thumb { -webkit-appearance: none; border-radius: 50%; background: #fff; border: 0; }
 .st-seek::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: #fff; border: 0; }
-.st-seek:hover::-webkit-slider-thumb, .st-seek:active::-webkit-slider-thumb { transform: scale(1.25); }
 .st-seek:focus-visible { outline: none; }
 .st-seek:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.35); }
 
 .st-big {
-  position: absolute; left: 50%; top: 50%; width: 78px; height: 78px; margin: -39px 0 0 -39px;
-  border-radius: 50%; display: grid; place-items: center; color: #fff;
-  background: rgba(255, 255, 255, 0.16); border: 1px solid rgba(255, 255, 255, 0.3);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 10px 30px rgba(0, 0, 0, 0.3);
-  -webkit-backdrop-filter: blur(18px) saturate(160%); backdrop-filter: blur(18px) saturate(160%);
-  opacity: 0; pointer-events: none; transition: opacity 0.2s, transform 0.2s; transform: scale(0.94);
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s, transform 0.2s;
+  transform: scale(0.94);
 }
-.st-big svg { width: 32px; height: 32px; margin-left: 4px; }
 .stage.is-paused:not(.is-loading):not(.is-ended) .st-big { opacity: 1; pointer-events: auto; transform: none; }
 
 .st-spinner {
@@ -411,10 +404,6 @@ html.kai-fs-on, html.kai-fs-on body, html:has(.stage:fullscreen), html:has(.stag
 .stage:fullscreen::backdrop { background: #000; }
 html.kai-fs-on .stage-slot { z-index: 1000; }
 html.kai-fs-on .dock { display: none; }
-.stage.kai-fs .st-bar, .stage.kai-fs:not(:fullscreen) .st-bar {
-  left: max(12px, env(safe-area-inset-left)); right: max(12px, env(safe-area-inset-right));
-  bottom: calc(10px + env(safe-area-inset-bottom, 0px));
-}
 .stage.kai-fs .st-skip { right: max(16px, env(safe-area-inset-right)); }
 /* iPhone con el teléfono vertical (con o sin bloqueo de rotación): el reproductor se gira 90° para verse horizontal.
  * Lo de arriba del video queda del lado derecho de la pantalla, así que se gira el teléfono hacia la izquierda.
@@ -425,48 +414,58 @@ html.kai-fs-on .dock { display: none; }
     transform-origin: top left; transform: rotate(90deg);
   }
   /* la muesca y la barra de inicio quedan a los lados del video girado */
-  .stage.kai-fs.kai-rot .st-bar, .stage.kai-fs.kai-rot:not(:fullscreen) .st-bar {
-    left: max(12px, env(safe-area-inset-top)); right: max(12px, env(safe-area-inset-bottom)); bottom: 10px;
-  }
-  .stage.kai-fs.kai-rot .st-skip { right: max(16px, env(safe-area-inset-bottom)); }
+    .stage.kai-fs.kai-rot .st-skip { right: max(16px, env(safe-area-inset-bottom)); }
 }
 
 .st-skip {
-  position: absolute; right: 16px; bottom: 96px;
-  padding: 10px 18px; border-radius: 999px; font-weight: 600; font-size: 14px; color: #fff;
-  background: rgba(255, 255, 255, 0.16); border: 1px solid rgba(255, 255, 255, 0.3);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 8px 24px rgba(0, 0, 0, 0.3);
-  -webkit-backdrop-filter: blur(18px) saturate(160%); backdrop-filter: blur(18px) saturate(160%);
+  position: absolute;
+  right: 16px;
+  padding: 10px 18px;
+  border-radius: 999px;
+  font-size: 14px;
   transition: opacity 0.25s;
 }
 .st-skip:hover { background: rgba(255, 255, 255, 0.26); }
-@media (max-width: 600px) { .st-skip { right: 10px; bottom: 70px; padding: 8px 14px; } }
+@media (max-width: 600px) { .st-skip { right: 10px; padding: 8px 14px; } }
 
 .st-menu {
-  position: absolute; right: 12px; bottom: 82px; z-index: 2;
-  width: min(300px, calc(100% - 24px)); max-height: calc(100% - 100px); overflow-y: auto;
-  border-radius: var(--r-lg); padding: 8px; display: grid; gap: 2px; color: #fff;
-  background: rgba(24, 26, 33, 0.72); border: 1px solid rgba(255, 255, 255, 0.14);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 16px 40px rgba(0, 0, 0, 0.4);
+  position: absolute;
+  right: 12px;
+  bottom: 82px;
+  z-index: 2;
+  width: min(300px, calc(100% - 24px));
+  max-height: calc(100% - 100px);
+  overflow-y: auto;
+  display: grid;
+  gap: 2px;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.14);
 }
-.menu-title { margin: 8px 10px 4px; font-size: 13px; font-weight: 600; color: rgba(255, 255, 255, 0.55); }
-.menu-item { display: flex; justify-content: space-between; align-items: center; gap: 10px; text-align: left; padding: 10px 12px; border-radius: 12px; font-size: 15px; cursor: pointer; }
+.menu-title { font-weight: 600; color: rgba(255, 255, 255, 0.55); }
+.menu-item { display: flex; justify-content: space-between; align-items: center; gap: 10px; text-align: left; font-size: 15px; cursor: pointer; }
 .menu-item:hover { background: rgba(255, 255, 255, 0.1); }
 .menu-item.is-on { font-weight: 600; }
-.menu-item.is-on::after { content: '✓'; color: var(--accent); }
+.menu-item.is-on::after { content: '✓'; }
 
 .p-card {
-  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 3;
-  width: min(calc(100% - 32px), 420px); padding: 20px; border-radius: var(--r-xl);
-  display: grid; gap: 14px; text-align: left; color: #fff;
-  background: rgba(24, 26, 33, 0.66); border: 1px solid rgba(255, 255, 255, 0.14);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 16px 40px rgba(0, 0, 0, 0.4);
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 3;
+  width: min(calc(100% - 32px), 420px);
+  padding: 20px;
+  display: grid;
+  gap: 14px;
+  text-align: left;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.14);
 }
 .p-card p { margin: 0; font: 700 21px/1.25 var(--font-display); letter-spacing: -0.02em; }
 #p-msg p { font: 500 16px/1.45 var(--font); }
 #p-msg p.p-detail { font: 400 12px/1.4 var(--font); opacity: .55; margin-top: 6px; }
-.p-card .btn { color: #fff; background: rgba(255, 255, 255, 0.12); border-color: rgba(255, 255, 255, 0.2); }
-.p-card .btn-lamp { background: #fff; color: #111; border-color: #fff; }
+.p-card .btn { color: #fff; border-color: rgba(255, 255, 255, 0.2); }
+.p-card .btn-lamp { border-color: #fff; }
 
 /* ───────── explorar y descargados ───────── */
 
@@ -491,43 +490,52 @@ html.kai-fs-on .dock { display: none; }
 /* ───────── hoja de opciones ───────── */
 
 .sheet { position: fixed; inset: 0; z-index: 30; }
-.sheet-back { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.35); opacity: 0; transition: opacity 0.18s; }
+.sheet-back { position: absolute; inset: 0; opacity: 0; transition: opacity 0.18s; }
 .sheet-panel {
-  position: absolute; left: 10px; right: 10px; bottom: calc(10px + env(safe-area-inset-bottom)); margin: 0 auto; max-width: 520px;
-  border-radius: var(--r-xl); padding: 18px 18px 8px; display: grid;
-  background: var(--glass-solid); border: 1px solid var(--glass-edge);
-  box-shadow: inset 0 1px 0 var(--glass-hi), 0 24px 60px var(--shadow);
-  transform: translateY(calc(100% + 20px)); transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: calc(10px + env(safe-area-inset-bottom));
+  margin: 0 auto;
+  max-width: 520px;
+  display: grid;
+  transform: translateY(calc(100% + 20px));
+  transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .sheet.is-open .sheet-back { opacity: 1; }
 .sheet.is-open .sheet-panel { transform: none; }
 .sheet-title { margin: 0; font: 700 21px/1.2 var(--font-display); letter-spacing: -0.02em; }
 .sheet-sub { margin: 2px 0 10px; color: var(--dim); font-size: 13px; overflow-wrap: anywhere; }
-.sheet-btn { text-align: left; padding: 14px 2px; border-top: 1px solid var(--line); font-size: 16px; }
+.sheet-btn { text-align: left; border-top: 1px solid var(--line); }
 .sheet-btn.is-danger { color: var(--danger); }
 .sheet-btn.is-quiet { color: var(--dim); }
 
 /* ───────── avisos ───────── */
 
 .toast {
-  position: fixed; z-index: 40; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 18px);
-  transform: translate(-50%, 20px); opacity: 0; pointer-events: none;
-  max-width: min(92vw, 460px); padding: 12px 18px; border-radius: 999px;
-  background: var(--glass-solid); color: var(--text); border: 1px solid var(--glass-edge);
-  box-shadow: inset 0 1px 0 var(--glass-hi), 0 12px 30px var(--shadow);
-  font-size: 15px; font-weight: 500; transition: opacity 0.2s, transform 0.2s;
+  position: fixed;
+  z-index: 40;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom) + 18px);
+  transform: translate(-50%, 20px);
+  opacity: 0;
+  pointer-events: none;
+  max-width: min(92vw, 460px);
+  padding: 12px 18px;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 500;
+  transition: opacity 0.2s, transform 0.2s;
 }
 .toast.is-on { opacity: 1; transform: translate(-50%, 0); }
 
 @media (min-width: 720px) {
-  .ep-main { grid-template-columns: 150px 1fr; }
-}
+  }
 
 /* Sin desenfoque disponible: superficies más opacas para que se lea bien */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .bar, .sheet-panel, .toast, .st-menu, .p-card { background: var(--glass-solid); }
-  .st-bar { background: rgba(22, 24, 30, 0.85); }
-}
+  }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
@@ -540,93 +548,84 @@ html.kai-fs-on .dock { display: none; }
 
 /* barra de arriba: saludo, hora y pastillas */
 .tv-top {
-  position: relative; z-index: 5; display: flex; justify-content: space-between; align-items: flex-start; gap: 16px;
-  padding: calc(env(safe-area-inset-top) + 22px) clamp(16px, 4vw, 56px) 8px;
+  position: relative;
+  z-index: 5;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
 }
-.tv-greet { margin: 0 0 2px; font-size: 13px; font-weight: 600; letter-spacing: 0.04em; color: var(--dim); }
-.tv-clock { margin: 0; display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
-.tv-hm { font: 300 clamp(34px, 5vw, 52px)/1 var(--font-display); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
-.tv-ap { font-size: 15px; font-weight: 600; color: var(--dim); }
-.tv-sep { width: 1px; height: 22px; background: var(--line); margin: 0 10px; align-self: center; }
-.tv-date { font-size: 15px; font-weight: 600; color: var(--dim); }
-.tv-date::first-letter { text-transform: uppercase; }
 /* la serie destacada */
-.tv-hero { max-width: 760px; padding: clamp(28px, 9vh, 110px) 0 28px; transition: opacity 0.12s, transform 0.12s; }
+.tv-hero { transition: opacity 0.12s, transform 0.12s; }
 .tv-hero.is-switching { opacity: 0; transform: translateY(6px); }
-.tv-title { margin: 0; font: 800 clamp(44px, 8vw, 96px)/0.95 var(--font-display); letter-spacing: -0.045em; text-wrap: balance; text-shadow: 0 2px 30px color-mix(in srgb, var(--bg) 50%, transparent); }
+.tv-title { margin: 0; font: 800 clamp(44px, 8vw, 96px)/0.95 var(--font-display); letter-spacing: -0.045em; text-wrap: balance; }
 .tv-alt { margin: 10px 0 0; font-size: 16px; color: var(--dim); font-weight: 500; }
 .tv-alt span { margin-left: 6px; opacity: 0.8; }
-.tv-facts { margin: 14px 0 0; display: flex; flex-wrap: wrap; gap: 6px; }
-.tv-facts span, .tv-facts .fact { font-size: 13px; font-weight: 600; padding: 5px 11px; border-radius: 999px; background: var(--glass); border: 1px solid var(--glass-edge); -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur); }
-.tv-facts .tv-new { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+.tv-facts { margin: 14px 0 0; display: flex; flex-wrap: wrap; }
+.tv-facts .tv-new { border-color: transparent; }
 .tv-synopsis { margin: 16px 0 0; max-width: 62ch; font-size: 16px; line-height: 1.55; color: color-mix(in srgb, var(--text) 86%, transparent); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; text-shadow: 0 1px 12px color-mix(in srgb, var(--bg) 70%, transparent); }
 .tv-synopsis.is-long { -webkit-line-clamp: 8; white-space: pre-line; }
 .tv-actions { margin-top: 24px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
 .tv-btn {
-  display: inline-flex; align-items: center; gap: 10px; height: 56px; padding: 0 26px 0 22px; border-radius: 18px;
-  font-size: 17px; font-weight: 650; color: var(--text);
-  background: var(--glass); border: 1px solid var(--glass-edge); box-shadow: inset 0 1px 0 var(--glass-hi), 0 10px 30px var(--shadow);
-  -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur);
+  display: inline-flex;
+  align-items: center;
+  color: var(--text);
   transition: transform 0.15s, background-color 0.15s, box-shadow 0.15s;
 }
-.tv-btn svg { width: 22px; height: 22px; }
-.tv-btn.is-primary { background: var(--primary); color: var(--primary-ink); border-color: transparent; }
+.tv-btn.is-primary { border-color: transparent; }
 .tv-btn.is-on svg { color: var(--accent); }
-.tv-btn.is-icon { padding: 0; width: 56px; justify-content: center; }
 
 /* "Estabas viendo … en el iPhone — Seguir aquí" */
 .resume-card {
-  display: flex; align-items: center; gap: 14px; margin: 0 0 18px; padding: 12px 12px 12px 18px; border-radius: 22px;
-  background: var(--glass-strong); border: 1px solid var(--glass-edge);
-  -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0 0 18px;
+  border-radius: 22px;
+  background: var(--glass-strong);
+  border: 1px solid var(--glass-edge);
+  -webkit-backdrop-filter: var(--blur);
+  backdrop-filter: var(--blur);
 }
-.resume-text { flex: 1; min-width: 0; }
 .resume-kicker { margin: 0; font-size: 13px; color: var(--dim); }
 .resume-title { margin: 2px 0 0; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.resume-card .tv-btn { flex: none; }
 /* en el teléfono ocupa el ancho; en pantallas grandes es la misma tarjeta, compacta y a la derecha */
 .resume-card { flex-wrap: wrap; padding: 12px 12px 12px 16px; }
-.resume-text { flex-basis: calc(100% - 56px); }
 .resume-x { order: 2; }
 .resume-card .tv-btn { order: 3; flex: 1; justify-content: center; }
 @media (min-width: 601px) { .resume-card { width: min(420px, 100%); margin-left: auto; } }
 /* en la PC flota arriba a la derecha, en el espacio libre sobre la portada, sin empujarla */
 @media (min-width: 900px) { .resume-card { position: absolute; top: 0; right: clamp(16px, 4vw, 56px); z-index: 4; margin: 0; } }
-@media (hover: hover) { .tv-btn:hover { transform: scale(1.03); } }
-.tv-btn:focus-visible { outline: none; transform: scale(1.05); box-shadow: 0 0 0 3px var(--text), 0 14px 40px var(--shadow); }
+@media (hover: hover) {  }
+.tv-btn:focus-visible { outline: none; }
 .tv-done { color: var(--dim); font-weight: 600; }
 .link-btn { margin-top: 8px; font-size: 14px; color: var(--accent); font-weight: 600; }
 
 /* filas de mosaicos grandes */
-.tv-row { margin: 8px 0 26px; }
-.tv-row-title { margin: 0 0 6px; font: 700 21px/1.2 var(--font-display); letter-spacing: -0.02em; }
 .tiles {
   display: grid; grid-auto-flow: column; grid-auto-columns: clamp(230px, 26vw, 360px); gap: 18px;
   overflow-x: auto; padding: 16px 8px 30px; margin: -6px -8px 0; scroll-snap-type: x proximity; scrollbar-width: none;
 }
 .tiles::-webkit-scrollbar { display: none; }
 .tile {
-  position: relative; display: block; aspect-ratio: 16 / 9; border-radius: 24px; overflow: hidden; scroll-snap-align: start;
-  background: linear-gradient(160deg, hsl(var(--h) 14% 32%), hsl(var(--h) 12% 16%));
-  border: 1px solid var(--glass-edge); box-shadow: 0 8px 20px var(--shadow);
+  position: relative;
+  scroll-snap-align: start;
   transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.2s;
 }
-.tile-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.tile-img { object-fit: cover; }
 .tile-img.is-fallback img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .tile-img.is-fallback .cover-glyph { right: 8%; bottom: -18%; font-size: 120px; }
 .tile-img.has-img .cover-glyph { display: none; }
 .tile::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 40%, rgba(0, 0, 0, 0.75) 100%); pointer-events: none; }
-.tile-text { position: absolute; z-index: 1; left: 16px; right: 16px; bottom: 14px; display: grid; color: #fff; }
-.tile-title { font: 700 19px/1.15 var(--font-display); letter-spacing: -0.02em; text-shadow: 0 1px 10px rgba(0, 0, 0, 0.5); }
-.tile-sub { font-size: 13px; color: rgba(255, 255, 255, 0.78); margin-top: 2px; }
+.tile-text { z-index: 1; left: 16px; right: 16px; bottom: 14px; display: grid; }
+.tile-sub { margin-top: 2px; }
 .tile-badge {
   position: absolute; z-index: 1; top: 12px; left: 12px; padding: 5px 11px; border-radius: 999px; font-size: 12px; font-weight: 700; color: #fff;
   background: rgba(255, 255, 255, 0.2); border: 1px solid rgba(255, 255, 255, 0.35); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
 }
 .tile-bar { position: absolute; z-index: 1; left: 0; right: 0; bottom: 0; height: 4px; background: rgba(255, 255, 255, 0.25); }
 .tile-bar span { display: block; height: 100%; background: #fff; }
-@media (hover: hover) { .tile:hover { transform: scale(1.04); } }
-.tile:focus-visible { outline: none; transform: scale(1.07); box-shadow: 0 0 0 3px #fff, 0 18px 50px var(--shadow); z-index: 2; }
+@media (hover: hover) {  }
+.tile:focus-visible { outline: none; z-index: 2; }
 [data-theme='light'] .tile:focus-visible { box-shadow: 0 0 0 3px var(--text), 0 18px 50px var(--shadow); }
 .tv-empty { padding: 12vh 0; }
 .tv-empty .tv-btn { margin-top: 10px; }
@@ -662,23 +661,15 @@ html.kai-fs-on .dock { display: none; }
 
 /* botón flotante: visible pero discreto */
 /* abajo: más pegado al borde que antes; en iPhone queda justo encima de la barrita de inicio (no la tapa) */
-.dock { position: fixed; z-index: 26; right: max(18px, env(safe-area-inset-right)); bottom: max(14px, calc(env(safe-area-inset-bottom) - 8px)); display: grid; justify-items: end; gap: 10px; }
+.dock { position: fixed; z-index: 26; justify-items: end; gap: 10px; }
 .dock-btn {
-  position: relative; display: grid; place-items: center; width: 54px; height: 54px; border-radius: 50%;
-  background: var(--glass-strong); border: 1px solid var(--glass-edge);
-  box-shadow: inset 0 1px 0 var(--glass-hi), 0 10px 30px var(--shadow);
-  -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur);
-  opacity: 0.62; transition: opacity 0.2s, transform 0.2s;
+  position: relative;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  transition: opacity 0.2s, transform 0.2s;
 }
-.dock-btn .dock-avatar { width: 40px; height: 40px; font-size: 17px; }
-/* ir arriba: el avatar se cambia por una flecha mientras dura */
 .dock-btn .dock-avatar { transition: opacity 0.18s, transform 0.18s; }
-.dock-top { position: absolute; inset: 0; display: grid; place-items: center; opacity: 0; transform: translateY(6px); transition: opacity 0.18s, transform 0.18s; pointer-events: none; }
-.dock-top svg { width: 24px; height: 24px; fill: none; stroke: var(--text); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
-.dock.is-up .dock-top { opacity: 1; transform: none; }
-.dock.is-up .dock-avatar { opacity: 0; transform: scale(0.7); }
-.dock.is-up .dock-state, .dock.is-up .dock-btn::after { display: none; }
-.dock.is-up .dock-btn { opacity: 0.9; }
 /* sincronización: ruedita azul alrededor mientras sincroniza; puntito abajo a la derecha (verde al día, azul por sincronizar, gris sin conexión) */
 .dock-ring { position: absolute; inset: -4px; border-radius: 50%; border: 2.5px solid transparent; border-top-color: var(--accent); border-right-color: color-mix(in srgb, var(--accent) 45%, transparent); display: none; animation: dock-spin 0.9s linear infinite; pointer-events: none; }
 .dock[data-sync='syncing'] .dock-ring { display: block; }
@@ -688,107 +679,62 @@ html.kai-fs-on .dock { display: none; }
 .dock[data-sync='pending'] .dock-state { background: var(--accent); }
 .dock[data-sync='offline'] .dock-state { background: var(--faint); }
 @media (prefers-reduced-motion: reduce) { .dock-ring { animation-duration: 2.4s; } }
-@media (hover: hover) { .dock-btn:hover { opacity: 1; transform: scale(1.05); } }
+@media (hover: hover) { .dock-btn:hover { opacity: 1; } }
 .dock-btn:focus-visible, .dock.is-open .dock-btn { opacity: 1; }
-body.is-playing:not(:has(.dock.is-open)) .dock-btn { opacity: 0.32; }
 body.lights-off .dock { opacity: 0; pointer-events: none; }
 .dock-panel {
-  width: 270px; padding: 10px; border-radius: 24px; display: grid; gap: 2px;
-  background: var(--glass-solid); border: 1px solid var(--glass-edge);
-  box-shadow: inset 0 1px 0 var(--glass-hi), 0 24px 60px var(--shadow);
-  -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur);
-  transform-origin: bottom right; transform: scale(0.92) translateY(8px); opacity: 0;
+  width: max-content;
+  min-width: 168px;
+  padding: 6px;
+  border-radius: 20px;
+  display: grid;
+  gap: 2px;
+  transform: scale(0.92) translateY(8px);
+  opacity: 0;
   transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.18s;
 }
 .dock-panel.is-in { transform: none; opacity: 1; }
-.dock-profile { display: flex; align-items: center; gap: 12px; padding: 8px 10px 12px; margin-bottom: 4px; border-bottom: 1px solid var(--line); border-radius: 14px 14px 0 0; }
+.dock-profile { display: flex; align-items: center; gap: 10px; padding: 6px 14px 10px 8px; margin-bottom: 4px; border-bottom: 1px solid var(--line); border-radius: 14px 14px 0 0; }
 .dock-profile > span:last-child { display: grid; }
 .dock-pname { font-weight: 650; }
 .dock-psub { font-size: 12px; color: var(--dim); }
-.dock-item { display: flex; align-items: center; gap: 12px; padding: 11px 12px; border-radius: 14px; font-size: 15px; font-weight: 500; }
+.dock-item { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 14px 10px 10px; border-radius: 14px; font-size: 15px; font-weight: 500; text-align: left; }
 .dock-item svg { width: 20px; height: 20px; color: var(--dim); }
-.dock-item.is-on { background: var(--glass); box-shadow: inset 0 0 0 1px var(--glass-edge); font-weight: 650; }
-.dock-item.is-on svg { color: var(--text); }
 @media (hover: hover) { .dock-item:hover, .dock-profile:hover { background: var(--glass); } }
-.dock-count { margin-left: auto; font-size: 12px; font-weight: 700; color: var(--dim); }
-.dock-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 8px 2px 2px; margin-top: 4px; border-top: 1px solid var(--line); }
-.dock-chip { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 40px; border-radius: 12px; font-size: 13px; font-weight: 600; background: var(--glass); border: 1px solid var(--glass-edge); }
-.dock-chip svg { width: 17px; height: 17px; }
-.dock-chip.is-spinning svg { animation: spin 0.9s linear infinite; }
-.dock-quota { margin: 6px 10px 2px; font-size: 11.5px; color: var(--faint); line-height: 1.35; }
-.dock-quota:empty { display: none; }
-body.quota-hit .dock-quota { color: var(--dim); }
-body.quota-hit .dock-quota::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #e6a23c; margin-right: 6px; vertical-align: 1px; }
+.dock-item.is-spinning svg { animation: spin 0.9s linear infinite; }
 body.quota-hit .dock-btn::after { content: ''; position: absolute; top: 2px; right: 2px; width: 9px; height: 9px; border-radius: 50%; background: #e6a23c; border: 2px solid var(--bg); }
 
 /* portada: el anime solo vive en su póster y en los mosaicos */
 .tv-hero { display: grid; grid-template-columns: 1fr; gap: 34px; align-items: end; max-width: 1180px; padding: clamp(24px, 7vh, 80px) 0 26px; }
 .tvh-text { min-width: 0; max-width: 760px; }
-.hero-poster { display: none; }
 @media (min-width: 900px) {
   .tv-hero { grid-template-columns: auto 1fr; }
-  .hero-poster {
-    display: block; position: relative; width: clamp(170px, 17vw, 240px); aspect-ratio: 2 / 3; border-radius: 22px; overflow: hidden;
-    border: 1px solid var(--glass-edge); box-shadow: 0 30px 70px var(--shadow), 0 0 0 1px rgba(255, 255, 255, 0.04);
-    transform: perspective(900px) rotateY(8deg); transform-origin: left center; transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
-    background: linear-gradient(160deg, hsl(var(--h, 220) 14% 30%), hsl(var(--h, 220) 12% 16%));
-  }
-  .hero-poster img, .hero-poster [data-thumb] img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-  .hero-poster::after { content: ''; position: absolute; inset: 0; background: linear-gradient(115deg, rgba(255, 255, 255, 0.22) 0%, transparent 32%); pointer-events: none; }
-  .hero-poster:hover { transform: perspective(900px) rotateY(0deg) scale(1.02); }
-}
+        }
 .tv.is-home .tv-title { font-size: clamp(44px, 7vw, 88px); }
 
 /* página de la serie: banner a su tamaño real + póster nítido + fondo difuminado del póster */
-.tv.is-series .tv-main { padding-top: calc(env(safe-area-inset-top) + 68px); max-width: 1180px; margin: 0 auto; }
-.series-wash { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
-.series-wash img { position: absolute; inset: -12%; width: 124%; height: 124%; object-fit: cover; filter: blur(70px) saturate(160%); opacity: 0.38; animation: fade 0.8s ease-out; }
-[data-theme='light'] .series-wash img { opacity: 0.32; }
-.series-wash::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 0%, color-mix(in srgb, var(--bg) 40%, transparent) 55%, var(--bg) 100%); }
+.tv.is-series .tv-main { max-width: 1180px; margin: 0 auto; }
+/* el fondo es la portada reducida a unos pocos píxeles y estirada (views/images.js): ya viene difuminada */
 .series-hero { margin-bottom: 36px; }
-.banner { position: relative; width: 100%; aspect-ratio: 19 / 4; min-height: 140px; max-height: 260px; border-radius: 26px; overflow: hidden; border: 1px solid var(--glass-edge); box-shadow: 0 24px 60px var(--shadow); }
-.banner img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; animation: fade 0.5s ease-out; }
-.banner::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 45%, rgba(0, 0, 0, 0.35) 100%); }
-.series-top { display: grid; grid-template-columns: auto 1fr; gap: 26px; align-items: end; padding: 0 clamp(4px, 2vw, 26px); }
-.series-hero.has-banner .series-top { margin-top: -74px; position: relative; }
-.poster { display: block; position: relative; overflow: hidden; width: clamp(130px, 16vw, 200px); aspect-ratio: 2 / 3; object-fit: cover; border-radius: 20px; box-shadow: 0 24px 60px var(--shadow); border: 3px solid var(--bg); background: var(--thumb-bg); }
-.poster.is-thumb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.series-info { min-width: 0; padding-bottom: 6px; }
-.series-info .tv-title { font-size: clamp(34px, 5.5vw, 64px); }
 /* nombres largos de AniList ("… Kan: Dakara, Shishunki wa Owarazu ni…"): más chicos, en cualquier pantalla */
-.series-info .tv-title.is-long { font-size: clamp(28px, 3.8vw, 48px); line-height: 1.02; }
-.series-info .tv-title.is-xlong { font-size: clamp(24px, 2.8vw, 38px); line-height: 1.06; letter-spacing: -0.03em; }
 .series-hero > .tv-synopsis { padding: 0 clamp(4px, 2vw, 26px); margin-top: 20px; max-width: 75ch; }
 .series-hero > .link-btn { margin: 8px clamp(4px, 2vw, 26px) 0; }
 .series-hero > .tv-actions { padding: 0 clamp(4px, 2vw, 26px); }
 .tv-btn.is-quiet { box-shadow: inset 0 1px 0 var(--glass-hi); }
 @media (max-width: 640px) {
-  .series-top { grid-template-columns: 1fr; gap: 14px; }
-  .series-hero.has-banner .series-top { margin-top: -56px; }
-  .poster { width: 112px; }
-  .banner { border-radius: 20px; min-height: 120px; }
-  .tv-btn { height: 52px; font-size: 16px; padding: 0 20px 0 16px; }
-}
+          }
 
 /* sección de episodios */
 .ep-section { margin-top: 6px; }
 .ep-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
-.ep-heading { margin: 0; font: 700 26px/1.1 var(--font-display); letter-spacing: -0.025em; }
+.ep-heading { margin: 0; }
 
 .tv-kicker { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; margin: 0 0 6px; font-size: 14px; color: var(--dim); font-weight: 600; }
 .tv-kicker a { color: var(--text); text-decoration: none; }
 .tv-kicker a:hover { text-decoration: underline; }
-.season-step { display: flex; gap: 8px; flex-wrap: wrap; }
-.step-btn {
-  display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 14px;
-  border-radius: 999px; font-size: 14px; font-weight: 600; color: var(--text); text-decoration: none;
-  background: var(--glass); box-shadow: inset 0 0 0 1px var(--glass-edge), inset 0 1px 0 var(--glass-hi);
-}
-.step-btn svg { width: 16px; height: 16px; }
-.step-btn.is-next svg { transform: scaleX(-1); }
-@media (hover: hover) { .step-btn:hover { background: var(--glass-strong, var(--glass)); } }
+
 .season-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
-@media (max-width: 520px) { .season-grid { grid-template-columns: repeat(2, 1fr); gap: 18px 12px; } .step-btn[title] span { display: none; } .step-btn[title] { padding: 0 11px; } }
+@media (max-width: 520px) { .season-grid { grid-template-columns: repeat(2, 1fr); gap: 18px 12px; }   }
 
 /* episodio: base (filas en explorar y descargados) */
 .episodes { list-style: none; margin: 0; padding: 0; --h: 220; }
@@ -816,7 +762,7 @@ body.quota-hit .dock-btn::after { content: ''; position: absolute; top: 2px; rig
 .ep-codec.is-bad { color: rgba(255, 255, 255, 0.85); }
 .ep-codec i { width: 6px; height: 6px; border-radius: 50%; background: #ff453a; box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.35); }
 .ep:has(.mini-bar) .ep-codec { bottom: 10px; }
-.ep-flag { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; color: #fff; background: rgba(0, 0, 0, 0.45); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+.ep-flag { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; color: #fff; background: rgba(0, 0, 0, 0.45); }
 .ep-flag svg { width: 13px; height: 13px; stroke-width: 2.2; }
 .ep-flag.is-seen { background: rgba(255, 255, 255, 0.9); color: #111; }
 .ep-new { display: inline-flex; align-items: center; height: 22px; padding: 0 9px; border-radius: 999px; font-size: 11px; font-weight: 750; background: var(--accent); color: var(--accent-ink); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25); }
@@ -856,38 +802,44 @@ body:not(.is-playing) .eq i { animation-play-state: paused; }
 
 /* cuadrícula de tarjetas en la página de la serie */
 .episodes.is-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 18px; }
-.episodes.is-grid .ep { display: block; border: 0; border-radius: 22px; padding: 8px 8px 12px; background: var(--glass); box-shadow: inset 0 0 0 1px var(--glass-edge), inset 0 1px 0 var(--glass-hi); transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.2s, background-color 0.2s; }
-@media (hover: hover) { .episodes.is-grid .ep:hover { transform: translateY(-3px); background: var(--glass-strong); box-shadow: inset 0 0 0 1px var(--glass-edge), 0 18px 40px var(--shadow); } }
+.episodes.is-grid .ep { display: block; border: 0; transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.2s, background-color 0.2s; }
+@media (hover: hover) { .episodes.is-grid .ep:hover { box-shadow: inset 0 0 0 1px var(--glass-edge), 0 18px 40px var(--shadow); } }
 .episodes.is-grid .ep-main { display: grid; grid-template-columns: 1fr; gap: 10px; padding: 0; }
-.episodes.is-grid .ep-thumb { border-radius: 16px; }
 .episodes.is-grid .ep-num { font-size: 46px; left: 12px; bottom: 6px; }
-.episodes.is-grid .ep-text { padding: 0 6px; padding-right: 86px; }
-.episodes.is-grid .ep-tools { position: absolute; right: 8px; bottom: 8px; }
-.episodes.is-grid .ep.is-next { box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 70%, transparent), 0 14px 40px color-mix(in srgb, var(--accent) 18%, transparent); }
+.episodes.is-grid .ep-tools { position: absolute; }
 @media (max-width: 640px) {
   .episodes.is-grid { grid-template-columns: 1fr; gap: 10px; }
-  .episodes.is-grid .ep { padding: 8px; border-radius: 18px; }
-  .episodes.is-grid .ep-main { grid-template-columns: 132px 1fr; align-items: center; gap: 12px; }
+    .episodes.is-grid .ep-main { grid-template-columns: 132px 1fr; align-items: center; gap: 12px; }
   .episodes.is-grid .ep-num { font-size: 30px; left: 9px; bottom: 4px; }
-  .episodes.is-grid .ep-thumb { border-radius: 12px; }
-  .episodes.is-grid .ep-text { padding: 0 70px 0 0; }
-  .episodes.is-grid .ep-tools { top: 50%; bottom: auto; transform: translateY(-50%); }
+      .episodes.is-grid .ep-tools { top: 50%; transform: translateY(-50%); }
 }
 
 /* seleccionar varios capítulos para descargarlos juntos */
 .pick-toggle {
-  display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 14px; margin-right: auto;
-  border-radius: 999px; font-size: 14px; font-weight: 600; color: var(--text);
-  background: var(--glass); box-shadow: inset 0 0 0 1px var(--glass-edge), inset 0 1px 0 var(--glass-hi);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: auto;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
 }
 .pick-toggle svg { width: 16px; height: 16px; }
 .pick-toggle.is-on { background: var(--accent); color: var(--accent-ink); box-shadow: none; }
 .episodes.is-picking .ep-tools, .episodes.is-picking .ep-play { display: none; }
 .episodes.is-picking .ep-main { cursor: pointer; }
 .episodes.is-picking .ep-thumb::before {
-  content: ''; position: absolute; z-index: 3; top: 8px; left: 8px; width: 24px; height: 24px; border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.9); background: rgba(0, 0, 0, 0.25); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
-  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  content: '';
+  position: absolute;
+  z-index: 3;
+  top: 8px;
+  left: 8px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
 }
 .episodes.is-picking .ep.is-picked .ep-thumb::before {
   border-color: var(--accent); background: var(--accent) center / 15px no-repeat
@@ -896,9 +848,6 @@ body:not(.is-playing) .eq i { animation-play-state: paused; }
 [data-theme='light'] .episodes.is-picking .ep.is-picked .ep-thumb::before {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E");
 }
-.episodes.is-grid.is-picking .ep.is-picked { box-shadow: inset 0 0 0 2px var(--accent); }
-.episodes.is-picking .ep.is-unpickable { opacity: 0.45; }
-.episodes.is-picking .ep.is-unpickable .ep-thumb::before { display: none; }
 
 .pick-bar {
   position: fixed; z-index: 27; left: 50%; transform: translateX(-50%);
@@ -912,7 +861,8 @@ body:not(.is-playing) .eq i { animation-play-state: paused; }
 @keyframes pick-in { from { opacity: 0; transform: translate(-50%, 12px); } }
 .pick-count { font-size: 14px; font-weight: 600; white-space: nowrap; margin-right: 6px; font-variant-numeric: tabular-nums; }
 .pick-btn { display: inline-flex; align-items: center; gap: 6px; height: 38px; padding: 0 14px; border-radius: 999px; font-size: 14px; font-weight: 600; color: var(--text); white-space: nowrap; }
-.pick-btn:hover { background: var(--glass); }
+.pick-btn:not(.is-primary) { background: var(--btn); }
+@media (hover: hover) { .pick-btn:not(.is-primary):not(:disabled):hover { background: var(--btn-hover); } }
 .pick-btn svg { width: 17px; height: 17px; }
 .pick-btn.is-primary { background: var(--accent); color: var(--accent-ink); }
 .pick-btn:disabled { opacity: 0.45; cursor: default; }
@@ -926,25 +876,20 @@ html.is-picking .series-main { padding-bottom: calc(110px + env(safe-area-inset-
 }
 
 /* lista junto al reproductor */
-.watch-list { background: var(--glass); border-radius: 24px; padding: 14px 10px 8px; box-shadow: inset 0 0 0 1px var(--glass-edge), inset 0 1px 0 var(--glass-hi); -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur); }
-.wl-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 0 8px 8px; }
+.wl-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
 .wl-title { margin: 0; font: 700 18px/1.2 var(--font-display); letter-spacing: -0.02em; }
 .wl-count { font-size: 12.5px; color: var(--dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.episodes.is-compact .ep { border: 0; border-radius: 16px; padding: 4px 4px 4px 6px; margin-bottom: 2px; transition: background-color 0.15s; }
-@media (hover: hover) { .episodes.is-compact .ep:hover { background: var(--glass); } }
-.episodes.is-compact .ep-main { grid-template-columns: 112px 1fr; gap: 12px; padding: 4px 0; }
-.episodes.is-compact .ep-thumb { border-radius: 10px; }
+.episodes.is-compact .ep { border: 0; margin-bottom: 2px; transition: background-color 0.15s; }
+@media (hover: hover) {  }
+.episodes.is-compact .ep-main { gap: 12px; padding: 4px 0; }
 .episodes.is-compact .ep-num { font-size: 24px; }
 .episodes.is-compact .ep-flags { top: 5px; right: 5px; }
 .episodes.is-compact .ep-flag { width: 19px; height: 19px; }
 .episodes.is-compact .ep-new { height: 19px; padding: 0 7px; font-size: 10px; }
 .episodes.is-compact .ep-sub { font-size: 13px; }
-.episodes.is-compact .ep.is-current { background: color-mix(in srgb, var(--accent) 14%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent); }
-.episodes.is-compact .ep.is-current .ep-thumb { box-shadow: 0 0 0 2px var(--accent); }
 .episodes.is-compact .ep.is-current .ep-title { color: var(--text); }
 @media (max-width: 1099px) {
-  .watch-list { padding: 14px 8px 8px; }
-}
+  }
 
 .stage-slot { isolation: isolate; }
 /* nada dentro de la página de reproducción debe crear desplazamiento lateral */
@@ -973,21 +918,24 @@ html.is-picking .series-main { padding-bottom: calc(110px + env(safe-area-inset-
 .collage.n3 { grid-template-columns: 1fr 1fr 1fr; }
 .collage.n4 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
 .tile .collage.tile-img.n4 { grid-template-columns: repeat(4, 1fr); grid-template-rows: 1fr; }
-.hero-poster.is-collage .collage, .poster.is-collage .collage { position: absolute; inset: 0; }
-.poster.is-collage { padding: 0; }
-.banner.is-collage { display: flex; gap: 2px; background: var(--thumb-bg, #111); justify-content: center; overflow: hidden; }
-.banner.is-collage img { position: static; flex: 0 0 auto; width: auto; height: 100%; aspect-ratio: 2 / 3; object-fit: cover; }
 /* tarjeta de capítulo con la imagen del anime: un velo para que el número se lea */
 .ep-thumb.is-art img { filter: saturate(1.05); }
 .ep-thumb.is-art::after { background: linear-gradient(180deg, rgba(0, 0, 0, 0.05) 30%, rgba(0, 0, 0, 0.6) 100%); }
 
 /* ───────── mini reproductor ───────── */
 .mini {
-  position: fixed; z-index: 28; right: max(18px, env(safe-area-inset-right)); bottom: calc(18px + env(safe-area-inset-bottom));
-  width: 340px; display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 2px;
-  padding: 8px 8px 10px; border-radius: 22px; overflow: hidden;
-  background: var(--glass-solid); box-shadow: inset 0 0 0 1px var(--glass-edge), inset 0 1px 0 var(--glass-hi), 0 22px 60px var(--shadow);
-  -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur);
+  position: fixed;
+  z-index: 28;
+  right: max(18px, env(safe-area-inset-right));
+  bottom: calc(18px + env(safe-area-inset-bottom));
+  width: 340px;
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 8px 10px;
+  overflow: hidden;
+  background: var(--glass-solid);
   animation: mini-in 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .mini[hidden] { display: none; }
@@ -999,18 +947,18 @@ html.is-picking .series-main { padding-bottom: calc(110px + env(safe-area-inset-
 .mini-text { display: grid; min-width: 0; text-align: left; padding: 2px 6px; }
 .mini-title { font-weight: 650; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mini-sub { font-size: 12px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mini-btn { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 12px; color: var(--text); }
+.mini-btn { display: grid; place-items: center; width: 38px; height: 38px; color: var(--text); }
 .mini-btn:hover { background: var(--glass); }
 .mini-btn svg { width: 20px; height: 20px; }
 .mini-progress { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: var(--line); }
-.mini-progress i { position: absolute; left: 0; top: 0; bottom: 0; width: var(--mp, 0%); background: var(--accent); }
+.mini-progress i { position: absolute; left: 0; top: 0; bottom: 0; width: var(--mp, 0%); }
 /* lo flotante se acomoda arriba del mini reproductor */
 html.has-mini { --mini-space: 262px; }
 html.has-mini .dock { bottom: calc(18px + var(--mini-space) + env(safe-area-inset-bottom)); }
 html.has-mini .pick-bar, html.has-mini .toast { bottom: calc(18px + var(--mini-space) + env(safe-area-inset-bottom)); }
 @media (max-width: 600px) {
   /* en el teléfono: una barra delgada con el video a la izquierda */
-  .mini { left: 8px; right: 8px; width: auto; grid-template-columns: 112px 1fr auto auto; gap: 4px; padding: 6px 6px 8px; border-radius: 16px; }
+  .mini { left: 8px; right: 8px; width: auto; grid-template-columns: 112px 1fr auto auto; gap: 4px; padding: 6px 6px 8px; }
   .mini-video { grid-column: auto; margin: 0; border-radius: 10px; }
   html.has-mini { --mini-space: 76px; }
 }
@@ -1031,7 +979,7 @@ html.has-mini body { padding-bottom: var(--mini-space); }
 
 /* etiquetas que filtran el catálogo */
 .tv-facts .fact { color: var(--text); transition: background-color 0.15s, transform 0.15s; }
-@media (hover: hover) { .tv-facts .fact:hover { background: var(--glass-strong); transform: translateY(-1px); } }
+@media (hover: hover) {  }
 .tv-facts .fact:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* cuadrícula de mosaicos (inicio y catálogo): hacia abajo, sin deslizar de lado */
@@ -1043,29 +991,27 @@ html.has-mini body { padding-bottom: var(--mini-space); }
   .tiles.is-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   .tiles.is-grid .tile { border-radius: 16px; }
   .tiles.is-grid .tile-text { left: 10px; right: 10px; bottom: 8px; }
-  .tiles.is-grid .tile-title { font-size: 14px; }
-  .tiles.is-grid .tile-sub { font-size: 11px; }
-  .tiles.is-grid .tile-badge { top: 7px; left: 7px; padding: 3px 8px; font-size: 10px; }
+      .tiles.is-grid .tile-badge { top: 7px; left: 7px; padding: 3px 8px; font-size: 10px; }
 }
-.tv-row-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-.tv-more { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px; border-radius: 999px; font-size: 14px; font-weight: 600; color: var(--text); background: var(--glass); box-shadow: inset 0 0 0 1px var(--glass-edge); }
+.tv-row-head { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.tv-more { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; }
 .tv-more svg { width: 16px; height: 16px; }
 @media (hover: hover) { .tv-more:hover { background: var(--glass-strong); } }
 
 /* lupa del inicio */
 .tv-top-tools { display: flex; align-items: center; gap: 10px; }
-.tv-icon { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; color: var(--text); background: var(--glass); box-shadow: inset 0 0 0 1px var(--glass-edge), inset 0 1px 0 var(--glass-hi); -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur); }
-.tv-icon svg { width: 20px; height: 20px; }
+.tv-icon { display: grid; place-items: center; border-radius: 50%; color: var(--text); }
 .tv-icon.is-small { width: 36px; height: 36px; background: transparent; box-shadow: none; }
 .home-search, .cat-search {
-  position: relative; z-index: 4; display: flex; align-items: center; gap: 8px;
-  height: 56px; padding: 0 8px 0 18px; border-radius: 999px;
-  background: var(--glass-strong); box-shadow: inset 0 0 0 1px var(--glass-edge), inset 0 1px 0 var(--glass-hi), 0 14px 40px var(--shadow);
-  -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur);
+  position: relative;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .home-search { margin: 4px clamp(16px, 4vw, 56px) 10px; animation: pick-in 0.22s ease-out; }
 .home-search[hidden] { display: none; }
-.home-search input, .cat-search input { flex: 1; min-width: 0; height: 100%; border: 0; background: transparent; color: var(--text); font: inherit; font-size: 17px; outline: none; }
+.home-search input, .cat-search input { flex: 1; min-width: 0; height: 100%; border: 0; background: transparent; color: var(--text); font: inherit; outline: none; }
 .home-search input::-webkit-search-cancel-button, .cat-search input::-webkit-search-cancel-button { -webkit-appearance: none; }
 .search-icon { display: grid; color: var(--dim); }
 .search-icon svg { width: 20px; height: 20px; }
@@ -1074,10 +1020,25 @@ html.has-mini body { padding-bottom: var(--mini-space); }
 /* catálogo */
 .catalog { max-width: 1440px; display: grid; gap: 14px; padding-top: 8px; }
 .cat-filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.cat-select { display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 6px 0 14px; border-radius: 999px; background: var(--glass); box-shadow: inset 0 0 0 1px var(--glass-edge); font-size: 13px; color: var(--dim); }
-.cat-select select { -webkit-appearance: none; appearance: none; border: 0; background: transparent; color: var(--text); font: inherit; font-size: 14px; font-weight: 600; padding: 0 22px 0 2px; height: 100%; max-width: 46vw; text-overflow: ellipsis;
+.cat-select { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--dim); }
+.cat-select select {
+  -webkit-appearance: none;
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  padding: 0 22px 0 2px;
+  height: 100%;
+  max-width: 46vw;
+  text-overflow: ellipsis;
   background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%);
-  background-position: calc(100% - 11px) 52%, calc(100% - 6px) 52%; background-size: 5px 5px; background-repeat: no-repeat; cursor: pointer; }
+  background-position: calc(100% - 11px) 52%, calc(100% - 6px) 52%;
+  background-size: 5px 5px;
+  background-repeat: no-repeat;
+  cursor: pointer;
+}
 .cat-select select option { color: #111; }
 .cat-clear { margin: 0 4px; }
 .cat-count { margin: 0; }
@@ -1106,11 +1067,13 @@ html.has-mini body { padding-bottom: var(--mini-space); }
 .shelf-main { padding: 8px var(--gutter) 120px; max-width: 1400px; margin: 0 auto; }
 .shelf-count { margin: 4px 0 16px; }
 .shelf { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 22px 16px; }
-.shelf-item { display: grid; gap: 6px; color: inherit; text-decoration: none; }
+.shelf-item { display: grid; color: inherit; text-decoration: none; }
 .shelf-poster {
-  position: relative; display: block; aspect-ratio: 2 / 3; border-radius: 16px; overflow: hidden;
+  position: relative;
+  display: block;
+  aspect-ratio: 2 / 3;
+  overflow: hidden;
   background: linear-gradient(160deg, hsl(var(--h) 14% 30%), hsl(var(--h) 10% 14%));
-  box-shadow: 0 14px 34px var(--shadow); border: 1px solid var(--glass-edge);
   transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.2s;
 }
 .shelf-poster img, .shelf-poster .is-fallback { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: grid; place-items: center; }
@@ -1118,14 +1081,11 @@ html.has-mini body { padding-bottom: var(--mini-space); }
 @media (hover: hover) { .shelf-item:hover .shelf-poster { transform: translateY(-3px); box-shadow: 0 20px 44px var(--shadow); } }
 .shelf-item:focus-visible { outline: none; }
 .shelf-item:focus-visible .shelf-poster { outline: 3px solid var(--accent); outline-offset: 3px; }
-.shelf-title { font-weight: 700; font-size: 15px; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.shelf-sub { font-size: 13px; color: var(--dim); margin-top: -3px; }
+.shelf-title { display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; }
+.shelf-sub { margin-top: -3px; }
 @media (max-width: 600px) {
   .shelf { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px 10px; }
-  .shelf-poster { border-radius: 12px; }
-  .shelf-title { font-size: 13px; }
-  .shelf-sub { font-size: 12px; }
-}
+      }
 .tv-btn.is-quiet { opacity: 0.7; pointer-events: none; }
 .shelf-poster .has-img .cover-glyph { display: none; }
 .shelf-poster .cover-glyph { position: static; font-size: 64px; }
@@ -1142,20 +1102,9 @@ html.has-mini body { padding-bottom: var(--mini-space); }
 .kcat-sit img.is-blink { opacity: 0; }
 .kcat-sit.is-closed img.is-blink { opacity: 1; }
 /* teléfono: sentado detrás del nombre, la parte de abajo se pierde detrás de las letras */
-.kcat-sit.is-title {
-  --kh: 78px; z-index: -1; left: 50%; top: calc(0.42em - var(--kh)); transform: translateX(-50%);
-  -webkit-mask-image: linear-gradient(#000 72%, transparent 97%); mask-image: linear-gradient(#000 72%, transparent 97%);
-}
-.kcat-sit.is-top { display: none; }
-@media (min-width: 900px) {
-  .kcat-sit.is-title { display: none; }
-  /* PC: echado encima de la fecha, más o menos de su mismo ancho */
-  .tv-date { position: relative; }
-  .kcat-sit.is-top { display: block; left: 50%; bottom: calc(100% - 6px); width: 105%; min-width: 130px; height: auto; aspect-ratio: 520 / 224; transform: translateX(-50%); }
-}
+
 
 /* ───────── Descubrir ───────── */
-.discover-links { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin: 34px 0 8px; opacity: 0.85; }
 .shelf-item.is-gray { width: 100%; border: 0; background: none; padding: 0; text-align: left; font: inherit; color: inherit; cursor: pointer; }
 .shelf-item.is-gray .shelf-poster img { filter: grayscale(1) contrast(0.95); opacity: 0.8; transition: filter 0.3s, opacity 0.3s; }
 @media (hover: hover) { .shelf-item.is-gray:hover .shelf-poster img { filter: grayscale(0.2); opacity: 1; } }
@@ -1180,8 +1129,14 @@ html.has-mini body { padding-bottom: var(--mini-space); }
 .lang-switch button.is-on { background: var(--primary); color: var(--primary-ink); }
 .tv-actions .lang-switch { height: auto; }
 .lang-chip {
-  position: absolute; z-index: 1; top: 10px; right: 10px; padding: 3px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 800; letter-spacing: 0.04em; color: #fff;
-  background: rgba(0, 0, 0, 0.45); border: 1px solid rgba(255, 255, 255, 0.25); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  position: absolute;
+  z-index: 1;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.45);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
 }
 .ep-new.is-lang { background: rgba(0, 0, 0, 0.55); color: #fff; }
 img.no-fade { animation: none !important; }
@@ -1215,14 +1170,636 @@ html.lite .bar, html.lite .sheet-panel, html.lite .toast, html.lite .st-menu, ht
 html.lite .st-bar { background: rgba(22, 24, 30, 0.85); }
 html.lite .ambient::before, html.lite .ambient::after { animation: none; will-change: auto; }
 /* pasar entre el reproductor grande y el mini: animar un video es lo que más le cuesta a un teléfono modesto (se veía
- * trabado); cambia al instante. Y el póster difuminado detrás de la serie (un desenfoque de pantalla entera que se
- * repinta justo al pasar al mini) no se dibuja: queda el color de la serie en el fondo. */
+ * trabado); cambia al instante. */
 html.lite .mini { animation: none; }
 html.lite #app { transition: none; }
-html.lite .series-wash img { display: none; }
 
 /* En pantalla completa lo de detrás del video no se ve: se deja de dibujar (al girar el teléfono y al entrar o salir
  * el navegador ya no tiene que acomodar la lista de capítulos ni el fondo). */
 html.kai-fs-on .ambient, html:has(.stage:fullscreen) .ambient,
 html.kai-fs-on .watch-info, html:has(.stage:fullscreen) .watch-info,
 html.kai-fs-on .watch-list, html:has(.stage:fullscreen) .watch-list { visibility: hidden; }
+
+/* ═════════════════════════ Kai 39 · diseño A (estilo Apple TV) ═════════════════════════
+ * Fondo neutro con un solo brillo del color de la serie, la imagen manda, datos en una línea sin pastillas,
+ * botones lisos (sin vidrio ni borde) y una barra flotante con las páginas principales. Pisa lo de arriba;
+ * lo que quede sin uso se limpia cuando el rediseño esté completo. */
+
+[data-theme='dark'] { --btn: rgba(255, 255, 255, 0.13); --btn-hover: rgba(255, 255, 255, 0.2); }
+[data-theme='dark']:not([data-dark='gris']) {
+  --bg: #000; --text: #f5f5f7; --dim: #98989f; --faint: #6c6c72; --line: rgba(255, 255, 255, 0.1);
+  --glass-solid: rgba(28, 28, 31, 0.94); --glass-strong: rgba(28, 28, 31, 0.78); --thumb-bg: #1c1c1f;
+}
+[data-theme='light'] { --btn: rgba(0, 0, 0, 0.06); --btn-hover: rgba(0, 0, 0, 0.1); }
+
+/* fondo: un solo brillo suave arriba, del color de la serie de la portada; sin manchas que se mueven */
+.ambient::after { display: none; }
+[data-theme] .ambient::before {
+  inset: 0; animation: none; will-change: auto; transition: none;
+  background: radial-gradient(110vmax 62vmax at 50% -20%, color-mix(in srgb, var(--tint, transparent) 34%, transparent), transparent 70%);
+}
+[data-theme='light'] .ambient::before { background: radial-gradient(110vmax 62vmax at 50% -20%, color-mix(in srgb, var(--tint, transparent) 22%, transparent), transparent 70%); }
+
+/* botones: lisos, del mismo alto, sin vidrio */
+.tv-btn {
+  height: 48px; padding: 0 20px; gap: 8px; border-radius: 12px; border: 0; font-size: 16px; font-weight: 600;
+  background: var(--btn); box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+.tv-btn svg { width: 20px; height: 20px; }
+.tv-btn.is-primary { background: var(--primary); color: var(--primary-ink); }
+.tv-btn.is-square { width: 48px; padding: 0; justify-content: center; flex: none; }
+@media (hover: hover) { .tv-btn:hover { transform: none; background: var(--btn-hover); } .tv-btn.is-primary:hover { background: var(--primary); opacity: 0.88; } }
+.tv-btn:focus-visible { transform: none; box-shadow: 0 0 0 3px var(--accent); }
+.tv-icon { width: 38px; height: 38px; background: var(--btn); box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+.tv-icon svg { width: 18px; height: 18px; }
+.tv-more { height: auto; padding: 0; border: 0; background: none; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+.tv-more svg { display: none; }
+.tv-more::after { content: '›'; margin-left: 4px; line-height: 1; }
+
+/* datos en una línea: "2014 · Serie · 19 capítulos · Comedia" (los que llevan al catálogo siguen siendo enlaces) */
+.tv-facts { gap: 0; margin-top: 8px; font-size: 14px; line-height: 1.5; color: var(--dim); }
+.tv-facts span, .tv-facts .fact {
+  padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none;
+  font-size: inherit; font-weight: 500; color: var(--dim);
+}
+.tv-facts > * + *::before { content: '·'; margin: 0 7px; color: var(--faint); }
+.tv-facts .fact-sep { display: none; }
+.tv-facts .fact-sep + *::before { content: '·'; }
+.tv-facts .tv-new { color: var(--accent); background: none; }
+@media (hover: hover) { .tv-facts .fact:hover { color: var(--text); background: none; transform: none; } }
+
+/* ── cabecera del inicio: "Kai", el saludo y la búsqueda ── */
+/* la cabecera va justo debajo de la franja que iOS desenfoca bajo la barra de estado (más arriba se ve borrosa) */
+.tv-top { align-items: center; padding: calc(env(safe-area-inset-top) + 14px) clamp(16px, 4vw, 56px) 4px; }
+.tv-brand { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.tv-word { position: relative; font: 700 26px/1 var(--font-display); letter-spacing: -0.035em; }
+.tv-greet { margin: 0; font-size: 13px; font-weight: 500; letter-spacing: 0; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (min-width: 900px) {
+  /* Kai, el gatito, echado sobre el nombre de la app */
+    }
+
+/* ── portada del inicio: la imagen de la serie a sangre y el texto encima ── */
+.tv.is-home .tv-top { z-index: 4; top: 0; left: 0; right: 0; }
+.tv.is-home .tv-main { padding-top: 0; }
+.tv.is-home .tv-hero {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: stretch;
+  gap: 0;
+  max-width: none;
+}
+.hero-art { position: absolute; inset: 0; z-index: -1; overflow: hidden; background: var(--thumb-bg); }
+.hero-art img, .hero-art [data-thumb], .hero-art [data-thumb] img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 20%; }
+.hero-art::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(180deg, transparent 0%, transparent 44%, color-mix(in srgb, var(--bg) 80%, transparent) 76%, var(--bg) 100%);
+}
+.tv.is-home .tvh-text { max-width: 620px; }
+.tv.is-home .tv-title { font: 700 clamp(30px, 8.4vw, 40px)/1.05 var(--font-display); letter-spacing: -0.03em; text-shadow: none; }
+.tv.is-home .tv-alt { margin-top: 6px; font-size: 14px; }
+.tv.is-home .tv-synopsis { display: none; }
+.tv.is-home .tv-actions { margin-top: 18px; gap: 10px; flex-wrap: nowrap; }
+.tv.is-home .tv-actions .tv-btn.is-primary { flex: 1; justify-content: center; }
+@media (min-width: 900px) {
+  /* PC: la imagen entra por la derecha y se funde hacia el texto (en vez del póster y el espacio vacío) */
+  .tv.is-home .tv-hero { margin-bottom: 18px; }
+  .hero-art { left: auto; width: 74%; -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 42%); mask-image: linear-gradient(to right, transparent 0%, #000 42%); }
+  .hero-art img { object-position: center 30%; }
+  .hero-art::after { background: linear-gradient(180deg, transparent 0%, transparent 60%, var(--bg) 100%); }
+  .tv.is-home .tvh-text { max-width: 540px; }
+  .tv.is-home .tv-title { font-size: clamp(40px, 4.4vw, 62px); }
+  .tv.is-home .tv-title.is-long { font-size: clamp(34px, 3.6vw, 50px); }
+  .tv.is-home .tv-title.is-xlong { font-size: clamp(30px, 3vw, 42px); }
+  .tv.is-home .tv-synopsis { display: -webkit-box; -webkit-line-clamp: 3; margin-top: 12px; font-size: 15px; color: var(--dim); }
+  .tv.is-home .tv-actions .tv-btn.is-primary { flex: none; }
+}
+
+/* "Seguir aquí lo que quedó a medias": una burbuja flotante arriba, como una notificación; al tocarla se abre */
+.tv.is-home .resume-card {
+  position: fixed; z-index: 6; top: calc(env(safe-area-inset-top) + 58px); left: 50%; right: auto; transform: translateX(-50%);
+  width: max-content; max-width: min(92vw, 380px); margin: 0; padding: 0; display: block; flex-wrap: nowrap; border-radius: 22px; border: 1px solid var(--glass-edge);
+  background: var(--glass-solid); box-shadow: 0 12px 34px rgba(0, 0, 0, 0.35); -webkit-backdrop-filter: none; backdrop-filter: none;
+  animation: resume-in 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes resume-in { from { opacity: 0; transform: translate(-50%, -12px) scale(0.96); } }
+.resume-pill { display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 16px 0 12px; font-size: 14px; font-weight: 600; color: var(--text); white-space: nowrap; }
+.resume-pill svg { width: 16px; height: 16px; color: var(--accent); }
+.resume-more { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.28s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.resume-in { min-height: 0; overflow: hidden; padding: 0 14px; }
+.resume-card.is-open { width: min(92vw, 380px); }
+.resume-card.is-open .resume-more { grid-template-rows: 1fr; }
+.resume-card.is-open .resume-in { padding-bottom: 14px; }
+.resume-card .resume-kicker { margin: 2px 0 0; }
+.resume-card .resume-title { white-space: normal; }
+.resume-actions { display: flex; gap: 8px; margin-top: 12px; }
+.resume-actions .tv-btn.is-primary { flex: 1; justify-content: center; }
+.resume-card .resume-x { order: 0; }
+@media (min-width: 900px) { .tv.is-home .resume-card { top: calc(env(safe-area-inset-top) + 76px); left: auto; right: clamp(16px, 4vw, 56px); transform: none; } }
+@media (min-width: 900px) { @keyframes resume-in { from { opacity: 0; transform: translateY(-12px) scale(0.96); } } }
+
+/* ── filas: la imagen arriba y el texto debajo, sin velos ni vidrio ── */
+.tile {
+  display: grid; grid-template-rows: auto auto; gap: 8px; aspect-ratio: auto; overflow: visible; border-radius: 0;
+  background: none; border: 0; box-shadow: none;
+}
+.tile::after { display: none; }
+.tile-img {
+  position: relative; inset: auto; grid-area: 1 / 1; width: 100%; height: auto; aspect-ratio: 16 / 9; border-radius: 12px; overflow: hidden;
+  background: linear-gradient(160deg, hsl(var(--h) 14% 30%), hsl(var(--h) 12% 16%));
+}
+.tile > .tile-badge {
+  position: static; grid-area: 1 / 1; align-self: start; justify-self: start; margin: 8px; padding: 4px 8px; border-radius: 6px; border: 0;
+  font-size: 11px; background: rgba(0, 0, 0, 0.6); -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+.tile > .tile-bar { position: relative; inset: auto; grid-area: 1 / 1; align-self: end; margin: 0 10px 10px; height: 3px; border-radius: 3px; overflow: hidden; background: rgba(255, 255, 255, 0.3); }
+.tile-text { position: static; grid-area: 2 / 1; color: var(--text); gap: 2px; }
+.tile-title { font: 600 15px/1.25 var(--font); letter-spacing: -0.005em; text-shadow: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tile-sub { color: var(--dim); font-size: 13px; margin: 0; }
+@media (hover: hover) { .tile:hover { transform: none; } .tile:hover .tile-img { filter: brightness(1.08); } }
+.tile:focus-visible { transform: none; box-shadow: none; }
+.tile:focus-visible .tile-img { outline: 3px solid var(--accent); outline-offset: 2px; }
+@media (max-width: 520px) {
+  .tiles.is-grid .tile-title { font-size: 14px; }
+  .tiles.is-grid .tile-sub { font-size: 12px; }
+}
+/* pósters: sin marco ni sombra grande */
+.shelf-poster { border-radius: 10px; border: 0; box-shadow: none; }
+.lang-chip { top: auto; bottom: 6px; right: auto; left: 6px; padding: 3px 5px; border-radius: 4px; border: 0; font-size: 9px; }
+
+/* ── barra flotante: las páginas principales y tu perfil ── */
+.dock { left: 50%; right: auto; transform: translateX(-50%); bottom: max(8px, calc(env(safe-area-inset-bottom) - 12px)); display: block; }
+.dock-bar {
+  display: flex; align-items: center; gap: 2px; padding: 5px; border-radius: 30px;
+  background: color-mix(in srgb, var(--glass-solid) 70%, transparent); border: 1px solid var(--glass-edge);
+  box-shadow: inset 0 1px 0 var(--glass-hi), 0 14px 34px rgba(0, 0, 0, 0.35);
+  -webkit-backdrop-filter: blur(18px) saturate(180%); backdrop-filter: blur(18px) saturate(180%);
+}
+.dock-tabs { display: flex; gap: 2px; }
+.dock-tab {
+  position: relative; display: grid; justify-items: center; align-content: center; gap: 3px; width: 66px; height: 52px; border-radius: 24px;
+  color: var(--dim); font: 600 10px/1 var(--font); transition: background-color 0.15s, color 0.15s;
+}
+.dock-tab svg { width: 23px; height: 23px; }
+.dock-tab.is-on { color: var(--text); background: var(--btn); }
+.dock-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.dock-badge { position: absolute; top: 5px; left: calc(50% + 5px); min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--primary); color: var(--primary-ink); font: 700 10px/16px var(--font); text-align: center; }
+.dock-badge:empty { display: none; }
+.dock-tab.has-news::after { content: ''; position: absolute; top: 8px; left: calc(50% + 8px); width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+.dock-btn { width: 52px; height: 52px; opacity: 1; background: none; border: 0; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+.dock-btn .dock-avatar { width: 34px; height: 34px; font-size: 15px; }
+/* tu perfil, del mismo gris que las pestañas (en el menú y en la elección de perfiles conserva su color) */
+.dock-btn .dock-avatar { background: var(--btn-hover); color: var(--text); box-shadow: none; border: 0; }
+@media (hover: hover) { .dock-btn:hover { transform: none; } .dock-tab:hover { color: var(--text); } }
+body.is-playing:not(:has(.dock.is-open)) .dock-btn { opacity: 1; }
+.dock-panel { position: absolute; right: 0; bottom: calc(100% + 10px); transform-origin: bottom right; }
+html.lite .dock-bar { background: var(--glass-solid); }
+/* en el teléfono, la página del reproductor es solo el video: sin barra */
+@media (max-width: 899px) { body:has(main.watch) .dock { display: none; } }
+/* lo que flota abajo se acomoda sobre la barra (teléfono) */
+@media (max-width: 899px) {
+  body { padding-bottom: calc(60px + env(safe-area-inset-bottom)); }
+  .toast, .pick-bar { bottom: calc(66px + max(8px, calc(env(safe-area-inset-bottom) - 12px))); }
+  .mini { bottom: calc(68px + max(8px, calc(env(safe-area-inset-bottom) - 12px))); }
+  html.has-mini .dock { bottom: max(8px, calc(env(safe-area-inset-bottom) - 12px)); }
+  html.has-mini .pick-bar, html.has-mini .toast { bottom: calc(74px + var(--mini-space) + max(8px, calc(env(safe-area-inset-bottom) - 12px))); }
+  body:has(main.watch) { padding-bottom: 0; }
+  body:has(main.watch) .mini { bottom: calc(18px + env(safe-area-inset-bottom)); }
+}
+/* PC: la barra va arriba, al centro, con el texto al lado del ícono */
+@media (min-width: 900px) {
+  .dock { top: 14px; bottom: auto; }
+  html.has-mini .dock { bottom: auto; }
+  .dock-panel { top: calc(100% + 10px); bottom: auto; transform-origin: top right; }
+  .dock-tab { width: auto; height: 40px; padding: 0 14px; grid-auto-flow: column; gap: 8px; border-radius: 20px; font-size: 14px; font-weight: 500; }
+  .dock-tab svg { width: 18px; height: 18px; }
+  .dock-badge { position: static; }
+  .dock-tab.has-news::after { top: 8px; left: auto; right: 6px; }
+  .dock-btn { width: 40px; height: 40px; }
+  .dock-btn .dock-avatar { width: 30px; height: 30px; font-size: 13px; }
+}
+
+/* la barra se achica al bajar (teléfono): queda la pestaña actual y tu perfil; al subir o tocarla vuelve */
+@media (max-width: 899px) {
+  .dock-bar { transition: padding 0.28s cubic-bezier(0.2, 0.8, 0.2, 1); }
+  .dock-tab, .dock-btn { transition: width 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), height 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.18s, background-color 0.15s, color 0.15s; }
+  .dock-tab span { transition: opacity 0.15s; }
+  .dock.is-compact .dock-bar { padding: 4px; }
+  .dock.is-compact .dock-tab { height: 40px; }
+  /* achicada queda siempre la casita (estés en la pestaña que estés) */
+  .dock.is-compact .dock-tab:not([data-tab='home']) { width: 0; opacity: 0; overflow: hidden; pointer-events: none; }
+  .dock.is-compact .dock-tab[data-tab='home'] { width: 48px; color: var(--text); }
+  .dock.is-compact .dock-tab span { opacity: 0; height: 0; overflow: hidden; }
+  .dock.is-compact .dock-tabs { gap: 0; }
+  /* achicada: solo la casita, con el punto de sincronización de tu perfil en su esquina */
+  .dock-bar { position: relative; }
+  .dock.is-compact .dock-btn { width: 0; height: 40px; opacity: 0; overflow: hidden; pointer-events: none; }
+  .dock-bar::after { content: ''; position: absolute; right: 3px; bottom: 3px; width: 11px; height: 11px; border-radius: 50%; background: var(--ok); border: 2px solid var(--bg); opacity: 0; transform: scale(0.5); transition: opacity 0.18s, transform 0.18s; pointer-events: none; }
+  .dock.is-compact .dock-bar::after { opacity: 1; transform: none; }
+  .dock[data-sync='syncing'] .dock-bar::after, .dock[data-sync='pending'] .dock-bar::after { background: var(--accent); }
+  .dock[data-sync='offline'] .dock-bar::after { background: var(--faint); }
+  /* la burbuja de subir, al lado de la barra achicada */
+  .dock-up {
+    position: absolute; left: calc(100% + 8px); bottom: 6px; width: 36px; height: 36px; border-radius: 50%;
+    display: grid; place-items: center; color: var(--text);
+    background: var(--glass-solid); box-shadow: inset 0 0 0 1px var(--glass-edge), 0 10px 30px var(--shadow);
+    -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur);
+    opacity: 0; transform: translateX(-22px) scale(0.4); pointer-events: none;
+    /* sale de detrás de la barra con un pequeño rebote; al irse, se recoge rápido */
+    transition: opacity 0.16s, transform 0.2s ease-in;
+  }
+  .dock.is-compact.is-deep:not(.is-open) .dock-up { transition: opacity 0.2s, transform 0.42s cubic-bezier(0.34, 1.56, 0.64, 1); }
+  .dock-up svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+  .dock.is-compact.is-deep:not(.is-open) .dock-up { opacity: 1; transform: none; pointer-events: auto; }
+  @media (prefers-reduced-motion: reduce) { .dock-up, .dock.is-compact.is-deep:not(.is-open) .dock-up { transform: none; transition: opacity 0.2s; } }
+  html.lite .dock-up { background: var(--glass-solid); -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+.dock-up { display: none; }
+@media (max-width: 899px) { .dock-up { display: grid; } }
+
+/* el texto de un botón siempre en una línea: si no entra ("Ver Shingeki no Kyojin Kuinaki Sentaku"), termina en … */
+.tv-btn > span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ── la portada es una isla oscura (como en las apps de Apple), igual en los dos temas ──
+ * Fundir la imagen hacia el fondo la lavaba en el tema claro y "Kai" se perdía sobre imágenes claras. La portada
+ * es una tarjeta redondeada con su propio degradado oscuro y el texto en blanco; la cabecera queda arriba, sobre
+ * el fondo de la página, sin nada detrás (ni el brillo del color de la serie). */
+.tv.is-home .tv-top { position: relative; color: var(--text); text-shadow: none; }
+.tv-top .tv-word, .tv-top .tv-greet { text-shadow: none; }
+.tv.is-home .tv-greet { color: var(--dim); }
+.tv.is-home .tv-top .tv-icon { background: var(--btn); color: var(--text); }
+.tv.is-home .tv-hero {
+  margin: 6px 0 22px; border-radius: 28px; overflow: hidden; background: #0e0e10; color: #fff;
+  min-height: min(68svh, 600px); padding: 140px 20px 20px;
+}
+.tv.is-home .hero-art::before { display: none; }
+.tv.is-home .hero-art::after { background: linear-gradient(180deg, transparent 0%, transparent 38%, rgba(0, 0, 0, 0.55) 68%, rgba(0, 0, 0, 0.88) 100%); }
+.tv.is-home .tv-hero .tv-alt,
+.tv.is-home .tv-hero .tv-facts,
+.tv.is-home .tv-hero .tv-facts span,
+.tv.is-home .tv-hero .tv-facts .fact { color: rgba(255, 255, 255, 0.72); }
+.tv.is-home .tv-hero .tv-facts > * + *::before { color: rgba(255, 255, 255, 0.4); }
+.tv.is-home .tv-hero .tv-synopsis { color: rgba(255, 255, 255, 0.75); }
+.tv.is-home .tv-hero .tv-btn { background: rgba(255, 255, 255, 0.18); color: #fff; }
+.tv.is-home .tv-hero .tv-btn.is-primary { background: #fff; color: #000; }
+@media (min-width: 900px) {
+  .tv.is-home .tv-hero { margin: 4px 0 24px; padding: 70px 40px 34px; min-height: clamp(440px, 60vh, 600px); }
+  .tv.is-home .hero-art::after { background: linear-gradient(180deg, transparent 0%, transparent 55%, rgba(14, 14, 16, 0.9) 100%); }
+}
+
+/* en el oscuro, un borde finito separa la tarjeta del fondo negro */
+[data-theme='dark'] .tv.is-home .tv-hero { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08); }
+/* en el inicio no hay brillo arriba: quedaba detrás de "Kai" y la lupa */
+body:has(.tv.is-home) .ambient { display: none; }
+/* Kai, el gatito: una sombra oscura suave para que se despegue de la imagen (es claro y se veía con borde blanco) */
+.kcat-sit img { filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.55)); }
+
+/* ═════════════════════════ Kai 39 · etapa 2: página de la serie y de la película ═════════════════════════
+ * La misma tarjeta oscura del inicio arriba (imagen, título, datos, Sub/Doblado y botones), la sinopsis debajo,
+ * las temporadas como pestañas y los capítulos como lista (teléfono) o cuadrícula liviana (PC). Sin el fondo
+ * difuminado de la portada ni el brillo de color: la página queda tan limpia como el inicio. */
+body:has(.tv.is-series) .ambient { display: none; }
+.bar.is-overlay .icon-btn { background: var(--btn); }
+.tv.is-series .tv-main { padding-top: calc(env(safe-area-inset-top) + 58px); }
+
+.hero-card {
+  position: relative; isolation: isolate; display: flex; flex-direction: column; justify-content: flex-end; align-items: stretch;
+  max-width: none; margin: 0 0 16px; padding: 150px 20px 20px; min-height: min(64svh, 560px);
+  border-radius: 28px; overflow: hidden; background: #0e0e10; color: #fff;
+}
+[data-theme='dark'] .hero-card { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08); }
+.hero-card .hero-art::before { display: none; }
+.hero-card .hero-art::after { background: linear-gradient(180deg, transparent 0%, transparent 36%, rgba(0, 0, 0, 0.55) 66%, rgba(0, 0, 0, 0.9) 100%); }
+.hero-card .tvh-text { max-width: 640px; }
+.hero-card .tv-title { font: 700 clamp(28px, 7.6vw, 38px)/1.05 var(--font-display); letter-spacing: -0.03em; color: #fff; text-shadow: none; }
+.hero-card .tv-title.is-long { font-size: clamp(25px, 6.6vw, 34px); }
+.hero-card .tv-title.is-xlong { font-size: clamp(22px, 5.8vw, 30px); }
+.hero-card .tv-kicker { margin-bottom: 6px; font-size: 13px; color: rgba(255, 255, 255, 0.7); }
+.hero-card .tv-kicker a { color: #fff; }
+.hero-card .tv-kicker span::before { content: '·'; margin-right: 8px; color: rgba(255, 255, 255, 0.4); }
+.hero-card .tv-alt { margin-top: 6px; font-size: 14px; color: rgba(255, 255, 255, 0.72); }
+.hero-card .facts-rows { gap: 2px; margin-top: 8px; }
+.hero-card .tv-facts, .hero-card .tv-facts span, .hero-card .tv-facts .fact { color: rgba(255, 255, 255, 0.72); }
+.hero-card .tv-facts > * + *::before { color: rgba(255, 255, 255, 0.4); }
+.hero-card .tv-facts .tv-new { color: #fff; }
+.hero-lang { margin-top: 12px; }
+.hero-card .lang-switch { box-shadow: none; }
+.hero-card .lang-switch button { color: rgba(255, 255, 255, 0.72); }
+.hero-card .tv-actions { margin-top: 16px; gap: 10px; flex-wrap: nowrap; }
+.hero-card .tv-btn { background: rgba(255, 255, 255, 0.18); color: #fff; }
+.hero-card .tv-btn.is-primary { flex: 1; justify-content: center; background: #fff; color: #000; }
+.hero-card .tv-btn.is-on svg { color: #fff; }
+.hero-card .tv-btn.is-quiet { opacity: 0.6; }
+.hero-card .tv-done { color: rgba(255, 255, 255, 0.8); }
+.series-about { margin: 0 2px 26px; display: grid; gap: 6px; }
+.series-about .tv-synopsis { margin: 0; max-width: 75ch; font-size: 15px; line-height: 1.55; color: var(--dim); }
+.series-about .link-btn { margin: 0; justify-self: start; }
+@media (min-width: 900px) {
+  .hero-card { min-height: clamp(420px, 58vh, 560px); padding: 60px 40px 34px; }
+  .hero-card .hero-art::after { background: linear-gradient(180deg, transparent 0%, transparent 55%, rgba(14, 14, 16, 0.92) 100%); }
+  .hero-card .tvh-text { max-width: 560px; }
+  .hero-card .tv-title { font-size: clamp(36px, 3.8vw, 56px); }
+  .hero-card .tv-title.is-long { font-size: clamp(32px, 3.2vw, 46px); }
+  .hero-card .tv-title.is-xlong { font-size: clamp(28px, 2.7vw, 38px); }
+  .hero-card .tv-btn.is-primary { flex: none; }
+  .series-about { margin: 0 4px 30px; }
+}
+
+/* temporadas como pestañas subrayadas; "Todas" vuelve al menú de temporadas */
+.season-tabs { display: flex; gap: 22px; margin: 0 0 14px; overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid var(--line); }
+.season-tabs::-webkit-scrollbar { display: none; }
+.season-tab { flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 12px 0 11px; font-size: 15px; font-weight: 600; color: var(--dim); white-space: nowrap; }
+.season-tab svg { width: 16px; height: 16px; }
+.season-tab.is-on { color: var(--text); box-shadow: inset 0 -2px 0 var(--text); }
+@media (hover: hover) { .season-tab:hover { color: var(--text); } }
+.ep-heading { font: 700 20px/1.2 var(--font-display); letter-spacing: -0.015em; }
+.pick-toggle { height: 32px; padding: 0 12px; background: var(--btn); box-shadow: none; }
+
+/* capítulos: en la PC, cuadrícula liviana (la imagen y el texto, sin tarjeta de vidrio) */
+.episodes.is-grid .ep { padding: 0; border-radius: 0; background: none; box-shadow: none; }
+.episodes.is-grid .ep-thumb { border-radius: 12px; }
+.episodes.is-grid .ep-text { padding: 0 2px; padding-right: 86px; }
+.episodes.is-grid .ep-tools { right: 0; bottom: -2px; }
+.episodes.is-grid .ep.is-next { box-shadow: none; }
+.episodes.is-grid .ep.is-next .ep-thumb { box-shadow: 0 0 0 2px var(--text); }
+.episodes.is-picking .ep.is-picked .ep-thumb { box-shadow: 0 0 0 2px var(--accent); }
+@media (hover: hover) { .episodes.is-grid .ep:hover { background: none; transform: none; } }
+/* en el teléfono, una lista: la miniatura a la izquierda y el texto al lado */
+@media (max-width: 899px) {
+  .episodes.is-grid { display: block; }
+  .episodes.is-grid .ep { display: grid; grid-template-columns: 1fr auto; align-items: center; padding: 6px 0; }
+  .episodes.is-grid .ep-main { grid-template-columns: 132px 1fr; gap: 12px; align-items: center; }
+  .episodes.is-grid .ep-thumb { border-radius: 8px; }
+  .episodes.is-grid .ep-num { font-size: 22px; left: 8px; bottom: 4px; }
+  .episodes.is-grid .ep-text { padding: 0; }
+  .episodes.is-grid .ep-tools { position: static; }
+  .episodes.is-grid .ep-title { font-size: 15px; }
+  .episodes.is-grid .ep-sub { font-size: 13px; }
+}
+/* el botón principal cede espacio a los cuadrados (si no, el último quedaba pegado al borde de la tarjeta) */
+.hero-card .tv-btn.is-primary, .tv.is-home .tv-actions .tv-btn.is-primary { min-width: 0; }
+@media (max-width: 899px) {
+  /* con dos botones cuadrados al lado, "Continuar Episodio 12" entra completo */
+  .hero-card .tv-actions { gap: 8px; }
+  .hero-card .tv-btn.is-primary { padding: 0 12px; gap: 6px; font-size: 15px; }
+}
+
+/* ── el final del inicio: "Descubrir" como una sección más, y Kai, el gatito, sentado encima de la tarjeta ── */
+.home-foot { max-width: 640px; margin-top: 34px; }
+.home-shelf { position: relative; margin-top: 4px; }
+/* Kai sentado sobre el borde de arriba de la tarjeta, a la derecha, como en un estante */
+.home-shelf .kcat-sit.is-foot { --kh: 92px; position: absolute; z-index: 1; right: 22px; bottom: calc(100% - 8px); }
+.home-links { position: relative; display: grid; border-radius: 18px; overflow: hidden; background: var(--btn); }
+.home-link { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 13px 14px 13px 16px; color: var(--text); transition: background-color 0.15s; }
+.home-link { position: relative; }
+.home-link + .home-link::before { content: ''; position: absolute; top: 0; left: 54px; right: 0; height: 1px; background: var(--line); }
+.home-link-ic { display: grid; place-items: center; color: var(--dim); }
+.home-link-ic svg { width: 22px; height: 22px; }
+.home-link-text { display: grid; gap: 1px; min-width: 0; }
+.home-link-text b { font-size: 16px; font-weight: 600; }
+.home-link-text span { font-size: 13px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.home-link > svg:last-child { width: 16px; height: 16px; color: var(--faint); }
+@media (hover: hover) { .home-link:hover { background: var(--btn-hover); } }
+.home-link:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+/* en la PC la cabecera va a la altura de la barra (Kai ya no está echado sobre el nombre) */
+@media (min-width: 900px) { .tv.is-home .tv-top { padding-top: calc(env(safe-area-inset-top) + 20px); } }
+
+/* ── textos de las filas: títulos, "Ver catálogo" y nombres de los pósters con jerarquía clara ── */
+.tv-row { margin: 6px 0 30px; }
+.tv-row-head { align-items: baseline; margin-bottom: 4px; }
+.tv-row-title { font: 700 22px/1.2 var(--font-display); letter-spacing: -0.02em; margin: 0 0 8px; }
+.tv-more { font-size: 15px; font-weight: 500; color: var(--dim); }
+.tv-more::after { font-size: 17px; color: var(--faint); }
+.shelf-item { gap: 3px; }
+.shelf-poster { margin-bottom: 5px; }
+.shelf-title { font-size: 15px; font-weight: 600; line-height: 1.3; letter-spacing: -0.01em; -webkit-line-clamp: 1; }
+.shelf-sub { margin: 0; font-size: 13px; color: var(--dim); }
+
+/* ═════════════════════════ Kai 39 · etapa 3: el reproductor ═════════════════════════
+ * Como en Apple TV: sin cápsula de vidrio; un degradado oscuro abajo con los controles en blanco, una línea de
+ * tiempo fina que engrosa al tocarla, el play del centro sin vidrio y "Saltar intro" como pastilla blanca.
+ * Además de verse más limpio, quita todos los desenfoques que se recalculaban sobre el video en movimiento. */
+.st-bar {
+  left: 0; right: 0; bottom: 0; padding: 34px 10px calc(4px + env(safe-area-inset-bottom, 0px)); border: 0; border-radius: 0;
+  background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.38) 38%, rgba(0, 0, 0, 0.72) 100%);
+  box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+.stage:not(:fullscreen) .st-bar { bottom: 0; }
+.stage.is-idle .st-bar { transform: none; }
+.stage.kai-fs .st-bar, .stage.kai-fs:not(:fullscreen) .st-bar {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+}
+@media (orientation: portrait) {
+  .stage.kai-fs.kai-rot .st-bar, .stage.kai-fs.kai-rot:not(:fullscreen) .st-bar {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding-bottom: 10px;
+}
+}
+@media (max-width: 600px) {
+  .st-bar { left: 0; right: 0; bottom: 0; border-radius: 0; }
+  .stage:not(:fullscreen) .st-bar { bottom: 0; }
+}
+.st-btn { border-radius: 10px; }
+@media (hover: hover) { .st-btn:hover { background: rgba(255, 255, 255, 0.12); } }
+.st-btn.is-on { color: #fff; background: rgba(255, 255, 255, 0.18); }
+.st-time { font-size: 13px; font-weight: 500; color: rgba(255, 255, 255, 0.85); }
+.st-speed { font-weight: 600; }
+
+/* línea de tiempo: fina, y más gruesa mientras la tocas o pasas el mouse */
+.st-seek-wrap { margin: 0 8px 2px; }
+.st-seek::-webkit-slider-runnable-track { height: 3px; transition: height 0.15s; }
+.st-seek::-moz-range-track { height: 3px; }
+.st-seek::-webkit-slider-thumb { width: 12px; height: 12px; margin-top: -4.5px; box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.25); transition: transform 0.15s, box-shadow 0.15s; }
+.st-seek:hover::-webkit-slider-runnable-track, .st-seek:active::-webkit-slider-runnable-track { height: 6px; }
+.st-seek:hover::-webkit-slider-thumb, .st-seek:active::-webkit-slider-thumb { transform: scale(1.35); margin-top: -3px; box-shadow: 0 0 0 6px rgba(255, 255, 255, 0.18); }
+.st-marks { height: 3px; margin-top: -1.5px; }
+.st-marks span { width: 2px; height: 100%; margin-left: -1px; background: rgba(0, 0, 0, 0.7); }
+
+/* el play del centro, los avisos de ±10 s y de 2×: sin vidrio */
+.st-big {
+  width: 68px; height: 68px; margin: -34px 0 0 -34px; border: 0; box-shadow: none;
+  background: rgba(0, 0, 0, 0.42); -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+.st-big svg { width: 30px; height: 30px; margin-left: 3px; }
+.st-flash, .st-hold { border: 0; background: rgba(0, 0, 0, 0.55); -webkit-backdrop-filter: none; backdrop-filter: none; }
+.st-spinner { border-width: 2.5px; }
+
+/* "Saltar intro" / "Volver a la intro": pastilla blanca, como en los reproductores grandes */
+.st-skip {
+  border: 0; color: #000; font-weight: 600; background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35); -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+@media (hover: hover) { .st-skip:hover { background: #fff; } }
+@media (max-width: 600px) {  }
+
+/* menú de velocidad y tarjetas sobre el video: paneles oscuros sólidos */
+.st-menu { border-radius: 16px; padding: 6px; background: rgba(28, 28, 31, 0.97); border-color: rgba(255, 255, 255, 0.1); box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5); }
+.menu-title { margin: 8px 12px 4px; font-size: 12px; letter-spacing: 0.02em; text-transform: uppercase; }
+.menu-item { min-height: 44px; padding: 0 12px; border-radius: 10px; }
+.menu-item.is-on::after { color: #fff; }
+.p-card { border-radius: 22px; background: rgba(28, 28, 31, 0.95); border-color: rgba(255, 255, 255, 0.1); box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5); -webkit-backdrop-filter: none; backdrop-filter: none; }
+.p-card .btn { background: rgba(255, 255, 255, 0.14); border: 0; }
+.p-card .btn-lamp { background: #fff; color: #000; }
+
+/* ── botones de toda la app (.btn): lisos, como los de la portada ── */
+.btn {
+  min-height: 42px; padding: 0 16px; border-radius: 12px; border: 0; background: var(--btn); box-shadow: none;
+  font-weight: 600; -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+@media (hover: hover) { .btn:hover { background: var(--btn-hover); } }
+.btn-lamp { background: var(--primary); color: var(--primary-ink); box-shadow: none; }
+@media (hover: hover) { .btn-lamp:hover { background: var(--primary); filter: none; opacity: 0.88; } }
+.btn-quiet { background: none; }
+/* la barra de arriba de las páginas: sin línea ni vidrio pesado; los botones como los de la cabecera */
+.bar { border-bottom: 0; background: color-mix(in srgb, var(--bg) 86%, transparent); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
+.bar .icon-btn { background: var(--btn); width: 38px; height: 38px; }
+.bar .icon-btn + .icon-btn { margin-left: 4px; }
+
+/* ── la página del reproductor: el título con jerarquía, botones lisos y la lista sin tarjeta de vidrio ── */
+.watch-info { gap: 12px; padding-top: 14px; }
+.watch-series { color: var(--dim); font-size: 14px; font-weight: 600; }
+@media (hover: hover) { .watch-series:hover { color: var(--text); text-decoration: none; } }
+.watch-title { margin-top: 2px; font: 700 clamp(24px, 5vw, 32px)/1.1 var(--font-display); letter-spacing: -0.025em; }
+.watch-actions { gap: 8px; }
+.watch-actions .btn { min-height: 40px; padding: 0 14px; font-size: 15px; }
+.watch-actions .icon-btn { background: var(--btn); width: 40px; height: 40px; border-radius: 12px; }
+.watch-list { background: none; box-shadow: none; padding: 0; border-radius: 0; -webkit-backdrop-filter: none; backdrop-filter: none; }
+.wl-head { padding: 4px 4px 10px; border-bottom: 1px solid var(--line); margin-bottom: 6px; }
+.wl-title { font-size: 18px; }
+.episodes.is-compact .ep { border-radius: 12px; padding: 4px 4px 4px 4px; }
+@media (hover: hover) { .episodes.is-compact .ep:hover { background: var(--btn); } }
+.episodes.is-compact .ep-main { grid-template-columns: 116px 1fr; }
+.episodes.is-compact .ep-thumb { border-radius: 8px; }
+.episodes.is-compact .ep.is-current { background: var(--btn); box-shadow: none; }
+.episodes.is-compact .ep.is-current .ep-thumb { box-shadow: none; }
+@media (min-width: 1100px) { .watch-list { padding-left: 4px; } }
+
+/* mini reproductor del mismo estilo */
+.mini { border-radius: 18px; border: 1px solid var(--glass-edge); box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4); }
+.mini-btn { border-radius: 10px; }
+@media (hover: hover) { .mini-btn:hover { background: var(--btn); } }
+.mini-progress i { background: var(--text); }
+/* en el teléfono (sin pantalla completa) el video es bajo: las velocidades van en una fila, como un control
+ * segmentado, en vez de una lista que no cabía */
+@media (max-width: 600px) {
+  .stage:not(.kai-fs):not(.is-fs) .st-menu {
+    left: 8px; right: 8px; bottom: 52px; width: auto; max-height: none; overflow: visible;
+    display: flex; gap: 2px; padding: 4px; border-radius: 14px;
+  }
+  .stage:not(.kai-fs):not(.is-fs) .menu-title { display: none; }
+  .stage:not(.kai-fs):not(.is-fs) .menu-item { flex: 1; justify-content: center; min-height: 38px; padding: 0 4px; font-size: 14px; }
+  .stage:not(.kai-fs):not(.is-fs) .menu-item.is-on { background: #fff; color: #000; }
+  .stage:not(.kai-fs):not(.is-fs) .menu-item.is-on::after { content: none; }
+}
+/* "Saltar intro" siempre por encima de la franja de controles (es más alta que la cápsula de antes y la tapaba) */
+.st-skip { z-index: 2; bottom: 108px; }
+@media (max-width: 600px) { .st-skip { bottom: 92px; } }
+.stage.kai-fs .st-skip { bottom: calc(112px + env(safe-area-inset-bottom, 0px)); }
+
+/* ── reproductor, segunda pasada ──
+ * Los botones más anchos (no más altos) para tocarlos sin errar, más separados del borde; en medio de la barra,
+ * qué se está viendo; y el play/pausa del centro sale cada vez que se tocan los controles (no solo en pausa). */
+.st-bar { padding-left: 16px; padding-right: 16px; }
+.stage.kai-fs .st-bar, .stage.kai-fs:not(:fullscreen) .st-bar { padding-left: max(22px, env(safe-area-inset-left)); padding-right: max(22px, env(safe-area-inset-right)); }
+@media (orientation: portrait) {
+  .stage.kai-fs.kai-rot .st-bar, .stage.kai-fs.kai-rot:not(:fullscreen) .st-bar { padding-left: max(22px, env(safe-area-inset-top)); padding-right: max(22px, env(safe-area-inset-bottom)); }
+}
+.st-row { gap: 4px; }
+.st-btn { min-width: 46px; height: 40px; padding: 0 10px; }
+.stage.kai-fs .st-btn, .stage.is-fs .st-btn { min-width: 54px; }
+@media (max-width: 600px) { .st-bar { padding: 26px 8px 2px; } .st-btn { min-width: 44px; padding: 0 8px; } }
+/* en el teléfono el "hover" se queda pegado después de tocar: era el cuadro oscuro detrás del play */
+@media (hover: none) { .st-btn:hover { background: none; } }
+.st-gap { display: flex; justify-content: center; min-width: 8px; overflow: hidden; }
+.st-title { max-width: 100%; padding: 0 12px; font-size: 14px; font-weight: 600; color: rgba(255, 255, 255, 0.92); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 600px) { .stage:not(.kai-fs):not(.is-fs) .st-title { display: none; } }
+.stage:not(.is-idle):not(.is-loading):not(.is-ended) .st-big { opacity: 1; pointer-events: auto; transform: none; }
+.stage.is-mini .st-big { display: none; }
+.st-big.is-pause svg { margin-left: 0; }
+
+/* ═════════════════════════ Kai 39 · etapa 3b: el resto de las pantallas ═════════════════════════
+ * Ajustes en grupos (tarjetas, como los ajustes de iOS), controles segmentados como los de Iconly (la opción
+ * elegida es una pastilla que "flota" sobre el carril), campos y filtros lisos, hoja de opciones, avisos y
+ * estados vacíos sobre la misma tarjeta. */
+[data-theme='dark'] { --card: #161618; --card-edge: rgba(255, 255, 255, 0.06); --seg-on: #3a3a3f; --card-shadow: none; }
+[data-theme='light'] { --card: #ffffff; --card-edge: rgba(0, 0, 0, 0.04); --seg-on: #ffffff; --card-shadow: 0 6px 24px rgba(20, 22, 30, 0.05); }
+
+/* controles segmentados: Automático · Claro · Oscuro, tonos, Sub · Doblado */
+.segmented, .lang-switch {
+  display: inline-flex; gap: 2px; padding: 3px; max-width: 100%; overflow-x: auto; scrollbar-width: none;
+  border: 0; border-radius: 12px; background: var(--btn); box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+.seg, .lang-switch button { height: auto; padding: 7px 14px; border-radius: 9px; font-size: 14px; font-weight: 500; color: var(--dim); white-space: nowrap; transition: background-color 0.15s, color 0.15s; }
+.seg.is-on, .lang-switch button.is-on { background: var(--seg-on); color: var(--text); font-weight: 600; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.14), 0 0 0 0.5px rgba(0, 0, 0, 0.05); }
+/* en la tarjeta de la portada (fondo oscuro) va en blanco */
+.hero-card .lang-switch { background: rgba(255, 255, 255, 0.14); }
+.hero-card .lang-switch button.is-on { background: #fff; color: #000; }
+
+/* Ajustes: un grupo por tarjeta, la etiqueta de cada grupo chica y en mayúsculas */
+.settings { max-width: 640px; gap: 14px; padding-top: 10px; }
+.settings-group, .settings-group.is-first {
+  gap: 10px; padding: 16px 18px; border: 0; border-radius: 20px;
+  background: var(--card); box-shadow: 0 0 0 1px var(--card-edge), var(--card-shadow);
+}
+.settings-label { font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--dim); }
+.settings-value { font: 650 18px/1.25 var(--font-display); letter-spacing: -0.01em; }
+.settings-group .dim { font-size: 14px; line-height: 1.5; }
+.settings .btn-row { gap: 8px; }
+
+/* campos y buscadores lisos */
+.form input:not([type='checkbox']) { background: var(--btn); border: 1px solid transparent; border-radius: 12px; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+.form input:not([type='checkbox']):focus { border-color: var(--accent); background: var(--card); }
+.switch input { background: var(--btn-hover); box-shadow: none; }
+.home-search, .cat-search {
+  height: 48px; padding: 0 8px 0 14px; border-radius: 14px; background: var(--btn); box-shadow: none;
+  -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+.home-search input, .cat-search input { font-size: 16px; }
+.cat-select { height: 40px; padding: 0 6px 0 12px; border-radius: 12px; background: var(--btn); box-shadow: none; }
+.cat-select select { font-weight: 600; }
+.cat-count { font-size: 14px; }
+
+/* hoja de opciones de un capítulo, menú del perfil y avisos: la misma tarjeta sólida */
+.sheet-back { background: rgba(0, 0, 0, 0.4); }
+.sheet-panel { border: 0; border-radius: 24px; padding: 18px 18px 6px; background: var(--card); box-shadow: 0 0 0 1px var(--card-edge), 0 24px 60px rgba(0, 0, 0, 0.3); -webkit-backdrop-filter: none; backdrop-filter: none; }
+.sheet-title { font-size: 19px; }
+.sheet-btn { padding: 15px 2px; font-size: 16px; font-weight: 500; }
+.dock-panel { background: var(--card); border: 0; box-shadow: 0 0 0 1px var(--card-edge), 0 20px 50px rgba(0, 0, 0, 0.3); -webkit-backdrop-filter: none; backdrop-filter: none; }
+.pick-bar { background: var(--card); box-shadow: 0 0 0 1px var(--card-edge), 0 18px 50px rgba(0, 0, 0, 0.3); -webkit-backdrop-filter: none; backdrop-filter: none; }
+.toast { border: 0; border-radius: 16px; background: var(--card); box-shadow: 0 0 0 1px var(--card-edge), 0 12px 30px rgba(0, 0, 0, 0.25); -webkit-backdrop-filter: none; backdrop-filter: none; }
+
+/* estados vacíos ("No hay capítulos descargados", "Explorar necesita conexión"): una tarjeta centrada */
+main > .empty, .downloads .empty, section.empty {
+  margin: 28px auto; max-width: 440px; padding: 36px 24px; text-align: center; display: grid; justify-items: center; gap: 4px;
+  border-radius: 22px; background: var(--card); box-shadow: 0 0 0 1px var(--card-edge), var(--card-shadow);
+}
+section.empty p:first-child { font-weight: 600; font-size: 16px; }
+section.empty .btn { margin-top: 10px; }
+.tv-empty { background: none; box-shadow: none; }
+
+/* ── PC: Kai acostado sobre el nombre de la app (como antes), y Descubrir en horizontal con Kai sentado a la derecha ── */
+.kcat-sit.is-top { display: none; }
+@media (min-width: 900px) {
+  .tv.is-home .tv-top { padding-top: calc(env(safe-area-inset-top) + 40px); }
+  .tv-word .kcat-sit.is-top {
+    display: block; left: 50%; bottom: calc(100% - 7px); width: 92px; height: auto; aspect-ratio: 520 / 224; transform: translateX(-50%);
+  }
+  .home-foot { max-width: none; }
+  .home-shelf { display: flex; align-items: flex-end; gap: 18px; }
+  .home-links { flex: 1; grid-template-columns: repeat(3, minmax(0, 1fr)); max-width: 1080px; }
+  .home-link + .home-link::before { top: 14px; bottom: 14px; left: 0; right: auto; width: 1px; height: auto; }
+  .home-shelf .kcat-sit.is-foot { position: relative; right: auto; bottom: auto; order: 2; --kh: 112px; margin-bottom: -4px; }
+}
+
+/* ── PC: la tarjeta de la portada a la altura del banner de AniList (~1900 × 400 px como máximo): más alta, el
+ * navegador lo agrandaba y se veía pixelado ── */
+@media (min-width: 900px) {
+  .hero-card, .tv.is-home .tv-hero { min-height: 400px; padding-top: 44px; padding-bottom: 32px; }
+}

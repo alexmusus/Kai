@@ -1,18 +1,21 @@
 /*
- * controllers/picking.js — "Seleccionar" en una temporada: elegir varios capítulos y descargarlos juntos.
- * Mientras se elige, tocar un capítulo lo marca en vez de abrirlo. Lo que ya está descargado (o en camino) no se
- * puede elegir. También: cambiar de temporada (Anterior, Siguiente, menú) no deja otra entrada en el historial.
+ * controllers/picking.js — "Seleccionar" en una temporada: elegir varios capítulos para descargarlos o marcarlos
+ * como vistos juntos. Mientras se elige, tocar un capítulo lo marca en vez de abrirlo; se puede elegir cualquiera
+ * (al descargar, se saltan los que ya están descargados o en camino). También: cambiar de temporada no deja otra
+ * entrada en el historial.
  */
 
 import { emit } from '../lib/events.js';
 import { plural } from '../lib/util.js';
 import { state } from '../models/store.js';
-import { prog } from '../models/progress.js';
+import { prog, setProgress } from '../models/progress.js';
 import { epById } from '../models/library.js';
 import { pickable, queueDownload } from '../models/downloads.js';
 import { app } from '../views/components.js';
 import { paintPick, pickSeason } from '../views/series.js';
 import { viewState } from '../views/view-state.js';
+import { softRender } from './router.js';
+import { sync } from './sync.js';
 
 /** Empieza a elegir en la temporada `ki` de la serie que se está mirando. @param {number} ki */
 export function startPicking(ki) {
@@ -30,18 +33,28 @@ export function endPicking(repaint = true) {
   if (repaint) paintPick();
 }
 
-/** Botones de la barra: Todos/Ninguno, Sin ver y Descargar. @param {string} act */
+/** Botones de la barra: marcar los elegidos como vistos o no vistos, y descargarlos. @param {string} act */
 export function pickAction(act) {
   const picking = viewState.picking;
   const season = pickSeason();
   if (!picking || !season) return;
-  const avail = season.episodes.filter(pickable);
-  if (act === 'pick-all') {
-    const allOn = avail.length && avail.every((e) => picking.ids.has(e.id));
-    picking.ids = allOn ? new Set() : new Set(avail.map((e) => e.id));
-  } else if (act === 'pick-unseen') {
-    picking.ids = new Set(avail.filter((e) => !(prog(e) || {}).w).map((e) => e.id));
-    if (!picking.ids.size) emit('notice', 'No hay capítulos sin ver para descargar en esta temporada.');
+  if (act === 'pick-seen' || act === 'pick-unseen') {
+    const eps = season.episodes.filter((e) => picking.ids.has(e.id));
+    const seen = act === 'pick-seen';
+    for (const e of eps) {
+      const d = (prog(e) || {}).d || 0;
+      setProgress(e, seen ? d : 0, d, seen);
+    }
+    emit(
+      'notice',
+      `${plural(eps.length, 'capítulo marcado', 'capítulos marcados')} como ${seen ? 'visto' : 'no visto'}${eps.length > 1 ? 's' : ''}.`,
+    );
+    // se cierra la selección en lo que está en pantalla antes de redibujar (la página se reusa: si no, la barra
+    // de Seleccionar quedaba abierta)
+    endPicking();
+    softRender();
+    sync();
+    return;
   } else if (act === 'pick-dl') {
     if (!state.library) return;
     const s = state.library.series[picking.si];
@@ -52,10 +65,9 @@ export function pickAction(act) {
     }
     eps.forEach((e) => queueDownload(e, s.name));
     if (eps.length) emit('notice', `${plural(eps.length, 'capítulo', 'capítulos')} en cola de descarga.`);
+    else emit('notice', 'Los capítulos elegidos ya están descargados.');
     endPicking();
-    return;
   }
-  paintPick();
 }
 
 // cambiar de temporada (anterior, siguiente, al menú) no deja una entrada más en el historial
@@ -80,10 +92,6 @@ app.addEventListener(
     e.stopPropagation();
     const ep = epById(li.dataset.id || '');
     if (!ep) return;
-    if (!pickable(ep)) {
-      emit('notice', state.saved.has(ep.id) ? 'Ya está descargado.' : 'Ya se está descargando.');
-      return;
-    }
     if (picking.ids.has(ep.id)) picking.ids.delete(ep.id);
     else picking.ids.add(ep.id);
     paintPick();

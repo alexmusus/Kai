@@ -13,6 +13,7 @@ export const ui = {
   big: $('#st-big'),
   play: $('#st-play'),
   chapter: $('#st-chapter'),
+  title: $('#st-title'),
   lights: $('#st-lights'),
   seek: $('#st-seek'),
   time: $('#st-time'),

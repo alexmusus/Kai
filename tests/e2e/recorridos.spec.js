@@ -40,7 +40,7 @@ test('serie con varias temporadas: menú con nombres uniformes', async ({ page }
   expect(k.errors).toEqual([]);
 });
 
-test('temporada: Sub/Doblado, anterior, siguiente y volver al menú', async ({ page }, info) => {
+test('temporada: Sub/Doblado, pestañas de temporadas y volver al menú', async ({ page }, info) => {
   const k = await openKai(page, '#/');
   const si = k.si(k.yah);
   await go(page, `#/serie/${si}/2`);
@@ -55,9 +55,10 @@ test('temporada: Sub/Doblado, anterior, siguiente y volver al menú', async ({ p
   await page.reload();
   await page.waitForTimeout(400);
   expect(await hrefs(page, '.episodes .ep-main')).toEqual(dub); // el perfil recuerda el idioma
-  await page.locator('.step-btn.is-next').click();
+  await expect(page.locator('.season-tab.is-on')).toHaveAttribute('href', `#/serie/${si}/2`);
+  await page.locator(`.season-tab[href="#/serie/${si}/3"]`).click();
   await expect(page).toHaveURL(new RegExp(`#/serie/${si}/3$`));
-  await page.locator('.season-step >> text=Temporadas').click();
+  await page.locator('.season-tab.is-all').click();
   await expect(page).toHaveURL(new RegExp(`#/serie/${si}$`));
   expect(k.errors).toEqual([]);
 });
@@ -200,6 +201,11 @@ test('seguir aquí lo que quedó a medias en otro dispositivo', async ({ page },
   const dor = ls.library.series.find((s) => s.name === 'Dorohedoro').seasons[0].episodes[4];
   const progress = { ...ls['p.pA.progress'], '@now': { p: dor.path, t: 754, d: 1440, w: false, dev: 'otro', dn: 'iPhone', u: NOW - 20 * 60000 } };
   const k = await openKai(page, '#/', { extraLS: { 'p.pA.progress': progress } });
+  // una burbuja arriba; al tocarla se abre con el detalle
+  await expect(page.locator('.resume-pill')).toContainText('Seguir de tu iPhone · 12:34');
+  await expect(page.locator('.resume-card [data-act="resume-here"]')).not.toBeInViewport();
+  await page.locator('.resume-pill').click();
+  await expect(page.locator('.resume-card')).toHaveClass(/is-open/);
   await expect(page.locator('.resume-card')).toContainText('En tu iPhone, hace 20 min');
   await expect(page.locator('.resume-card')).toContainText('Dorohedoro · Episodio 5');
   await expect(page.locator('.resume-card [data-act="resume-here"]')).toContainText('12:34');
@@ -219,15 +225,29 @@ test('Seleccionar capítulos de una temporada', async ({ page }, info) => {
   await eps.nth(0).click();
   await eps.nth(4).click();
   await expect(page).toHaveURL(new RegExp(`#/serie/${k.si('Dorohedoro')}$`)); // no abrió el capítulo
-  await expect(page.locator('#pick-count')).toHaveText('2 capítulos, 500 MB');
-  await page.locator('[data-act="pick-unseen"]').click(); // Dorohedoro: ninguno visto del todo
-  await expect(page.locator('#pick-count')).toHaveText('12 capítulos, 3.0 GB');
-  await expect(page.locator('[data-act="pick-all"]')).toHaveText('Ninguno');
+  await expect(page.locator('#pick-count')).toHaveText('2 capítulos, 500 MB por descargar');
+  await expect(page.locator('[data-act="pick-seen"]')).toBeEnabled();
+  await expect(page.locator('[data-act="pick-unseen"]')).toBeDisabled(); // ninguno de los dos está visto
   await shot(page, 'seleccionar', info);
   await page.locator('[data-act="pick-dl"]').click(); // sin conexión: avisa y no sale del modo
   await expect(page.locator('#pick-bar')).toBeVisible();
   await page.locator('[data-act="pick-mode"]').click();
   await expect(page.locator('#pick-bar')).toBeHidden();
+  // marcar como vistos varios a la vez (y volver a marcarlos como no vistos)
+  await page.locator('[data-act="pick-mode"]').click();
+  await eps.nth(1).click();
+  await eps.nth(2).click();
+  await page.locator('[data-act="pick-seen"]').click();
+  await expect(page.locator('#toast')).toHaveText('2 capítulos marcados como vistos.');
+  await expect(page.locator('#pick-bar')).toBeHidden();
+  await expect(page.locator('#season-eps .ep').nth(1)).toHaveClass(/is-seen/);
+  await expect(page.locator('#season-eps .ep').nth(2)).toHaveClass(/is-seen/);
+  await page.locator('[data-act="pick-mode"]').click();
+  await eps.nth(1).click();
+  await expect(page.locator('[data-act="pick-seen"]')).toBeDisabled(); // ya está visto
+  await page.locator('[data-act="pick-unseen"]').click();
+  await expect(page.locator('#toast')).toHaveText('1 capítulo marcado como no visto.');
+  await expect(page.locator('#season-eps .ep').nth(1)).not.toHaveClass(/is-seen/);
   await eps.nth(1).click();
   await expect(page).toHaveURL(/#\/play\//); // fuera del modo, tocar abre el capítulo
   expect(k.errors).toEqual([]);
@@ -314,19 +334,32 @@ test('volver: Anterior/Siguiente no dejan entradas de más, y el menú lleva a l
   const si = k.si(k.yah);
   await page.locator(`.shelf a[href="#/serie/${si}"]`).click();
   await page.locator(`.season-grid a[href="#/serie/${si}/0"]`).click();
-  await page.locator('.step-btn.is-next').click();
-  await page.locator('.step-btn.is-next').click();
+  // las temporadas son pestañas: cambiar de una a otra no deja entradas de más en el historial
+  await page.locator(`.season-tab[href="#/serie/${si}/1"]`).click();
+  await page.locator(`.season-tab[href="#/serie/${si}/2"]`).click();
   await expect(page).toHaveURL(new RegExp(`#/serie/${si}/2$`));
   await page.locator('.bar [data-act="back"]').click();
   await expect(page).toHaveURL(new RegExp(`#/serie/${si}$`)); // directo al menú, sin pasar por la 1 y la 0
   await page.locator('.bar [data-act="back"]').click();
   await expect(page).toHaveURL(/#\/$/);
-  // el botón flotante: abre el menú, lleva a Ajustes y vuelve al inicio
-  await page.locator('#dock .dock-btn').click();
-  await page.locator('#dock .dock-item[href="#/ajustes"]').click();
+  // la barra flotante: lleva a Ajustes (y la marca), vuelve al inicio, y tu perfil abre el menú
+  await page.locator('#dock .dock-tab[data-tab="ajustes"]').click();
   await expect(page).toHaveURL(/#\/ajustes$/);
-  await page.locator('.bar [data-act="home"]').click();
+  await expect(page.locator('#dock .dock-tab.is-on')).toHaveAttribute('data-tab', 'ajustes');
+  await page.locator('#dock .dock-tab[data-tab="home"]').click();
   await expect(page).toHaveURL(/#\/$/);
+  await expect(page.locator('#dock .dock-tab.is-on')).toHaveAttribute('data-tab', 'home');
+  await page.locator('#dock .dock-btn').click();
+  // el menú: cambiar de perfil, actualizar y el tema (el botón ofrece el otro tema después de usarlo)
+  await expect(page.locator('#dock .dock-panel .dock-item')).toHaveText(['Actualizar', 'Tema claro']);
+  await page.locator('#dock .dock-panel [data-act="theme"]').click();
+  await expect(page.locator('#dock .dock-panel [data-act="theme"]')).toHaveText('Tema oscuro');
+  await page.locator('#dock .dock-panel [data-act="theme"]').click();
+  await page.locator('#dock .dock-btn').click();
+  // en el inicio, Inicio lleva arriba
+  await page.evaluate(() => window.scrollTo(0, 600));
+  await page.locator('#dock .dock-tab[data-tab="home"]').click();
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
   // la hoja de opciones pone en cola con el nombre de la serie (sin conexión: avisa)
   await go(page, '#/serie/' + k.si('Dorohedoro'));
   await page.locator('#season-eps .ep').nth(0).locator('[data-act="more"]').click();
@@ -398,5 +431,65 @@ test('abrir Kai sin # (como la app instalada) deja el inicio en "#/", igual que 
   await page.evaluate(() => history.back());
   await expect(page).toHaveURL(/\/#\/$/);
   await expect(page.locator('.tv.is-home')).toBeVisible();
+  expect(k.errors).toEqual([]);
+});
+
+test('la barra flotante se achica al bajar en la casita, se queda así hasta tocarla y la burbuja sube', async ({ page }, info) => {
+  test.skip(info.project.name !== 'iphone', 'solo en el teléfono');
+  const k = await openKai(page, '#/');
+  await page.waitForTimeout(600);
+  const dock = page.locator('#dock');
+  const up = page.locator('#dock .dock-up');
+  const scrollY = () => page.evaluate(() => window.scrollY);
+  // inicio: bajar la achica; subir (el rebote del final) ya no la agranda; no hay burbuja (la casita sube)
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await expect(dock).toHaveClass(/is-compact/);
+  await expect(page.locator('#dock .dock-btn')).toHaveCSS('opacity', '0'); // sin tu perfil, solo la casita
+  await page.evaluate(() => window.scrollBy(0, -200));
+  await page.waitForTimeout(200);
+  await expect(dock).toHaveClass(/is-compact/);
+  await expect(up).toHaveCSS('opacity', '0');
+  await page.locator('#dock .dock-tab[data-tab="home"]').click();
+  await expect.poll(scrollY).toBe(0);
+  await expect(dock).not.toHaveClass(/is-compact/);
+  await expect(page).toHaveURL(/#\/$/);
+  // en otra pestaña, achicada también queda la casita: tocarla solo la agranda
+  await go(page, '#/ajustes');
+  await page.waitForTimeout(700);
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await expect(dock).toHaveClass(/is-compact/);
+  await expect(page.locator('#dock .dock-tab[data-tab="home"]')).toHaveCSS('width', '48px');
+  await expect(page.locator('#dock .dock-tab[data-tab="ajustes"]')).toHaveCSS('opacity', '0');
+  // y lejos del principio, al lado, la burbuja de subir
+  await expect(up).toHaveCSS('opacity', '1');
+  await page.screenshot({ path: '/tmp/claude-0/-home-user-Kai/2a50527b-117a-5251-8346-343e47b047cb/scratchpad/new/compact-ajustes.png', clip: { x: 0, y: 700, width: 390, height: 144 } });
+  const y = await scrollY();
+  await page.locator('#dock .dock-tab[data-tab="home"]').click();
+  await expect(dock).not.toHaveClass(/is-compact/);
+  await expect(page).toHaveURL(/#\/ajustes$/);
+  expect(await scrollY()).toBe(y);
+  await page.waitForTimeout(1300);
+  await page.evaluate(() => window.scrollBy(0, -300));
+  await page.waitForTimeout(100);
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await expect(dock).toHaveClass(/is-compact/);
+  await up.click();
+  await expect.poll(scrollY).toBe(0);
+  await expect(dock).not.toHaveClass(/is-compact/);
+  await expect(up).toHaveCSS('opacity', '0');
+  expect(k.errors).toEqual([]);
+});
+
+test('tema claro: el inicio y una serie se ven con fondo claro y sin errores', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'light' });
+  const k = await openKai(page, '#/', { extraLS: { settings: { root: 'Anime', autoplay: true, autoSkip: true, theme: 'light', cat: false } } });
+  const bg = () => page.evaluate(() => getComputedStyle(document.documentElement).backgroundColor);
+  const light = (c) => (c.match(/\d+/g) || []).slice(0, 3).every((n) => Number(n) > 180);
+  expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBe('light');
+  expect(light(await bg())).toBe(true);
+  await expect(page.locator('.tv-hero .tv-title')).toContainText('Yahari');
+  await go(page, '#/serie/' + k.si('Dorohedoro'));
+  await expect(page.locator('#app')).toContainText('Dorohedoro');
+  expect(light(await bg())).toBe(true);
   expect(k.errors).toEqual([]);
 });
