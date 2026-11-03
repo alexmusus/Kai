@@ -1716,3 +1716,7 @@ body:has(.tv.is-series) .ambient { display: none; }
   .stage:not(.kai-fs):not(.is-fs) .menu-item.is-on { background: #fff; color: #000; }
   .stage:not(.kai-fs):not(.is-fs) .menu-item.is-on::after { content: none; }
 }
+/* "Saltar intro" siempre por encima de la franja de controles (es más alta que la cápsula de antes y la tapaba) */
+.st-skip { z-index: 2; bottom: 108px; }
+@media (max-width: 600px) { .st-skip { bottom: 92px; } }
+.stage.kai-fs .st-skip { bottom: calc(112px + env(safe-area-inset-bottom, 0px)); }
