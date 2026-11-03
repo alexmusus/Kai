@@ -160,9 +160,8 @@ export function renderSeries(arg) {
     </main>
     <div class="pick-bar" id="pick-bar" role="toolbar" aria-label="Capítulos seleccionados" hidden>
       <span class="pick-count" id="pick-count" aria-live="polite"></span>
-      <button class="pick-btn" data-act="pick-all">Todos</button>
-      <button class="pick-btn" data-act="pick-unseen">Sin ver</button>
-      <button class="pick-btn" data-act="pick-seen" disabled>${ICON.check}<span>Marcar vistos</span></button>
+      <button class="pick-btn" data-act="pick-seen" disabled>${ICON.check}<span>Visto</span></button>
+      <button class="pick-btn" data-act="pick-unseen" disabled>${ICON.close}<span>No visto</span></button>
       <button class="pick-btn is-primary" data-act="pick-dl" disabled>${ICON.down}<span>Descargar</span></button>
     </div>
   </div>`;
@@ -402,12 +401,8 @@ export function paintPick() {
     ? `${plural(eps.length, 'capítulo', 'capítulos')}${toGet.length ? `, ${fmtSize(size)} por descargar` : ''}`
     : 'Toca los capítulos que quieras';
   bar.querySelector('[data-act="pick-dl"]').disabled = !toGet.length;
-  const seenBtn = bar.querySelector('[data-act="pick-seen"]');
-  seenBtn.disabled = !eps.length;
-  seenBtn.querySelector('span').textContent =
-    eps.length && eps.every((e) => (prog(e) || {}).w) ? 'Marcar no vistos' : 'Marcar vistos';
-  const season = pickSeason();
-  const all = season ? season.episodes : [];
-  bar.querySelector('[data-act="pick-all"]').textContent =
-    all.length && all.every((e) => viewState.picking.ids.has(e.id)) ? 'Ninguno' : 'Todos';
+  // cada botón se apaga si no cambiaría nada (todos ya vistos, o ninguno visto)
+  const seen = eps.filter((e) => (prog(e) || {}).w).length;
+  bar.querySelector('[data-act="pick-seen"]').disabled = !eps.length || seen === eps.length;
+  bar.querySelector('[data-act="pick-unseen"]').disabled = !seen;
 }

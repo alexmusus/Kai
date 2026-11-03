@@ -226,9 +226,8 @@ test('Seleccionar capítulos de una temporada', async ({ page }, info) => {
   await eps.nth(4).click();
   await expect(page).toHaveURL(new RegExp(`#/serie/${k.si('Dorohedoro')}$`)); // no abrió el capítulo
   await expect(page.locator('#pick-count')).toHaveText('2 capítulos, 500 MB por descargar');
-  await page.locator('[data-act="pick-unseen"]').click(); // Dorohedoro: ninguno visto del todo
-  await expect(page.locator('#pick-count')).toHaveText('12 capítulos, 3.0 GB por descargar');
-  await expect(page.locator('[data-act="pick-all"]')).toHaveText('Ninguno');
+  await expect(page.locator('[data-act="pick-seen"]')).toBeEnabled();
+  await expect(page.locator('[data-act="pick-unseen"]')).toBeDisabled(); // ninguno de los dos está visto
   await shot(page, 'seleccionar', info);
   await page.locator('[data-act="pick-dl"]').click(); // sin conexión: avisa y no sale del modo
   await expect(page.locator('#pick-bar')).toBeVisible();
@@ -238,7 +237,6 @@ test('Seleccionar capítulos de una temporada', async ({ page }, info) => {
   await page.locator('[data-act="pick-mode"]').click();
   await eps.nth(1).click();
   await eps.nth(2).click();
-  await expect(page.locator('[data-act="pick-seen"]')).toHaveText('Marcar vistos');
   await page.locator('[data-act="pick-seen"]').click();
   await expect(page.locator('#toast')).toHaveText('2 capítulos marcados como vistos.');
   await expect(page.locator('#pick-bar')).toBeHidden();
@@ -246,8 +244,9 @@ test('Seleccionar capítulos de una temporada', async ({ page }, info) => {
   await expect(page.locator('#season-eps .ep').nth(2)).toHaveClass(/is-seen/);
   await page.locator('[data-act="pick-mode"]').click();
   await eps.nth(1).click();
-  await expect(page.locator('[data-act="pick-seen"]')).toHaveText('Marcar no vistos');
-  await page.locator('[data-act="pick-seen"]').click();
+  await expect(page.locator('[data-act="pick-seen"]')).toBeDisabled(); // ya está visto
+  await page.locator('[data-act="pick-unseen"]').click();
+  await expect(page.locator('#toast')).toHaveText('1 capítulo marcado como no visto.');
   await expect(page.locator('#season-eps .ep').nth(1)).not.toHaveClass(/is-seen/);
   await eps.nth(1).click();
   await expect(page).toHaveURL(/#\/play\//); // fuera del modo, tocar abre el capítulo
@@ -351,8 +350,16 @@ test('volver: Anterior/Siguiente no dejan entradas de más, y el menú lleva a l
   await expect(page).toHaveURL(/#\/$/);
   await expect(page.locator('#dock .dock-tab.is-on')).toHaveAttribute('data-tab', 'home');
   await page.locator('#dock .dock-btn').click();
-  await expect(page.locator('#dock .dock-panel')).toContainText('Explorar MEGA');
+  // el menú: cambiar de perfil, actualizar y el tema (el botón ofrece el otro tema después de usarlo)
+  await expect(page.locator('#dock .dock-panel .dock-item')).toHaveText(['Actualizar', 'Tema claro']);
+  await page.locator('#dock .dock-panel [data-act="theme"]').click();
+  await expect(page.locator('#dock .dock-panel [data-act="theme"]')).toHaveText('Tema oscuro');
+  await page.locator('#dock .dock-panel [data-act="theme"]').click();
   await page.locator('#dock .dock-btn').click();
+  // en el inicio, Inicio lleva arriba
+  await page.evaluate(() => window.scrollTo(0, 600));
+  await page.locator('#dock .dock-tab[data-tab="home"]').click();
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
   // la hoja de opciones pone en cola con el nombre de la serie (sin conexión: avisa)
   await go(page, '#/serie/' + k.si('Dorohedoro'));
   await page.locator('#season-eps .ep').nth(0).locator('[data-act="more"]').click();

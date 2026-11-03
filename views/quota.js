@@ -1,9 +1,9 @@
 // @ts-check
 /*
- * views/quota.js — el aviso de la transferencia de MEGA (en el menú y en Ajustes).
+ * views/quota.js — el aviso de la transferencia de MEGA (en Ajustes, y la marca del botón de perfil).
  */
 
-import { $, fmtSize, fmtWait } from '../lib/util.js';
+import { fmtSize, fmtWait } from '../lib/util.js';
 import { quotaUntil, proQuota, xferUsed } from '../models/quota.js';
 
 /** @param {boolean} [long] la versión larga es para Ajustes */
@@ -19,9 +19,7 @@ export function quotaText(long = false) {
     : `MEGA: ${fmtSize(used)} en 6 h`;
 }
 
-/** Actualiza el texto del menú y la marca de límite alcanzado (body.quota-hit). */
+/** La marca de límite alcanzado en el botón de perfil (body.quota-hit). */
 export function paintQuota() {
-  const el = $('#drawer-quota');
-  if (el) el.textContent = quotaText();
   document.body.classList.toggle('quota-hit', !!quotaUntil());
 }

@@ -33,34 +33,21 @@ export function endPicking(repaint = true) {
   if (repaint) paintPick();
 }
 
-/** ¿Están vistos todos los elegidos? (el botón pasa a "Marcar no vistos") @param {Set<string>} ids */
-export function allPickedSeen(ids) {
-  const eps = [...ids].map(epById).filter(Boolean);
-  return eps.length > 0 && eps.every((e) => (prog(e) || {}).w);
-}
-
-/** Botones de la barra: Todos/Ninguno, Sin ver, Marcar vistos y Descargar. @param {string} act */
+/** Botones de la barra: marcar los elegidos como vistos o no vistos, y descargarlos. @param {string} act */
 export function pickAction(act) {
   const picking = viewState.picking;
   const season = pickSeason();
   if (!picking || !season) return;
-  const avail = season.episodes;
-  if (act === 'pick-all') {
-    const allOn = avail.length && avail.every((e) => picking.ids.has(e.id));
-    picking.ids = allOn ? new Set() : new Set(avail.map((e) => e.id));
-  } else if (act === 'pick-unseen') {
-    picking.ids = new Set(avail.filter((e) => !(prog(e) || {}).w).map((e) => e.id));
-    if (!picking.ids.size) emit('notice', 'No hay capítulos sin ver en esta temporada.');
-  } else if (act === 'pick-seen') {
+  if (act === 'pick-seen' || act === 'pick-unseen') {
     const eps = season.episodes.filter((e) => picking.ids.has(e.id));
-    const seen = !allPickedSeen(picking.ids);
+    const seen = act === 'pick-seen';
     for (const e of eps) {
       const d = (prog(e) || {}).d || 0;
       setProgress(e, seen ? d : 0, d, seen);
     }
     emit(
       'notice',
-      `${plural(eps.length, 'capítulo marcado', 'capítulos marcados')} como ${seen ? 'vistos' : 'no vistos'}.`,
+      `${plural(eps.length, 'capítulo marcado', 'capítulos marcados')} como ${seen ? 'visto' : 'no visto'}${eps.length > 1 ? 's' : ''}.`,
     );
     // se cierra la selección en lo que está en pantalla antes de redibujar (la página se reusa: si no, la barra
     // de Seleccionar quedaba abierta)
@@ -80,9 +67,7 @@ export function pickAction(act) {
     if (eps.length) emit('notice', `${plural(eps.length, 'capítulo', 'capítulos')} en cola de descarga.`);
     else emit('notice', 'Los capítulos elegidos ya están descargados.');
     endPicking();
-    return;
   }
-  paintPick();
 }
 
 // cambiar de temporada (anterior, siguiente, al menú) no deja una entrada más en el historial

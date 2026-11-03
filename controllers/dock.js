@@ -9,8 +9,7 @@ import { avatarHTML } from '../views/account.js';
 import { ICON } from '../views/icons.js';
 import { paintSync, paintNewsDot } from '../views/dock.js';
 import { resolvedTheme } from '../views/theme.js';
-import { hasUnreadNews } from '../models/news.js';
-import { quotaText } from '../views/quota.js';
+import { on } from '../lib/events.js';
 
 export const dock = $('#dock');
 
@@ -122,22 +121,20 @@ function paintTabs(view) {
 }
 
 export function fillDock() {
-  const { view } = route();
   const p = visibleProfiles().find((x) => x.id === state.profile.id) || state.profile;
-  const item = (href, icon, label, on, extra = '') =>
-    `<a class="dock-item ${on ? 'is-on' : ''}" href="${href}" role="menuitem">${icon}<span>${label}</span>${extra}</a>`;
   const dark = resolvedTheme() === 'dark';
+  // solo lo de tu perfil: cambiar de perfil, actualizar y el tema (Explorar MEGA y la transferencia están en
+  // Ajustes, y Descubrir al final del inicio)
   dock.querySelector('.dock-panel').innerHTML = `
     <a class="dock-profile" href="#/perfiles" role="menuitem">${avatarHTML(p)}<span><span class="dock-pname">${esc(p.name)}</span><span class="dock-psub">Cambiar perfil</span></span></a>
-    ${item('#/explorar', ICON.folder, 'Explorar MEGA', view === 'explorar')}
-    ${item('#/descubrir/porque', ICON.grid, 'Descubrir', view === 'descubrir')}
-    ${hasUnreadNews() ? item('#/ajustes', ICON.gear, 'Novedades', false, '<span class="dock-news">Nuevo</span>') : ''}
-    <div class="dock-row">
-      <button class="dock-chip" data-act="refresh" role="menuitem">${ICON.refresh}<span>Actualizar</span></button>
-      <button class="dock-chip" data-act="theme" role="menuitem">${dark ? ICON.sun : ICON.moon}<span>${dark ? 'Claro' : 'Oscuro'}</span></button>
-    </div>
-    <p class="dock-quota" id="drawer-quota">${quotaText()}</p>`;
+    <button class="dock-item" data-act="refresh" role="menuitem">${ICON.refresh}<span>Actualizar</span></button>
+    <button class="dock-item" data-act="theme" role="menuitem">${dark ? ICON.sun : ICON.moon}<span>${dark ? 'Tema claro' : 'Tema oscuro'}</span></button>`;
 }
+
+// al cambiar el tema desde el menú, su botón pasa a ofrecer el otro
+on('theme', () => {
+  if (!dock.querySelector('.dock-panel').hidden) fillDock();
+});
 
 export function openDock() {
   fillDock();
@@ -146,7 +143,7 @@ export function openDock() {
   dock.classList.add('is-open');
   dock.querySelector('.dock-btn').setAttribute('aria-expanded', 'true');
   requestAnimationFrame(() => panel.classList.add('is-in'));
-  const first = panel.querySelector('.dock-item.is-on') || panel.querySelector('.dock-item');
+  const first = panel.querySelector('.dock-profile');
   if (first) first.focus({ preventScroll: true });
 }
 export function closeDock() {
