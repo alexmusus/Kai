@@ -1276,7 +1276,8 @@ html.kai-fs-on .watch-list, html:has(.stage:fullscreen) .watch-list { visibility
 @media (hover: hover) { .tv-facts .fact:hover { color: var(--text); background: none; transform: none; } }
 
 /* ── cabecera del inicio: "Kai", el saludo y la búsqueda ── */
-.tv-top { align-items: center; padding: max(4px, calc(env(safe-area-inset-top) - 8px)) clamp(16px, 4vw, 56px) 2px; }
+/* la cabecera va justo debajo de la franja que iOS desenfoca bajo la barra de estado (más arriba se ve borrosa) */
+.tv-top { align-items: center; padding: calc(env(safe-area-inset-top) + 14px) clamp(16px, 4vw, 56px) 4px; }
 .tv-brand { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
 .tv-word { position: relative; font: 700 26px/1 var(--font-display); letter-spacing: -0.035em; }
 .tv-greet { margin: 0; font-size: 13px; font-weight: 500; letter-spacing: 0; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1568,19 +1569,19 @@ body:has(.tv.is-series) .ambient { display: none; }
   .hero-card .tv-btn.is-primary { padding: 0 12px; gap: 6px; font-size: 15px; }
 }
 
-/* ── el final del inicio: Kai, el gatito, sentado a la izquierda y Descubrir en una lista a su lado ── */
-.home-foot { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: end; gap: 14px; max-width: 640px; margin: 34px 0 10px; }
-.home-foot .kcat-sit.is-foot { position: relative; display: block; --kh: 104px; }
-.home-links { display: grid; border-radius: 18px; overflow: hidden; background: var(--btn); }
-.home-link { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 11px 12px 11px 12px; color: var(--text); transition: background-color 0.15s; }
-.home-link + .home-link { box-shadow: inset 0 1px 0 var(--line); }
-.home-link-ic { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 9px; color: #fff; background: #5e5ce6; }
-.home-link-ic svg { width: 18px; height: 18px; stroke-width: 1.9; }
-.home-link[data-tone='cine'] .home-link-ic { background: #ff453a; }
-.home-link[data-tone='porque'] .home-link-ic { background: #bf5af2; }
-.home-link[data-tone='emision'] .home-link-ic { background: #30b158; }
+/* ── el final del inicio: "Descubrir" como una sección más, y Kai, el gatito, sentado encima de la tarjeta ── */
+.home-foot { max-width: 640px; margin-top: 34px; }
+.home-shelf { position: relative; margin-top: 4px; }
+/* Kai sentado sobre el borde de arriba de la tarjeta, a la derecha, como en un estante */
+.home-shelf .kcat-sit.is-foot { --kh: 92px; position: absolute; z-index: 1; right: 22px; bottom: calc(100% - 8px); }
+.home-links { position: relative; display: grid; border-radius: 18px; overflow: hidden; background: var(--btn); }
+.home-link { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 13px 14px 13px 16px; color: var(--text); transition: background-color 0.15s; }
+.home-link { position: relative; }
+.home-link + .home-link::before { content: ''; position: absolute; top: 0; left: 54px; right: 0; height: 1px; background: var(--line); }
+.home-link-ic { display: grid; place-items: center; color: var(--dim); }
+.home-link-ic svg { width: 22px; height: 22px; }
 .home-link-text { display: grid; gap: 1px; min-width: 0; }
-.home-link-text b { font-size: 15px; font-weight: 600; }
+.home-link-text b { font-size: 16px; font-weight: 600; }
 .home-link-text span { font-size: 13px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .home-link > svg:last-child { width: 16px; height: 16px; color: var(--faint); }
 @media (hover: hover) { .home-link:hover { background: var(--btn-hover); } }

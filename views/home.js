@@ -212,19 +212,22 @@ export function renderHome() {
     </main>
   </div>`;
 }
-/** El final del inicio: Kai, el gatito, sentado a la izquierda y, a su lado, Cine y Descubrir en una lista. */
+/** El final del inicio: "Descubrir" (Cine, Porque viste…, En emisión) y Kai, el gatito, sentado encima. */
 function homeFootHTML(lib) {
   const cine = lib.series.findIndex(isCine);
   const link = (href, icon, title, sub, tone) =>
     `<a class="home-link" href="${href}" data-tone="${tone}"><span class="home-link-ic">${icon}</span><span class="home-link-text"><b>${esc(title)}</b><span>${esc(sub)}</span></span>${ICON.chev}</a>`;
-  return `<footer class="home-foot">
-    ${catHTML('foot')}
-    <nav class="home-links" aria-label="Descubrir">
-      ${cine >= 0 ? link(`#/serie/${cine}`, ICON.film, lib.series[cine].name, 'Películas que no son anime', 'cine') : ''}
-      ${link('#/descubrir/porque', ICON.spark, 'Porque viste…', 'Recomendaciones según lo que tienes', 'porque')}
-      ${link('#/descubrir/emision', ICON.live, 'En emisión', 'Lo que está saliendo ahora', 'emision')}
-    </nav>
-  </footer>`;
+  return `<section class="tv-row home-foot" aria-labelledby="home-disc">
+    <h3 class="tv-row-title" id="home-disc">Descubrir</h3>
+    <div class="home-shelf">
+      ${catHTML('foot')}
+      <nav class="home-links" aria-label="Descubrir">
+        ${cine >= 0 ? link(`#/serie/${cine}`, ICON.film, lib.series[cine].name, 'Películas que no son anime', 'cine') : ''}
+        ${link('#/descubrir/porque', ICON.spark, 'Porque viste…', 'Recomendaciones según lo que tienes', 'porque')}
+        ${link('#/descubrir/emision', ICON.live, 'En emisión', 'Lo que está saliendo ahora', 'emision')}
+      </nav>
+    </div>
+  </section>`;
 }
 
 /** Fila "Películas" del inicio: las 10 primeras en orden alfabético y el enlace al estante completo. */
