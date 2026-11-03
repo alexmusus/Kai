@@ -742,8 +742,10 @@ body.quota-hit .dock-btn::after { content: ''; position: absolute; top: 2px; rig
 /* página de la serie: banner a su tamaño real + póster nítido + fondo difuminado del póster */
 .tv.is-series .tv-main { padding-top: calc(env(safe-area-inset-top) + 68px); max-width: 1180px; margin: 0 auto; }
 .series-wash { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
-.series-wash img { position: absolute; inset: -12%; width: 124%; height: 124%; object-fit: cover; filter: blur(70px) saturate(160%); opacity: 0.38; animation: fade 0.8s ease-out; }
-[data-theme='light'] .series-wash img { opacity: 0.32; }
+/* el fondo es la portada reducida a unos pocos píxeles y estirada (views/images.js): ya viene difuminada */
+.series-wash canvas { position: absolute; inset: -12%; width: 124%; height: 124%; object-fit: cover; filter: saturate(160%); opacity: 0.38; animation: fade 0.8s ease-out; }
+.series-wash canvas.no-fade { animation: none; }
+[data-theme='light'] .series-wash canvas { opacity: 0.32; }
 .series-wash::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 0%, color-mix(in srgb, var(--bg) 40%, transparent) 55%, var(--bg) 100%); }
 .series-hero { margin-bottom: 36px; }
 .banner { position: relative; width: 100%; aspect-ratio: 19 / 4; min-height: 140px; max-height: 260px; border-radius: 26px; overflow: hidden; border: 1px solid var(--glass-edge); box-shadow: 0 24px 60px var(--shadow); }
@@ -1215,11 +1217,9 @@ html.lite .bar, html.lite .sheet-panel, html.lite .toast, html.lite .st-menu, ht
 html.lite .st-bar { background: rgba(22, 24, 30, 0.85); }
 html.lite .ambient::before, html.lite .ambient::after { animation: none; will-change: auto; }
 /* pasar entre el reproductor grande y el mini: animar un video es lo que más le cuesta a un teléfono modesto (se veía
- * trabado); cambia al instante. Y el póster difuminado detrás de la serie (un desenfoque de pantalla entera que se
- * repinta justo al pasar al mini) no se dibuja: queda el color de la serie en el fondo. */
+ * trabado); cambia al instante. */
 html.lite .mini { animation: none; }
 html.lite #app { transition: none; }
-html.lite .series-wash img { display: none; }
 
 /* En pantalla completa lo de detrás del video no se ve: se deja de dibujar (al girar el teléfono y al entrar o salir
  * el navegador ya no tiene que acomodar la lista de capítulos ni el fondo). */

@@ -97,7 +97,7 @@ export function renderSeries(arg) {
   app.innerHTML =
     header('', { overlay: true }) +
     `<div class="tv is-series">
-    <div class="series-wash" aria-hidden="true">${m && m.cover ? `<img src="${esc(m.cover)}" alt="">` : ''}</div>
+    <div class="series-wash" aria-hidden="true"${m && m.cover ? ` data-wash="${esc(m.cover)}"` : ''}></div>
     <main class="tv-main series-main">
       <section class="series-hero ${(m && m.banner) || collage ? 'has-banner' : ''}">
         ${
@@ -229,7 +229,7 @@ export function renderSeasonMenu(s, si) {
   app.innerHTML =
     header('', { overlay: true }) +
     `<div class="tv is-series">
-    <div class="series-wash" aria-hidden="true">${m && m.cover ? `<img src="${esc(m.cover)}" alt="">` : ''}</div>
+    <div class="series-wash" aria-hidden="true"${m && m.cover ? ` data-wash="${esc(m.cover)}"` : ''}></div>
     <main class="tv-main series-main">
       <section class="series-hero ${m && m.banner ? 'has-banner' : ''}">
         ${m && m.banner ? `<div class="banner"><img src="${esc(m.banner)}" alt="" decoding="async"></div>` : ''}
@@ -326,7 +326,7 @@ export function renderMovie(arg) {
   app.innerHTML =
     header('', { overlay: true }) +
     `<div class="tv is-series is-movie">
-    <div class="series-wash" aria-hidden="true">${m && m.cover ? `<img src="${esc(m.cover)}" alt="">` : ''}</div>
+    <div class="series-wash" aria-hidden="true"${m && m.cover ? ` data-wash="${esc(m.cover)}"` : ''}></div>
     <main class="tv-main series-main">
       <section class="series-hero ${m && m.banner ? 'has-banner' : ''}">
         ${m && m.banner ? `<div class="banner"><img src="${esc(m.banner)}" alt="" decoding="async"></div>` : ''}

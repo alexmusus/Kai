@@ -74,7 +74,7 @@ Fuera de las capas:
 | Archivo | Por qué está aparte |
 |---|---|
 | `core.js` | Descifrado de MEGA. Script clásico: lo comparten la página y el service worker. |
-| `sw.js` | Service worker: funciona sin conexión y sirve el video descifrado por rangos (`/__stream`). |
+| `sw.js` | Service worker: los archivos de la app salen de su caché sin preguntar al servidor (la caché lleva la versión), funciona sin conexión y sirve el video descifrado por rangos (`/__stream`). |
 | `vendor/mega.js` | megajs empaquetado. No se edita a mano. |
 
 ## Estado
@@ -91,6 +91,8 @@ se cambian sus campos, nunca se reemplazan (`setIndex` cambia el contenido del �
   (`reuseIfSame` en `router.js`): lo ya pintado no se vuelve a pintar.
 - Nada de desenfoque (`backdrop-filter`) en lo que se repite en listas (cada capítulo, cada póster).
 - `html.lite` (teléfonos con 4 GB o menos, `views/theme.js`): sin desenfoques ni fondo en movimiento.
+- El fondo difuminado de una serie es su portada reducida a 5 px de ancho y estirada (`views/images.js`), no un
+  `filter: blur()` de pantalla completa.
 - Los gestos miden el video una vez al tocar y lo mueven una vez por cuadro (`requestAnimationFrame`).
 
 ## Reglas que no se rompen
@@ -115,6 +117,7 @@ se cambian sus campos, nunca se reemplazan (`setIndex` cambia el contenido del �
   de `index.html` (para pedirlos todos a la vez); `tests/unit/modulos.test.js` revisa las dos listas.
 - Versiones (`sw.js`): `VERSION` es la de Kai y sube solo al pasar `prueba` a `main`; `ENTREGA` sube en cada
   subida a `prueba` (sin cambiar `sw.js` el navegador no instala lo nuevo) y vuelve a 1 al subir `VERSION`.
+  GitHub Actions falla si cambia algo de la app sin que cambie una de las dos (`tests/version-check.mjs`).
 
 ## Pruebas
 
