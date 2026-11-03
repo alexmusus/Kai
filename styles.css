@@ -1599,3 +1599,124 @@ body:has(.tv.is-series) .ambient { display: none; }
 .shelf-poster { margin-bottom: 5px; }
 .shelf-title { font-size: 15px; font-weight: 600; line-height: 1.3; letter-spacing: -0.01em; -webkit-line-clamp: 1; }
 .shelf-sub { margin: 0; font-size: 13px; color: var(--dim); }
+
+/* ═════════════════════════ Kai 39 · etapa 3: el reproductor ═════════════════════════
+ * Como en Apple TV: sin cápsula de vidrio; un degradado oscuro abajo con los controles en blanco, una línea de
+ * tiempo fina que engrosa al tocarla, el play del centro sin vidrio y "Saltar intro" como pastilla blanca.
+ * Además de verse más limpio, quita todos los desenfoques que se recalculaban sobre el video en movimiento. */
+.st-bar {
+  left: 0; right: 0; bottom: 0; padding: 34px 10px calc(4px + env(safe-area-inset-bottom, 0px)); border: 0; border-radius: 0;
+  background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.38) 38%, rgba(0, 0, 0, 0.72) 100%);
+  box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+.stage:not(:fullscreen) .st-bar { bottom: 0; }
+.stage.is-idle .st-bar { transform: none; }
+.stage.kai-fs .st-bar, .stage.kai-fs:not(:fullscreen) .st-bar {
+  left: 0; right: 0; bottom: 0; padding-left: max(14px, env(safe-area-inset-left)); padding-right: max(14px, env(safe-area-inset-right));
+  padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+}
+@media (orientation: portrait) {
+  .stage.kai-fs.kai-rot .st-bar, .stage.kai-fs.kai-rot:not(:fullscreen) .st-bar {
+    left: 0; right: 0; bottom: 0; padding-left: max(14px, env(safe-area-inset-top)); padding-right: max(14px, env(safe-area-inset-bottom)); padding-bottom: 10px;
+  }
+}
+@media (max-width: 600px) {
+  .st-bar { left: 0; right: 0; bottom: 0; padding: 26px 4px 2px; border-radius: 0; }
+  .stage:not(:fullscreen) .st-bar { bottom: 0; }
+}
+.st-btn { border-radius: 10px; }
+@media (hover: hover) { .st-btn:hover { background: rgba(255, 255, 255, 0.12); } }
+.st-btn.is-on { color: #fff; background: rgba(255, 255, 255, 0.18); }
+.st-time { font-size: 13px; font-weight: 500; color: rgba(255, 255, 255, 0.85); }
+.st-speed { font-weight: 600; }
+
+/* línea de tiempo: fina, y más gruesa mientras la tocas o pasas el mouse */
+.st-seek-wrap { margin: 0 8px 2px; }
+.st-seek::-webkit-slider-runnable-track { height: 3px; transition: height 0.15s; }
+.st-seek::-moz-range-track { height: 3px; }
+.st-seek::-webkit-slider-thumb { width: 12px; height: 12px; margin-top: -4.5px; box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.25); transition: transform 0.15s, box-shadow 0.15s; }
+.st-seek:hover::-webkit-slider-runnable-track, .st-seek:active::-webkit-slider-runnable-track { height: 6px; }
+.st-seek:hover::-webkit-slider-thumb, .st-seek:active::-webkit-slider-thumb { transform: scale(1.35); margin-top: -3px; box-shadow: 0 0 0 6px rgba(255, 255, 255, 0.18); }
+.st-marks { height: 3px; margin-top: -1.5px; }
+.st-marks span { width: 2px; height: 100%; margin-left: -1px; background: rgba(0, 0, 0, 0.7); }
+
+/* el play del centro, los avisos de ±10 s y de 2×: sin vidrio */
+.st-big {
+  width: 68px; height: 68px; margin: -34px 0 0 -34px; border: 0; box-shadow: none;
+  background: rgba(0, 0, 0, 0.42); -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+.st-big svg { width: 30px; height: 30px; margin-left: 3px; }
+.st-flash, .st-hold { border: 0; background: rgba(0, 0, 0, 0.55); -webkit-backdrop-filter: none; backdrop-filter: none; }
+.st-spinner { border-width: 2.5px; }
+
+/* "Saltar intro" / "Volver a la intro": pastilla blanca, como en los reproductores grandes */
+.st-skip {
+  border: 0; color: #000; font-weight: 600; background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35); -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+@media (hover: hover) { .st-skip:hover { background: #fff; } }
+@media (max-width: 600px) { .st-skip { bottom: 68px; } }
+
+/* menú de velocidad y tarjetas sobre el video: paneles oscuros sólidos */
+.st-menu { border-radius: 16px; padding: 6px; background: rgba(28, 28, 31, 0.97); border-color: rgba(255, 255, 255, 0.1); box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5); }
+.menu-title { margin: 8px 12px 4px; font-size: 12px; letter-spacing: 0.02em; text-transform: uppercase; }
+.menu-item { min-height: 44px; padding: 0 12px; border-radius: 10px; }
+.menu-item.is-on::after { color: #fff; }
+.p-card { border-radius: 22px; background: rgba(28, 28, 31, 0.95); border-color: rgba(255, 255, 255, 0.1); box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5); -webkit-backdrop-filter: none; backdrop-filter: none; }
+.p-card .btn { background: rgba(255, 255, 255, 0.14); border: 0; }
+.p-card .btn-lamp { background: #fff; color: #000; }
+
+/* ── botones de toda la app (.btn): lisos, como los de la portada ── */
+.btn {
+  min-height: 42px; padding: 0 16px; border-radius: 12px; border: 0; background: var(--btn); box-shadow: none;
+  font-weight: 600; -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+@media (hover: hover) { .btn:hover { background: var(--btn-hover); } }
+.btn-lamp { background: var(--primary); color: var(--primary-ink); box-shadow: none; }
+@media (hover: hover) { .btn-lamp:hover { background: var(--primary); filter: none; opacity: 0.88; } }
+.btn-quiet { background: none; }
+/* la barra de arriba de las páginas: sin línea ni vidrio pesado; los botones como los de la cabecera */
+.bar { border-bottom: 0; background: color-mix(in srgb, var(--bg) 86%, transparent); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
+.bar .icon-btn { background: var(--btn); width: 38px; height: 38px; }
+.bar .icon-btn + .icon-btn { margin-left: 4px; }
+
+/* ── la página del reproductor: el título con jerarquía, botones lisos y la lista sin tarjeta de vidrio ── */
+.watch-info { gap: 12px; padding-top: 14px; }
+.watch-series { color: var(--dim); font-size: 14px; font-weight: 600; }
+@media (hover: hover) { .watch-series:hover { color: var(--text); text-decoration: none; } }
+.watch-title { margin-top: 2px; font: 700 clamp(24px, 5vw, 32px)/1.1 var(--font-display); letter-spacing: -0.025em; }
+.watch-actions { gap: 8px; }
+.watch-actions .btn { min-height: 40px; padding: 0 14px; font-size: 15px; }
+.watch-actions .icon-btn { background: var(--btn); width: 40px; height: 40px; border-radius: 12px; }
+.watch-list { background: none; box-shadow: none; padding: 0; border-radius: 0; -webkit-backdrop-filter: none; backdrop-filter: none; }
+.wl-head { padding: 4px 4px 10px; border-bottom: 1px solid var(--line); margin-bottom: 6px; }
+.wl-title { font-size: 18px; }
+.episodes.is-compact .ep { border-radius: 12px; padding: 4px 4px 4px 4px; }
+@media (hover: hover) { .episodes.is-compact .ep:hover { background: var(--btn); } }
+.episodes.is-compact .ep-main { grid-template-columns: 116px 1fr; }
+.episodes.is-compact .ep-thumb { border-radius: 8px; }
+.episodes.is-compact .ep.is-current { background: var(--btn); box-shadow: none; }
+.episodes.is-compact .ep.is-current .ep-thumb { box-shadow: none; }
+@media (min-width: 1100px) { .watch-list { padding-left: 4px; } }
+
+/* mini reproductor del mismo estilo */
+.mini { border-radius: 18px; border: 1px solid var(--glass-edge); box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4); }
+.mini-btn { border-radius: 10px; }
+@media (hover: hover) { .mini-btn:hover { background: var(--btn); } }
+.mini-progress i { background: var(--text); }
+/* en el teléfono (sin pantalla completa) el video es bajo: las velocidades van en una fila, como un control
+ * segmentado, en vez de una lista que no cabía */
+@media (max-width: 600px) {
+  .stage:not(.kai-fs):not(.is-fs) .st-menu {
+    left: 8px; right: 8px; bottom: 52px; width: auto; max-height: none; overflow: visible;
+    display: flex; gap: 2px; padding: 4px; border-radius: 14px;
+  }
+  .stage:not(.kai-fs):not(.is-fs) .menu-title { display: none; }
+  .stage:not(.kai-fs):not(.is-fs) .menu-item { flex: 1; justify-content: center; min-height: 38px; padding: 0 4px; font-size: 14px; }
+  .stage:not(.kai-fs):not(.is-fs) .menu-item.is-on { background: #fff; color: #000; }
+  .stage:not(.kai-fs):not(.is-fs) .menu-item.is-on::after { content: none; }
+}
+/* "Saltar intro" siempre por encima de la franja de controles (es más alta que la cápsula de antes y la tapaba) */
+.st-skip { z-index: 2; bottom: 108px; }
+@media (max-width: 600px) { .st-skip { bottom: 92px; } }
+.stage.kai-fs .st-skip { bottom: calc(112px + env(safe-area-inset-bottom, 0px)); }
