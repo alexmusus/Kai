@@ -9,8 +9,8 @@ importScripts('core.js');
 /* VERSION es la de Kai que se ve en Ajustes: sube solo al pasar algo a main (lo publicado). ENTREGA cuenta las
  * subidas a prueba dentro de esa versión: sube en cada una (el navegador solo instala de nuevo si este archivo
  * cambia) y vuelve a 1 cuando sube VERSION. */
-const VERSION = 38;
-const ENTREGA = 4;
+const VERSION = 39;
+const ENTREGA = 1;
 const CACHE = `kai-${VERSION}.${ENTREGA}`;
 const SHELL = [
   './', 'styles.css', 'app.js', 'core.js', 'models/subs.js', 'models/meta-api.js',
@@ -94,7 +94,7 @@ self.addEventListener('fetch', (e) => {
     return;
   }
   if (url.origin === location.origin) {
-    e.respondWith(staleWhileRevalidate(req, e));
+    e.respondWith(shellFirst(req));
   }
   // Todo lo demás (API y servidores de MEGA) pasa directo a la red.
 });
@@ -120,23 +120,26 @@ async function clean(res) {
   return new Response(await res.blob(), { status: res.status, statusText: res.statusText, headers: res.headers });
 }
 
-async function staleWhileRevalidate(req, e) {
+/* Los archivos de Kai salen de la caché sin preguntar al servidor: la caché lleva el número de versión, y una
+ * versión nueva siempre cambia este archivo (sw.js), así que el navegador la instala entera y borra la vieja.
+ * Antes, al abrir, se le preguntaba al servidor por cada archivo (unos 70) para ver si había cambiado.
+ * GitHub Actions revisa que ningún cambio en la app se publique sin subir VERSION o ENTREGA
+ * (tests/version-check.mjs). */
+async function shellFirst(req) {
   const cache = await caches.open(CACHE);
   const key = req.mode === 'navigate' ? './' : req;
   const hit = await cache.match(key, { ignoreSearch: req.mode === 'navigate' });
-  const update = fetch(req).then(async (res) => {
+  if (hit) return clean(hit);
+  try {
+    let res = await fetch(req);
     if (res.ok && res.type === 'basic') {
       res = await clean(res);
       cache.put(key, res.clone());
     }
     return res;
-  }).catch(() => null);
-  if (hit) {
-    e.waitUntil(update);
-    return clean(hit);
+  } catch {
+    return new Response('Sin conexión', { status: 503 });
   }
-  const res = await update;
-  return res || new Response('Sin conexión', { status: 503 });
 }
 
 function parseRange(header, size) {
