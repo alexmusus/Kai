@@ -91,8 +91,16 @@ se cambian sus campos, nunca se reemplazan (`setIndex` cambia el contenido del �
   (`reuseIfSame` en `router.js`): lo ya pintado no se vuelve a pintar.
 - Nada de desenfoque (`backdrop-filter`) en lo que se repite en listas (cada capítulo, cada póster).
 - `html.lite` (teléfonos con 4 GB o menos, `views/theme.js`): sin desenfoques ni fondo en movimiento.
-- El fondo difuminado de una serie es su portada reducida a 5 px de ancho y estirada (`views/images.js`), no un
-  `filter: blur()` de pantalla completa.
+- Ningún desenfoque sobre el video ni en listas: el único que queda es el de la barra flotante (y el modo liviano
+  lo quita).
+
+## Diseño (Kai 39)
+
+Estilo de las apps de Apple: fondo neutro, la imagen manda, datos en una línea sin pastillas, botones lisos
+(`--btn`), tarjetas sólidas (`--card`) y un solo acento. La portada del inicio y de cada serie es una tarjeta
+oscura igual en los dos temas (`hero-card`, `heroArtHTML` en `views/components.js`). En `styles.css`, los bloques
+"Kai 39 · …" del final son el diseño actual; las reglas de arriba son la base que comparten. Al agregar algo, que
+use los mismos tokens (`--btn`, `--card`, `--text`, `--dim`) para que se vea en los dos temas.
 - Los gestos miden el video una vez al tocar y lo mueven una vez por cuadro (`requestAnimationFrame`).
 
 ## Reglas que no se rompen

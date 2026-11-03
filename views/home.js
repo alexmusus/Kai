@@ -32,44 +32,11 @@ export function greeting() {
   const g = h < 12 ? 'Buenos días' : h < 19 ? 'Buenas tardes' : 'Buenas noches';
   return state.profile ? `${g}, ${state.profile.name}` : g;
 }
-// crear un Intl.DateTimeFormat es caro (carga los datos del idioma): se crean una vez y se reusan
-const HOUR_FMT = new Intl.DateTimeFormat('es', { hour: 'numeric', minute: '2-digit', hour12: true });
-const DATE_FMT = new Intl.DateTimeFormat('es', { weekday: 'long', day: 'numeric', month: 'long' });
-export function clockParts() {
-  const d = new Date();
-  const time = HOUR_FMT.formatToParts(d);
-  const hm = time
-    .filter((p) => p.type !== 'dayPeriod')
-    .map((p) => p.value)
-    .join('')
-    .trim();
-  const ap = (time.find((p) => p.type === 'dayPeriod') || {}).value || '';
-  const date = DATE_FMT.format(d);
-  return { hm, ap, date };
-}
-export function clockHTML() {
-  const { hm, ap, date } = clockParts();
-  // en la PC, Kai va echado encima de la fecha
-  return `<span class="tv-hm">${esc(hm)}</span><span class="tv-ap">${esc(ap)}</span><span class="tv-sep" aria-hidden="true"></span><span class="tv-date"><span class="tv-date-t">${esc(date)}</span>${catHTML('top')}</span>`;
-}
-
+// el saludo cambia con la hora del día: se revisa de vez en cuando (solo cambia el texto)
 setInterval(() => {
-  // solo cambia el texto (así Kai no se vuelve a cargar cada vez)
-  const el = $('#tv-clock');
-  if (el) {
-    const p = clockParts();
-    for (const [sel, v] of [
-      ['.tv-hm', p.hm],
-      ['.tv-ap', p.ap],
-      ['.tv-date-t', p.date],
-    ]) {
-      const x = el.querySelector(sel);
-      if (x && x.textContent !== v) x.textContent = v;
-    }
-  }
   const g = $('#tv-greet');
-  if (g) g.textContent = greeting();
-}, 20000);
+  if (g && g.textContent !== greeting()) g.textContent = greeting();
+}, 60000);
 
 export function tvTop() {
   // cabecera compacta: el nombre de la app (con Kai, el gatito, echado encima en la PC), el saludo y la búsqueda

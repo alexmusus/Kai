@@ -117,11 +117,9 @@ export function countLabel(s, m) {
   );
 })();
 
-/** Kai, el gatito: sentado detrás del título de la portada, parpadeando de vez en cuando. */
+/** Kai, el gatito: sentado al final del inicio, parpadeando de vez en cuando. @param {string} where */
 export function catHTML(where) {
   if (state.settings.cat === false) return '';
-  if (where === 'top')
-    return '<span class="kcat-sit is-top" aria-hidden="true"><img src="gato/echado.webp" alt="" decoding="async"></span>';
   return `<span class="kcat-sit is-${where}" aria-hidden="true"><img src="gato/sentado.webp" alt="" decoding="async"><img class="is-blink" src="gato/sentado-cierra.webp" alt="" decoding="async"></span>`;
 }
 
