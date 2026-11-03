@@ -434,45 +434,49 @@ test('abrir Kai sin # (como la app instalada) deja el inicio en "#/", igual que 
   expect(k.errors).toEqual([]);
 });
 
-test('la barra flotante se achica al bajar, se queda así hasta tocarla y la burbuja sube', async ({ page }, info) => {
+test('la barra flotante se achica al bajar en la casita, se queda así hasta tocarla y la burbuja sube', async ({ page }, info) => {
   test.skip(info.project.name !== 'iphone', 'solo en el teléfono');
   const k = await openKai(page, '#/');
   await page.waitForTimeout(600);
   const dock = page.locator('#dock');
-  await page.evaluate(() => window.scrollTo(0, 600));
-  await expect(dock).toHaveClass(/is-compact/);
-  await expect(page.locator('#dock .dock-btn')).toHaveCSS('opacity', '0'); // sin tu perfil, solo la casita
-  // tocarla achicada solo la agranda: no navega
-  await page.locator('#dock .dock-tab.is-on').click();
-  await expect(dock).not.toHaveClass(/is-compact/);
-  await expect(page).toHaveURL(/#\/$/);
-  // bajar otra vez la achica; subir (el rebote del final) ya no la agranda
-  await page.waitForTimeout(1300);
+  const up = page.locator('#dock .dock-up');
+  const scrollY = () => page.evaluate(() => window.scrollY);
+  // inicio: bajar la achica; subir (el rebote del final) ya no la agranda; no hay burbuja (la casita sube)
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
   await expect(dock).toHaveClass(/is-compact/);
+  await expect(page.locator('#dock .dock-btn')).toHaveCSS('opacity', '0'); // sin tu perfil, solo la casita
   await page.evaluate(() => window.scrollBy(0, -200));
   await page.waitForTimeout(200);
   await expect(dock).toHaveClass(/is-compact/);
-  // lejos del principio, la burbuja de subir
-  const up = page.locator('#dock .dock-up');
-  await expect(up).toHaveCSS('opacity', '1');
-  await page.screenshot({ path: '/tmp/claude-0/-home-user-Kai/2a50527b-117a-5251-8346-343e47b047cb/scratchpad/new/compact.jpg', type: 'jpeg', quality: 80 });
-  await up.click();
-  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
-  await expect(dock).not.toHaveClass(/is-compact/);
   await expect(up).toHaveCSS('opacity', '0');
-  // en otra pestaña, achicada también queda la casita (y tocarla solo la agranda)
+  await page.locator('#dock .dock-tab[data-tab="home"]').click();
+  await expect.poll(scrollY).toBe(0);
+  await expect(dock).not.toHaveClass(/is-compact/);
+  await expect(page).toHaveURL(/#\/$/);
+  // en otra pestaña, achicada también queda la casita: tocarla solo la agranda
   await go(page, '#/ajustes');
   await page.waitForTimeout(700);
-  await page.evaluate(() => window.scrollTo(0, 700));
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
   await expect(dock).toHaveClass(/is-compact/);
   await expect(page.locator('#dock .dock-tab[data-tab="home"]')).toHaveCSS('width', '48px');
   await expect(page.locator('#dock .dock-tab[data-tab="ajustes"]')).toHaveCSS('opacity', '0');
-  await page.waitForTimeout(500);
+  // y lejos del principio, al lado, la burbuja de subir
+  await expect(up).toHaveCSS('opacity', '1');
   await page.screenshot({ path: '/tmp/claude-0/-home-user-Kai/2a50527b-117a-5251-8346-343e47b047cb/scratchpad/new/compact-ajustes.png', clip: { x: 0, y: 700, width: 390, height: 144 } });
+  const y = await scrollY();
   await page.locator('#dock .dock-tab[data-tab="home"]').click();
   await expect(dock).not.toHaveClass(/is-compact/);
   await expect(page).toHaveURL(/#\/ajustes$/);
+  expect(await scrollY()).toBe(y);
+  await page.waitForTimeout(1300);
+  await page.evaluate(() => window.scrollBy(0, -300));
+  await page.waitForTimeout(100);
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await expect(dock).toHaveClass(/is-compact/);
+  await up.click();
+  await expect.poll(scrollY).toBe(0);
+  await expect(dock).not.toHaveClass(/is-compact/);
+  await expect(up).toHaveCSS('opacity', '0');
   expect(k.errors).toEqual([]);
 });
 

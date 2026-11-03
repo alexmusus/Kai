@@ -43,8 +43,8 @@ export function paintDock() {
 
 /* ── la barra se achica al bajar ──
  * En el teléfono, al bajar queda solo la casita (con el punto de sincronización), y se queda así
- * hasta que la tocas: ese toque solo la agranda (no navega). Mientras estás lejos del principio, al lado aparece
- * una burbuja con una flecha para subir. */
+ * hasta que la tocas: ese toque solo la agranda (no navega; en el inicio, además sube). Lejos del principio, fuera
+ * del inicio, al lado aparece una burbuja con una flecha para subir. */
 const COMPACT_ON = matchMedia('(max-width: 899px)');
 let compactY = window.scrollY;
 let compactFrame = 0;
@@ -60,7 +60,7 @@ function setDeep(on) {
 function checkCompact() {
   compactFrame = 0;
   const y = window.scrollY;
-  setDeep(y > 600);
+  setDeep(y > 600 && route().view !== 'home'); // en el inicio sube la casita: no hace falta la burbuja
   const dy = y - compactY;
   if (Math.abs(dy) < 8) return; // movimientos mínimos no cuentan
   compactY = y;
@@ -90,6 +90,8 @@ dock.addEventListener(
     if (!(/** @type {Element} */ (e.target).closest('.dock-bar'))) return;
     e.preventDefault();
     e.stopPropagation();
+    // en el inicio, la casita achicada sube de una vez (ahí no está la burbuja); en otra página solo la agranda
+    if (route().view === 'home') return dockUp();
     setCompact(false);
     compactHold = performance.now() + 1200; // que el siguiente movimiento no la vuelva a achicar enseguida
   },
