@@ -200,6 +200,11 @@ test('seguir aquí lo que quedó a medias en otro dispositivo', async ({ page },
   const dor = ls.library.series.find((s) => s.name === 'Dorohedoro').seasons[0].episodes[4];
   const progress = { ...ls['p.pA.progress'], '@now': { p: dor.path, t: 754, d: 1440, w: false, dev: 'otro', dn: 'iPhone', u: NOW - 20 * 60000 } };
   const k = await openKai(page, '#/', { extraLS: { 'p.pA.progress': progress } });
+  // una burbuja arriba; al tocarla se abre con el detalle
+  await expect(page.locator('.resume-pill')).toContainText('Seguir de tu iPhone · 12:34');
+  await expect(page.locator('.resume-card [data-act="resume-here"]')).not.toBeInViewport();
+  await page.locator('.resume-pill').click();
+  await expect(page.locator('.resume-card')).toHaveClass(/is-open/);
   await expect(page.locator('.resume-card')).toContainText('En tu iPhone, hace 20 min');
   await expect(page.locator('.resume-card')).toContainText('Dorohedoro · Episodio 5');
   await expect(page.locator('.resume-card [data-act="resume-here"]')).toContainText('12:34');

@@ -1298,8 +1298,13 @@ html.kai-fs-on .watch-list, html:has(.stage:fullscreen) .watch-list { visibility
 .hero-art img, .hero-art [data-thumb], .hero-art [data-thumb] img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 20%; }
 .hero-art::after {
   content: ''; position: absolute; inset: 0;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--bg) 50%, transparent) 0%, transparent 18%, transparent 40%, color-mix(in srgb, var(--bg) 80%, transparent) 74%, var(--bg) 100%);
+  background: linear-gradient(180deg, transparent 0%, transparent 44%, color-mix(in srgb, var(--bg) 80%, transparent) 76%, var(--bg) 100%);
 }
+/* la imagen llega arriba sin oscurecer: el saludo y los botones de arriba se leen con una sombra suave */
+.tv.is-home .tv-top { text-shadow: 0 1px 10px rgba(0, 0, 0, 0.45); }
+.tv.is-home .tv-greet { color: color-mix(in srgb, var(--text) 82%, transparent); }
+[data-theme='dark'] .tv.is-home .tv-top .tv-icon { background: rgba(0, 0, 0, 0.32); }
+[data-theme='light'] .tv.is-home .tv-top { text-shadow: 0 1px 10px rgba(255, 255, 255, 0.6); }
 .tv.is-home .tvh-text { max-width: 620px; }
 .tv.is-home .tv-title { font: 700 clamp(30px, 8.4vw, 40px)/1.05 var(--font-display); letter-spacing: -0.03em; text-shadow: none; }
 .tv.is-home .tv-alt { margin-top: 6px; font-size: 14px; }
@@ -1312,7 +1317,7 @@ html.kai-fs-on .watch-list, html:has(.stage:fullscreen) .watch-list { visibility
   .tv.is-home .tv-hero { min-height: clamp(480px, 66vh, 640px); padding: 150px clamp(16px, 4vw, 56px) 30px; margin-bottom: 18px; }
   .hero-art { left: auto; width: 74%; -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 42%); mask-image: linear-gradient(to right, transparent 0%, #000 42%); }
   .hero-art img { object-position: center 30%; }
-  .hero-art::after { background: linear-gradient(180deg, color-mix(in srgb, var(--bg) 35%, transparent) 0%, transparent 25%, transparent 60%, var(--bg) 100%); }
+  .hero-art::after { background: linear-gradient(180deg, transparent 0%, transparent 60%, var(--bg) 100%); }
   .tv.is-home .tvh-text { max-width: 540px; }
   .tv.is-home .tv-title { font-size: clamp(40px, 4.4vw, 62px); }
   .tv.is-home .tv-title.is-long { font-size: clamp(34px, 3.6vw, 50px); }
@@ -1321,9 +1326,28 @@ html.kai-fs-on .watch-list, html:has(.stage:fullscreen) .watch-list { visibility
   .tv.is-home .tv-actions .tv-btn.is-primary { flex: none; }
 }
 
-/* "Seguir aquí lo que quedó a medias": debajo de la portada en el teléfono; en la PC, arriba a la derecha */
-.tv.is-home .resume-card { background: var(--glass-solid); -webkit-backdrop-filter: none; backdrop-filter: none; }
-@media (min-width: 900px) { .tv.is-home .resume-card { top: calc(env(safe-area-inset-top) + 76px); } }
+/* "Seguir aquí lo que quedó a medias": una burbuja flotante arriba, como una notificación; al tocarla se abre */
+.tv.is-home .resume-card {
+  position: fixed; z-index: 6; top: calc(env(safe-area-inset-top) + 58px); left: 50%; right: auto; transform: translateX(-50%);
+  width: max-content; max-width: min(92vw, 380px); margin: 0; padding: 0; display: block; flex-wrap: nowrap; border-radius: 22px; border: 1px solid var(--glass-edge);
+  background: var(--glass-solid); box-shadow: 0 12px 34px rgba(0, 0, 0, 0.35); -webkit-backdrop-filter: none; backdrop-filter: none;
+  animation: resume-in 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes resume-in { from { opacity: 0; transform: translate(-50%, -12px) scale(0.96); } }
+.resume-pill { display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 16px 0 12px; font-size: 14px; font-weight: 600; color: var(--text); white-space: nowrap; }
+.resume-pill svg { width: 16px; height: 16px; color: var(--accent); }
+.resume-more { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.28s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.resume-in { min-height: 0; overflow: hidden; padding: 0 14px; }
+.resume-card.is-open { width: min(92vw, 380px); }
+.resume-card.is-open .resume-more { grid-template-rows: 1fr; }
+.resume-card.is-open .resume-in { padding-bottom: 14px; }
+.resume-card .resume-kicker { margin: 2px 0 0; }
+.resume-card .resume-title { white-space: normal; }
+.resume-actions { display: flex; gap: 8px; margin-top: 12px; }
+.resume-actions .tv-btn.is-primary { flex: 1; justify-content: center; }
+.resume-card .resume-x { order: 0; }
+@media (min-width: 900px) { .tv.is-home .resume-card { top: calc(env(safe-area-inset-top) + 76px); left: auto; right: clamp(16px, 4vw, 56px); transform: none; } }
+@media (min-width: 900px) { @keyframes resume-in { from { opacity: 0; transform: translateY(-12px) scale(0.96); } } }
 
 /* ── filas: la imagen arriba y el texto debajo, sin velos ni vidrio ── */
 .tv-row-title { font: 700 20px/1.2 var(--font-display); letter-spacing: -0.015em; }
@@ -1356,7 +1380,7 @@ html.kai-fs-on .watch-list, html:has(.stage:fullscreen) .watch-list { visibility
 .lang-chip { top: auto; bottom: 6px; right: auto; left: 6px; padding: 3px 5px; border-radius: 4px; border: 0; font-size: 9px; }
 
 /* ── barra flotante: las páginas principales y tu perfil ── */
-.dock { left: 50%; right: auto; transform: translateX(-50%); bottom: calc(8px + env(safe-area-inset-bottom)); display: block; }
+.dock { left: 50%; right: auto; transform: translateX(-50%); bottom: max(8px, calc(env(safe-area-inset-bottom) - 12px)); display: block; }
 .dock-bar {
   display: flex; align-items: center; gap: 2px; padding: 5px; border-radius: 30px;
   background: color-mix(in srgb, var(--glass-solid) 70%, transparent); border: 1px solid var(--glass-edge);
@@ -1376,6 +1400,8 @@ html.kai-fs-on .watch-list, html:has(.stage:fullscreen) .watch-list { visibility
 .dock-tab.has-news::after { content: ''; position: absolute; top: 8px; left: calc(50% + 8px); width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
 .dock-btn { width: 52px; height: 52px; opacity: 1; background: none; border: 0; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
 .dock-btn .dock-avatar { width: 34px; height: 34px; font-size: 15px; }
+/* tu perfil, del mismo gris que las pestañas (en el menú y en la elección de perfiles conserva su color) */
+.dock-btn .dock-avatar { background: var(--btn-hover); color: var(--text); box-shadow: none; border: 0; }
 @media (hover: hover) { .dock-btn:hover { transform: none; } .dock-tab:hover { color: var(--text); } }
 body.is-playing:not(:has(.dock.is-open)) .dock-btn { opacity: 1; }
 .dock-panel { position: absolute; right: 0; bottom: calc(100% + 10px); transform-origin: bottom right; }
@@ -1384,11 +1410,11 @@ html.lite .dock-bar { background: var(--glass-solid); }
 @media (max-width: 899px) { body:has(main.watch) .dock { display: none; } }
 /* lo que flota abajo se acomoda sobre la barra (teléfono) */
 @media (max-width: 899px) {
-  body { padding-bottom: calc(76px + env(safe-area-inset-bottom)); }
-  .toast, .pick-bar { bottom: calc(80px + env(safe-area-inset-bottom)); }
-  .mini { bottom: calc(80px + env(safe-area-inset-bottom)); }
-  html.has-mini .dock { bottom: calc(8px + env(safe-area-inset-bottom)); }
-  html.has-mini .pick-bar, html.has-mini .toast { bottom: calc(86px + var(--mini-space) + env(safe-area-inset-bottom)); }
+  body { padding-bottom: calc(60px + env(safe-area-inset-bottom)); }
+  .toast, .pick-bar { bottom: calc(66px + max(8px, calc(env(safe-area-inset-bottom) - 12px))); }
+  .mini { bottom: calc(68px + max(8px, calc(env(safe-area-inset-bottom) - 12px))); }
+  html.has-mini .dock { bottom: max(8px, calc(env(safe-area-inset-bottom) - 12px)); }
+  html.has-mini .pick-bar, html.has-mini .toast { bottom: calc(74px + var(--mini-space) + max(8px, calc(env(safe-area-inset-bottom) - 12px))); }
   body:has(main.watch) { padding-bottom: 0; }
   body:has(main.watch) .mini { bottom: calc(18px + env(safe-area-inset-bottom)); }
 }

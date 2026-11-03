@@ -315,6 +315,12 @@ const ACTIONS = {
   'news-clear': clearNews,
   'seen-all': (el) => paintSeenByAll(el),
   'resume-here': resumeHere,
+  'resume-toggle': (el) => {
+    const box = el.closest('.resume-card');
+    const open = !box.classList.contains('is-open');
+    box.classList.toggle('is-open', open);
+    el.setAttribute('aria-expanded', String(open));
+  },
   'resume-dismiss': dismissResume,
 
   // series, temporadas y películas
