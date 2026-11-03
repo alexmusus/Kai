@@ -27,7 +27,7 @@ import {
   setTint,
   app,
   header,
-  collageHTML,
+  heroArtHTML,
   titleSize,
   factsRowsHTML,
   langChip,
@@ -47,6 +47,25 @@ export function langSwitchHTML(s, langs) {
   const cur = langPref(s);
   return `<div class="lang-switch" role="group" aria-label="Idioma">${langs.map((l) => `<button class="${l === cur ? 'is-on' : ''}" data-act="lang" data-lang="${l}" aria-pressed="${l === cur}">${l === 'sub' ? 'Sub' : 'Doblado'}</button>`).join('')}</div>`;
 }
+
+/** La portada de una serie, temporada o película: la tarjeta oscura con la imagen, igual que en el inicio. */
+function heroCardHTML({ m, thumbId = '', kicker = '', title, alt = '', facts = '', lang = '', actions }) {
+  return `<section class="series-hero hero-card">${heroArtHTML(m, thumbId)}<div class="tvh-text">${kicker}<h2 class="tv-title${titleSize(title)}">${esc(title)}</h2>${alt}${facts}${lang ? `<div class="hero-lang">${lang}</div>` : ''}<div class="tv-actions">${actions}</div></div></section>`;
+}
+/** La sinopsis y el botón para traducirla, debajo de la tarjeta. */
+function aboutHTML(syn, translate) {
+  return syn || translate
+    ? `<section class="series-about">${syn ? `<p class="tv-synopsis is-long" id="synopsis">${esc(syn)}</p>` : ''}${translate}</section>`
+    : '';
+}
+/** El nombre alternativo de la ficha, si es distinto del que se muestra. */
+const altHTML = (m, shown) =>
+  m && m.title && m.title.toLowerCase() !== shown.toLowerCase()
+    ? `<p class="tv-alt">${esc(m.title)}${m.native ? ` <span lang="ja">${esc(m.native)}</span>` : ''}</p>`
+    : '';
+/** Un botón cuadrado de la portada, con su nombre para lectores de pantalla y al pasar el mouse. */
+const squareBtn = (attrs, label, icon, on = false) =>
+  `<button class="tv-btn is-square${on ? ' is-on' : ''}" ${attrs} aria-label="${esc(label)}" title="${esc(label)}">${icon}</button>`;
 
 export function renderSeries(arg) {
   const lib = state.library;
@@ -94,55 +113,46 @@ export function renderSeries(arg) {
   const seen = scope.filter((e) => (prog(e) || {}).w).length;
   const collage = m && m.collage && m.collage.length ? m.collage : null;
   setTint(seriesColor(s));
+  const shown = multi ? seasonFullName(s, season) : s.name;
+  const dlLabel = `Descargar ${upcoming.length === 1 ? 'el siguiente' : `los ${upcoming.length} siguientes`}`;
   app.innerHTML =
     header('', { overlay: true }) +
     `<div class="tv is-series">
-    <div class="series-wash" aria-hidden="true"${m && m.cover ? ` data-wash="${esc(m.cover)}"` : ''}></div>
     <main class="tv-main series-main">
-      <section class="series-hero ${(m && m.banner) || collage ? 'has-banner' : ''}">
-        ${
-          collage
-            ? `<div class="banner is-collage" aria-hidden="true">${Array.from(
-                { length: Math.max(12, collage.length) },
-                (_, i) => collage[i % collage.length],
-              )
-                .map((u) => `<img src="${esc(u)}" alt="" decoding="async">`)
-                .join('')}</div>`
-            : m && m.banner
-              ? `<div class="banner"><img src="${esc(m.banner)}" alt="" decoding="async"></div>`
-              : ''
-        }
-        <div class="series-top">
-          ${collage ? `<span class="poster is-collage">${collageHTML(collage)}</span>` : m && m.cover ? `<img class="poster" src="${esc(m.cover)}" alt="" decoding="async">` : coverEp ? `<span class="poster is-thumb" data-thumb="${esc(coverEp.id)}"></span>` : ''}
-          <div class="series-info">
-            ${multi ? `<p class="tv-kicker"><a href="#/serie/${si}">${esc(s.name)}</a><span>${esc(seasonLabel(s, season))}</span></p>` : ''}
-            <h2 class="tv-title${titleSize(multi ? seasonFullName(s, season) : s.name)}">${esc(multi ? seasonFullName(s, season) : s.name)}</h2>
-            ${m && m.title && m.title.toLowerCase() !== (multi ? seasonFullName(s, season) : s.name).toLowerCase() ? `<p class="tv-alt">${esc(m.title)}${m.native ? ` <span lang="ja">${esc(m.native)}</span>` : ''}</p>` : ''}
-            ${factsRowsHTML(s, m, { count: flat ? null : scope.length, seen, total: scope.length, lang: langText(langsOf(season.episodes)) })}
-          </div>
-        </div>
-        ${syn ? `<p class="tv-synopsis is-long" id="synopsis">${esc(syn)}</p>` : ''}
-        ${m && !hasSpanish(m) && m.synopsis && canTranslate() ? `<button class="link-btn" data-act="translate"${ownMeta ? ` data-key="${esc(season.name)}"` : ''}>Traducir sinopsis al español</button>` : ''}
-        <div class="tv-actions">
-          ${next ? `<a class="tv-btn is-primary" href="#/play/${encodeURIComponent(next.id)}">${ICON.play}<span>${esc(plan.label)}</span></a>` : `<span class="tv-done">${esc(plan.label)}</span>`}
-          ${upcoming.length ? `<button class="tv-btn" data-act="series-dl" data-si="${si}"${multi ? ` data-from="${esc(next.id)}"` : ''}>${ICON.down}<span>Descargar ${upcoming.length === 1 ? 'el siguiente' : `los ${upcoming.length} siguientes`}</span></button>` : ''}
-          ${flat ? '' : `<button class="tv-btn ${isLater(s) ? 'is-on' : ''}" data-act="later" data-si="${si}" aria-pressed="${isLater(s)}">${isLater(s) ? ICON.laterOn : ICON.later}<span>Más tarde</span></button>`}
-        </div>
-      </section>
+      ${heroCardHTML({
+        m: collage ? { ...m, cover: collage[0] } : m,
+        thumbId: coverEp ? coverEp.id : '',
+        kicker: multi
+          ? `<p class="tv-kicker"><a href="#/serie/${si}">${esc(s.name)}</a><span>${esc(seasonLabel(s, season))}</span></p>`
+          : '',
+        title: shown,
+        alt: altHTML(m, shown),
+        facts: factsRowsHTML(s, m, {
+          count: flat ? null : scope.length,
+          seen,
+          total: scope.length,
+          lang: langText(langsOf(season.episodes)),
+        }),
+        lang: langSwitchHTML(s, season.langs),
+        actions: `${next ? `<a class="tv-btn is-primary" href="#/play/${encodeURIComponent(next.id)}">${ICON.play}<span>${esc(plan.label)}</span></a>` : `<span class="tv-done">${esc(plan.label)}</span>`}
+          ${upcoming.length ? squareBtn(`data-act="series-dl" data-si="${si}"${multi ? ` data-from="${esc(next.id)}"` : ''}`, dlLabel, ICON.down) : ''}
+          ${flat ? '' : squareBtn(`data-act="later" data-si="${si}" aria-pressed="${isLater(s)}"`, 'Más tarde', isLater(s) ? ICON.laterOn : ICON.later, isLater(s))}`,
+      })}
+      ${aboutHTML(syn, m && !hasSpanish(m) && m.synopsis && canTranslate() ? `<button class="link-btn" data-act="translate"${ownMeta ? ` data-key="${esc(season.name)}"` : ''}>Traducir sinopsis al español</button>` : '')}
       <section class="ep-section">
+        ${
+          multi
+            ? `<nav class="season-tabs" aria-label="Temporadas"><a class="season-tab is-all" href="#/serie/${si}" data-replace>${ICON.grid}<span>Todas</span></a>${s.seasons
+                .map(
+                  (se, k) =>
+                    `<a class="season-tab ${k === ki ? 'is-on' : ''}" href="#/serie/${si}/${k}" data-replace${k === ki ? ' aria-current="page"' : ''}>${esc(seasonLabel(s, se))}</a>`,
+                )
+                .join('')}</nav>`
+            : ''
+        }
         <div class="ep-head">
           <h3 class="ep-heading">${flat ? 'Películas' : 'Episodios'}</h3>
           <button class="pick-toggle" data-act="pick-mode" id="pick-toggle" aria-pressed="false">${ICON.check}<span>Seleccionar</span></button>
-          ${langSwitchHTML(s, season.langs)}
-          ${
-            multi
-              ? `<nav class="season-step" aria-label="Otras temporadas">
-            ${ki > 0 ? `<a class="step-btn" href="#/serie/${si}/${ki - 1}" data-replace title="${esc(seasonLabel(s, s.seasons[ki - 1]))}">${ICON.back}<span>Anterior</span></a>` : ''}
-            <a class="step-btn" href="#/serie/${si}" data-replace>${ICON.grid}<span>Temporadas</span></a>
-            ${ki < s.seasons.length - 1 ? `<a class="step-btn is-next" href="#/serie/${si}/${ki + 1}" data-replace title="${esc(seasonLabel(s, s.seasons[ki + 1]))}"><span>Siguiente</span>${ICON.back}</a>` : ''}
-          </nav>`
-              : ''
-          }
         </div>
         ${season.title && season.title !== s.name && !multi ? `<p class="season-title">${esc(season.title)}</p>` : ''}
         <ol class="episodes is-grid" id="season-eps">${season.episodes.map((ep) => episodeRow(ep, { fresh: fresh.has(ep.id), next: next && ep.id === next.id })).join('')}</ol>
@@ -226,42 +236,36 @@ export function renderSeasonMenu(s, si) {
     })
     .join('');
   setTint(seriesColor(s));
+  const dlLabel = `Descargar ${upcoming.length === 1 ? 'el siguiente' : `los ${upcoming.length} siguientes`}`;
   app.innerHTML =
     header('', { overlay: true }) +
     `<div class="tv is-series">
-    <div class="series-wash" aria-hidden="true"${m && m.cover ? ` data-wash="${esc(m.cover)}"` : ''}></div>
     <main class="tv-main series-main">
-      <section class="series-hero ${m && m.banner ? 'has-banner' : ''}">
-        ${m && m.banner ? `<div class="banner"><img src="${esc(m.banner)}" alt="" decoding="async"></div>` : ''}
-        <div class="series-top">
-          ${m && m.cover ? `<img class="poster" src="${esc(m.cover)}" alt="" decoding="async">` : coverEp ? `<span class="poster is-thumb" data-thumb="${esc(coverEp.id)}"></span>` : ''}
-          <div class="series-info">
-            <h2 class="tv-title${titleSize(s.name)}">${esc(s.name)}</h2>
-            ${m && m.title && !isFranchise(s) && m.title.toLowerCase() !== s.name.toLowerCase() ? `<p class="tv-alt">${esc(m.title)}${m.native ? ` <span lang="ja">${esc(m.native)}</span>` : ''}</p>` : ''}
-            ${factRows(
-              `<span>${plural(s.seasons.length, 'temporada', 'temporadas')}</span><span>${plural(s.all.length, 'capítulo', 'capítulos')}</span>${langsOf(s.all).length ? `<span>${esc(langText(langsOf(s.all)))}</span>` : ''}${seen ? `<span>${seen} vistos</span>` : ''}`,
-              m,
-              [
-                m && m.year
-                  ? `<a class="fact" href="#/catalogo?${new URLSearchParams({ y: m.year })}">${esc(m.year)}</a>`
-                  : '',
-                ...((m && m.genres) || [])
-                  .slice(0, 3)
-                  .map((g) => `<a class="fact" href="#/catalogo?${new URLSearchParams({ g })}">${esc(g)}</a>`),
-              ].join(''),
-            )}
-          </div>
-        </div>
-        ${syn ? `<p class="tv-synopsis is-long" id="synopsis">${esc(syn)}</p>` : ''}
-        ${m && !hasSpanish(m) && m.synopsis && canTranslate() ? `<button class="link-btn" data-act="translate"${metaKey ? ` data-key="${esc(metaKey)}"` : ''}>Traducir sinopsis al español</button>` : ''}
-        <div class="tv-actions">
-          ${next ? `<a class="tv-btn is-primary" href="#/play/${encodeURIComponent(next.id)}">${ICON.play}<span>${esc(plan.label)}</span></a>` : `<span class="tv-done">${esc(plan.label)}</span>`}
-          ${upcoming.length ? `<button class="tv-btn" data-act="series-dl" data-si="${si}">${ICON.down}<span>Descargar ${upcoming.length === 1 ? 'el siguiente' : `los ${upcoming.length} siguientes`}</span></button>` : ''}
-          <button class="tv-btn ${isLater(s) ? 'is-on' : ''}" data-act="later" data-si="${si}" aria-pressed="${isLater(s)}">${isLater(s) ? ICON.laterOn : ICON.later}<span>Más tarde</span></button>
-        </div>
-      </section>
+      ${heroCardHTML({
+        m,
+        thumbId: coverEp ? coverEp.id : '',
+        title: s.name,
+        alt: isFranchise(s) ? '' : altHTML(m, s.name),
+        facts: factRows(
+          `<span>${plural(s.seasons.length, 'temporada', 'temporadas')}</span><span>${plural(s.all.length, 'capítulo', 'capítulos')}</span>${langsOf(s.all).length ? `<span>${esc(langText(langsOf(s.all)))}</span>` : ''}${seen ? `<span>${seen} vistos</span>` : ''}`,
+          m,
+          [
+            m && m.year
+              ? `<a class="fact" href="#/catalogo?${new URLSearchParams({ y: m.year })}">${esc(m.year)}</a>`
+              : '',
+            ...((m && m.genres) || [])
+              .slice(0, 3)
+              .map((g) => `<a class="fact" href="#/catalogo?${new URLSearchParams({ g })}">${esc(g)}</a>`),
+          ].join(''),
+        ),
+        lang: langSwitchHTML(s, s.seasons.some((se) => se.langs) ? ['sub', 'dob'] : null),
+        actions: `${next ? `<a class="tv-btn is-primary" href="#/play/${encodeURIComponent(next.id)}">${ICON.play}<span>${esc(plan.label)}</span></a>` : `<span class="tv-done">${esc(plan.label)}</span>`}
+          ${upcoming.length ? squareBtn(`data-act="series-dl" data-si="${si}"`, dlLabel, ICON.down) : ''}
+          ${squareBtn(`data-act="later" data-si="${si}" aria-pressed="${isLater(s)}"`, 'Más tarde', isLater(s) ? ICON.laterOn : ICON.later, isLater(s))}`,
+      })}
+      ${aboutHTML(syn, m && !hasSpanish(m) && m.synopsis && canTranslate() ? `<button class="link-btn" data-act="translate"${metaKey ? ` data-key="${esc(metaKey)}"` : ''}>Traducir sinopsis al español</button>` : '')}
       <section class="ep-section">
-        <div class="ep-head"><h3 class="ep-heading">Temporadas</h3>${langSwitchHTML(s, s.seasons.some((se) => se.langs) ? ['sub', 'dob'] : null)}</div>
+        <div class="ep-head"><h3 class="ep-heading">Temporadas</h3></div>
         <ul class="shelf season-grid" role="list">${cards}</ul>
       </section>
     </main>
@@ -326,33 +330,25 @@ export function renderMovie(arg) {
   app.innerHTML =
     header('', { overlay: true }) +
     `<div class="tv is-series is-movie">
-    <div class="series-wash" aria-hidden="true"${m && m.cover ? ` data-wash="${esc(m.cover)}"` : ''}></div>
     <main class="tv-main series-main">
-      <section class="series-hero ${m && m.banner ? 'has-banner' : ''}">
-        ${m && m.banner ? `<div class="banner"><img src="${esc(m.banner)}" alt="" decoding="async"></div>` : ''}
-        <div class="series-top">
-          ${m && m.cover ? `<img class="poster" src="${esc(m.cover)}" alt="" decoding="async">` : `<span class="poster is-thumb" data-thumb="${esc(it.eps[0].id)}"></span>`}
-          <div class="series-info">
-            <h2 class="tv-title">${esc(t)}</h2>
-            ${m && m.title && m.title.toLowerCase() !== t.toLowerCase() ? `<p class="tv-alt">${esc(m.title)}${m.native ? ` <span lang="ja">${esc(m.native)}</span>` : ''}</p>` : ''}
-            ${facts}
-          </div>
-        </div>
-        ${syn ? `<p class="tv-synopsis is-long" id="synopsis">${esc(syn)}</p>` : ''}
-        ${m && !hasSpanish(m) && m.synopsis && canTranslate() ? `<button class="link-btn" data-act="translate" data-key="${esc(it.key)}">Traducir sinopsis al español</button>` : ''}
-        <div class="tv-actions">
-          <a class="tv-btn is-primary" href="#/play/${encodeURIComponent(plan.ep.id)}">${ICON.play}<span>${esc(plan.label)}</span></a>
+      ${heroCardHTML({
+        m,
+        thumbId: it.eps[0].id,
+        title: t,
+        alt: altHTML(m, t),
+        facts,
+        lang: langSwitchHTML(s, langsOf(it.eps).length > 1 ? langsOf(it.eps) : null),
+        actions: `<a class="tv-btn is-primary" href="#/play/${encodeURIComponent(plan.ep.id)}">${ICON.play}<span>${esc(plan.label)}</span></a>
           ${
             busy
-              ? `<span class="tv-btn is-quiet">${ICON.queued}<span>Descargando…</span></span>`
+              ? `<span class="tv-btn is-square is-quiet" aria-label="Descargando…" title="Descargando…">${ICON.queued}</span>`
               : pending.length
-                ? `<button class="tv-btn" data-act="movie-dl" data-si="${si}" data-key="${esc(it.key)}">${ICON.down}<span>Descargar</span></button>`
-                : `<span class="tv-btn is-quiet">${ICON.saved}<span>Descargada</span></span>`
+                ? squareBtn(`data-act="movie-dl" data-si="${si}" data-key="${esc(it.key)}"`, 'Descargar', ICON.down)
+                : `<span class="tv-btn is-square is-quiet" aria-label="Descargada" title="Descargada">${ICON.saved}</span>`
           }
-          <button class="tv-btn ${later ? 'is-on' : ''}" data-act="later-item" data-si="${si}" data-key="${esc(it.key)}" aria-pressed="${later}">${later ? ICON.laterOn : ICON.later}<span>Más tarde</span></button>
-          ${langSwitchHTML(s, langsOf(it.eps).length > 1 ? langsOf(it.eps) : null)}
-        </div>
-      </section>
+          ${squareBtn(`data-act="later-item" data-si="${si}" data-key="${esc(it.key)}" aria-pressed="${later}"`, 'Más tarde', later ? ICON.laterOn : ICON.later, later)}`,
+      })}
+      ${aboutHTML(syn, m && !hasSpanish(m) && m.synopsis && canTranslate() ? `<button class="link-btn" data-act="translate" data-key="${esc(it.key)}">Traducir sinopsis al español</button>` : '')}
       ${
         it.eps.length > 1
           ? `<section class="ep-section">
