@@ -1276,7 +1276,7 @@ html.kai-fs-on .watch-list, html:has(.stage:fullscreen) .watch-list { visibility
 @media (hover: hover) { .tv-facts .fact:hover { color: var(--text); background: none; transform: none; } }
 
 /* ── cabecera del inicio: "Kai", el saludo y la búsqueda ── */
-.tv-top { align-items: center; padding: calc(env(safe-area-inset-top) + 12px) clamp(16px, 4vw, 56px) 6px; }
+.tv-top { align-items: center; padding: calc(env(safe-area-inset-top) + 2px) clamp(16px, 4vw, 56px) 4px; }
 .tv-brand { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
 .tv-word { position: relative; font: 700 26px/1 var(--font-display); letter-spacing: -0.035em; }
 .tv-greet { margin: 0; font-size: 13px; font-weight: 500; letter-spacing: 0; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1454,28 +1454,35 @@ html.lite .dock-bar { background: var(--glass-solid); }
 /* el texto de un botón siempre en una línea: si no entra ("Ver Shingeki no Kyojin Kuinaki Sentaku"), termina en … */
 .tv-btn > span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-/* ── tema claro: la portada es una isla oscura (como en las apps de Apple) ──
- * Fundir la imagen hacia el fondo claro la lavaba y "Kai" se perdía sobre imágenes claras. En el tema claro la
- * portada es una tarjeta redondeada con su propio degradado oscuro y el texto en blanco; la cabecera queda
- * arriba, sobre el fondo claro, en texto oscuro. El tema oscuro sigue a sangre. */
-[data-theme='light'] .tv.is-home .tv-top { position: relative; color: var(--text); text-shadow: none; }
-[data-theme='light'] .tv.is-home .tv-greet { color: var(--dim); }
-[data-theme='light'] .tv.is-home .tv-top .tv-icon { background: var(--btn); color: var(--text); }
-[data-theme='light'] .tv.is-home .tv-hero {
+/* ── la portada es una isla oscura (como en las apps de Apple), igual en los dos temas ──
+ * Fundir la imagen hacia el fondo la lavaba en el tema claro y "Kai" se perdía sobre imágenes claras. La portada
+ * es una tarjeta redondeada con su propio degradado oscuro y el texto en blanco; la cabecera queda arriba, sobre
+ * el fondo de la página, sin nada detrás (ni el brillo del color de la serie). */
+.tv.is-home .tv-top { position: relative; color: var(--text); text-shadow: none; }
+.tv.is-home .tv-greet { color: var(--dim); }
+.tv.is-home .tv-top .tv-icon { background: var(--btn); color: var(--text); }
+.tv.is-home .tv-hero {
   margin: 6px 0 22px; border-radius: 28px; overflow: hidden; background: #0e0e10; color: #fff;
   min-height: min(68svh, 600px); padding: 140px 20px 20px;
 }
-[data-theme='light'] .tv.is-home .hero-art::before { display: none; }
-[data-theme='light'] .tv.is-home .hero-art::after { background: linear-gradient(180deg, transparent 0%, transparent 38%, rgba(0, 0, 0, 0.55) 68%, rgba(0, 0, 0, 0.88) 100%); }
-[data-theme='light'] .tv.is-home .tv-hero .tv-alt,
-[data-theme='light'] .tv.is-home .tv-hero .tv-facts,
-[data-theme='light'] .tv.is-home .tv-hero .tv-facts span,
-[data-theme='light'] .tv.is-home .tv-hero .tv-facts .fact { color: rgba(255, 255, 255, 0.72); }
-[data-theme='light'] .tv.is-home .tv-hero .tv-facts > * + *::before { color: rgba(255, 255, 255, 0.4); }
-[data-theme='light'] .tv.is-home .tv-hero .tv-synopsis { color: rgba(255, 255, 255, 0.75); }
-[data-theme='light'] .tv.is-home .tv-hero .tv-btn { background: rgba(255, 255, 255, 0.18); color: #fff; }
-[data-theme='light'] .tv.is-home .tv-hero .tv-btn.is-primary { background: #fff; color: #000; }
+.tv.is-home .hero-art::before { display: none; }
+.tv.is-home .hero-art::after { background: linear-gradient(180deg, transparent 0%, transparent 38%, rgba(0, 0, 0, 0.55) 68%, rgba(0, 0, 0, 0.88) 100%); }
+.tv.is-home .tv-hero .tv-alt,
+.tv.is-home .tv-hero .tv-facts,
+.tv.is-home .tv-hero .tv-facts span,
+.tv.is-home .tv-hero .tv-facts .fact { color: rgba(255, 255, 255, 0.72); }
+.tv.is-home .tv-hero .tv-facts > * + *::before { color: rgba(255, 255, 255, 0.4); }
+.tv.is-home .tv-hero .tv-synopsis { color: rgba(255, 255, 255, 0.75); }
+.tv.is-home .tv-hero .tv-btn { background: rgba(255, 255, 255, 0.18); color: #fff; }
+.tv.is-home .tv-hero .tv-btn.is-primary { background: #fff; color: #000; }
 @media (min-width: 900px) {
-  [data-theme='light'] .tv.is-home .tv-hero { margin: 4px 0 24px; padding: 70px 40px 34px; min-height: clamp(440px, 60vh, 600px); }
-  [data-theme='light'] .tv.is-home .hero-art::after { background: linear-gradient(180deg, transparent 0%, transparent 55%, rgba(14, 14, 16, 0.9) 100%); }
+  .tv.is-home .tv-hero { margin: 4px 0 24px; padding: 70px 40px 34px; min-height: clamp(440px, 60vh, 600px); }
+  .tv.is-home .hero-art::after { background: linear-gradient(180deg, transparent 0%, transparent 55%, rgba(14, 14, 16, 0.9) 100%); }
 }
+
+/* en el oscuro, un borde finito separa la tarjeta del fondo negro */
+[data-theme='dark'] .tv.is-home .tv-hero { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08); }
+/* en el inicio no hay brillo arriba: quedaba detrás de "Kai" y la lupa */
+body:has(.tv.is-home) .ambient { display: none; }
+/* Kai, el gatito: una sombra oscura suave para que se despegue de la imagen (es claro y se veía con borde blanco) */
+.kcat-sit img { filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.55)); }
