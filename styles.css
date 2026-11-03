@@ -1300,11 +1300,16 @@ html.kai-fs-on .watch-list, html:has(.stage:fullscreen) .watch-list { visibility
   content: ''; position: absolute; inset: 0;
   background: linear-gradient(180deg, transparent 0%, transparent 44%, color-mix(in srgb, var(--bg) 80%, transparent) 76%, var(--bg) 100%);
 }
-/* la imagen llega arriba sin oscurecer: el saludo y los botones de arriba se leen con una sombra suave */
-.tv.is-home .tv-top { text-shadow: 0 1px 10px rgba(0, 0, 0, 0.45); }
-.tv.is-home .tv-greet { color: color-mix(in srgb, var(--text) 82%, transparent); }
-[data-theme='dark'] .tv.is-home .tv-top .tv-icon { background: rgba(0, 0, 0, 0.32); }
-[data-theme='light'] .tv.is-home .tv-top { text-shadow: 0 1px 10px rgba(255, 255, 255, 0.6); }
+/* La imagen llega arriba sin oscurecer. Lo que va encima (Kai, el saludo, la lupa) va siempre en blanco con una
+ * sombra suave, en los dos temas: la imagen puede ser clara u oscura, y así se lee sobre cualquiera. */
+.tv.is-home .tv-top { color: #fff; text-shadow: 0 1px 12px rgba(0, 0, 0, 0.55); }
+.tv.is-home .tv-greet { color: rgba(255, 255, 255, 0.85); }
+.tv.is-home .tv-top .tv-icon { background: rgba(0, 0, 0, 0.3); color: #fff; }
+/* solo detrás de la hora y la batería del teléfono, un degradado finito para que se lean sobre la imagen */
+.tv.is-home .hero-art::before {
+  content: ''; position: absolute; z-index: 1; left: 0; right: 0; top: 0; height: calc(env(safe-area-inset-top) + 18px);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--bg) 70%, transparent), transparent);
+}
 .tv.is-home .tvh-text { max-width: 620px; }
 .tv.is-home .tv-title { font: 700 clamp(30px, 8.4vw, 40px)/1.05 var(--font-display); letter-spacing: -0.03em; text-shadow: none; }
 .tv.is-home .tv-alt { margin-top: 6px; font-size: 14px; }
@@ -1445,3 +1450,6 @@ html.lite .dock-bar { background: var(--glass-solid); }
   .dock.is-compact .dock-btn { width: 40px; height: 40px; }
   .dock.is-compact .dock-btn .dock-avatar { width: 30px; height: 30px; font-size: 13px; }
 }
+
+/* el texto de un botón siempre en una línea: si no entra ("Ver Shingeki no Kyojin Kuinaki Sentaku"), termina en … */
+.tv-btn > span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
