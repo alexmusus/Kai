@@ -165,9 +165,11 @@ export function renderSeries(arg) {
   } catch {
     /* nada */
   }
-  const fli = focusId && app.querySelector(`.ep[data-id="${CSS.escape(focusId)}"]`);
-  if (fli)
+  if (focusId)
     requestAnimationFrame(() => {
+      // se busca aquí y no antes: el enrutador puede haber vuelto a poner la página que ya estaba
+      const fli = app.querySelector(`.ep[data-id="${CSS.escape(focusId)}"]`);
+      if (!fli) return;
       fli.scrollIntoView({ block: 'center' });
       fli.classList.add('is-flash');
     });

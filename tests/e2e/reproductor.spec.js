@@ -125,3 +125,39 @@ test('quitar un capítulo y quitar todas las descargas preguntan con la hoja de 
   }))).toBe(0);
   expect(k.errors).toEqual([]);
 });
+
+test('deslizar hacia abajo en el video pasa al mini reproductor, y tocar el mini vuelve al reproductor', async ({ page }, info) => {
+  test.skip(info.project.name !== 'iphone', 'gesto táctil');
+  const k = await openWithDownloads(page, '#/serie/' + 0);
+  const dor = k.si('Dorohedoro');
+  await page.evaluate((h) => { location.hash = h; }, `#/serie/${dor}`);
+  await page.waitForTimeout(200);
+  await page.evaluate((id) => { location.hash = '#/play/' + id; }, k.eps[0].id);
+  await expect.poll(() => page.evaluate(() => document.querySelector('#video').readyState), { timeout: 10000 }).toBeGreaterThan(1);
+  await page.evaluate(() => { const v = document.querySelector('#video'); v.muted = true; return v.play(); });
+  // el dedo baja 160 px desde el centro del video, en varios pasos
+  await page.evaluate(async () => {
+    const tap = document.querySelector('#st-tap');
+    const r = tap.getBoundingClientRect();
+    const x = r.left + r.width / 2;
+    const y0 = r.top + r.height / 3;
+    const ev = (type, y) => tap.dispatchEvent(new PointerEvent(type, { pointerId: 7, pointerType: 'touch', isPrimary: true, clientX: x, clientY: y, bubbles: true }));
+    ev('pointerdown', y0);
+    for (let d = 10; d <= 160; d += 15) {
+      ev('pointermove', y0 + d);
+      await new Promise((res) => requestAnimationFrame(res));
+    }
+    ev('pointerup', y0 + 160);
+  });
+  await expect(page).toHaveURL(new RegExp(`#/serie/${dor}$`));
+  await expect(page.locator('#mini')).toBeVisible();
+  // sin restos del gesto en el video
+  expect(await page.evaluate(() => document.querySelector('#stage').style.transform)).toBe('');
+  expect(await page.evaluate(() => document.querySelector('#video').paused)).toBe(false);
+  // tocar el mini vuelve al reproductor grande, entrando con su animación
+  await page.locator('#mini .mini-open').click();
+  await expect(page).toHaveURL(/#\/play\//);
+  await expect(page.locator('#stage-slot.is-from-mini')).toHaveCount(1);
+  await expect(page.locator('#mini')).toBeHidden();
+  expect(k.errors).toEqual([]);
+});

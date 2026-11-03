@@ -27,6 +27,10 @@ export function enterMini() {
   closeMenu();
   const slot = $('#mini-slot');
   if (stage.parentElement !== slot) slot.prepend(stage);
+  // lo que le dejó el gesto de deslizar hacia abajo
+  stage.style.transition = '';
+  stage.style.transform = '';
+  stage.style.opacity = '';
   stage.classList.add('is-mini');
   stage.hidden = false;
   mini.hidden = false;

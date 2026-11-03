@@ -52,7 +52,7 @@ decide. ESLint lo revisa (`no-restricted-imports`).
 
 | Controlador | De qué se encarga |
 |---|---|
-| `router.js` | qué página se dibuja, historial de "volver", scroll al volver; el reproductor se registra con `setPlayer` |
+| `router.js` | qué página se dibuja, historial de "volver", scroll al volver; las partes que salen iguales a las de antes se reusan (no parpadean); el reproductor se registra con `setPlayer` |
 | `actions.js` | los botones (`data-act`): una tabla nombre → función; las del reproductor las atiende `player/` |
 | `home.js` | portada estilo TV: destacado al pasar o enfocar un mosaico, flechas como control remoto |
 | `lifecycle.js` | dirección, conexión, segundo plano y cierre: guardar y sincronizar a tiempo |
@@ -82,6 +82,16 @@ Fuera de las capas:
 `models/store.js` tiene el estado compartido (`state`) y el índice de capítulos (`index`). Son objetos únicos:
 se cambian sus campos, nunca se reemplazan (`setIndex` cambia el contenido del índice). La forma de los datos
 (`Episode`, `Season`, `Series`, `Library`, `Progress`…) está en `models/types.js`.
+
+## Fluidez
+
+- Volver atrás se dibuja en `popstate` (no en `hashchange`): así el gesto de volver del iPhone no muestra un cuadro
+  de la página que se deja.
+- Después de dibujar una página, cada parte idéntica a la que ya había en esa dirección se cambia por la de antes
+  (`reuseIfSame` en `router.js`): lo ya pintado no se vuelve a pintar.
+- Nada de desenfoque (`backdrop-filter`) en lo que se repite en listas (cada capítulo, cada póster).
+- `html.lite` (teléfonos con 4 GB o menos, `views/theme.js`): sin desenfoques ni fondo en movimiento.
+- Los gestos miden el video una vez al tocar y lo mueven una vez por cuadro (`requestAnimationFrame`).
 
 ## Reglas que no se rompen
 

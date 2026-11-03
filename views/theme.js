@@ -16,6 +16,11 @@ const isFullscreen = () =>
     ($('#stage') && $('#stage').classList.contains('kai-fs'))
   );
 
+/* Teléfonos de gama media (4 GB de memoria o menos; solo Chrome y Android lo dicen): sin desenfoques ni fondo en
+ * movimiento. Se ve casi igual y la tarjeta gráfica no tiene que recalcular el vidrio en cada animación. */
+const nav = /** @type {Navigator & { deviceMemory?: number }} */ (navigator);
+if (nav.deviceMemory && nav.deviceMemory <= 4) document.documentElement.classList.add('lite');
+
 const darkMQ = matchMedia('(prefers-color-scheme: dark)');
 export function resolvedTheme() {
   const t = state.settings.theme;

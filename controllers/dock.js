@@ -14,6 +14,7 @@ import { quotaText } from '../views/quota.js';
 
 export const dock = $('#dock');
 
+let dockHtml = '';
 export function paintDock() {
   const v = route().view;
   const show = !!(LS.get('session', null) && state.profile && v !== 'perfiles');
@@ -24,7 +25,12 @@ export function paintDock() {
   }
   const p = visibleProfiles().find((x) => x.id === state.profile.id) || state.profile;
   const btn = dock.querySelector('.dock-btn');
-  btn.innerHTML = `${avatarHTML(p, 'dock-avatar')}<span class="dock-top" aria-hidden="true">${ICON.top}</span><span class="dock-ring" aria-hidden="true"></span><span class="dock-state" aria-hidden="true"></span>`;
+  // se llama en cada cambio de página: solo se rehace si cambió el perfil (rehacerlo igual lo hacía parpadear)
+  const html = `${avatarHTML(p, 'dock-avatar')}<span class="dock-top" aria-hidden="true">${ICON.top}</span><span class="dock-ring" aria-hidden="true"></span><span class="dock-state" aria-hidden="true"></span>`;
+  if (dockHtml !== html) {
+    btn.innerHTML = html;
+    dockHtml = html;
+  }
   btn.dataset.name = p.name;
   paintSync();
   paintNewsDot();
