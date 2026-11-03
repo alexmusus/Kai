@@ -81,7 +81,10 @@ addEventListener(
   },
   { passive: true },
 );
-if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+/* Volver la deja el navegador ('auto') y Kai repite lo mismo por si no llegó. Con 'manual' (hasta la entrega 14),
+ * Safari quitaba la foto del deslizar antes de dibujar la página en su lugar, y al volver al inicio desde abajo se
+ * veía la pantalla en blanco o negro un momento. */
+if ('scrollRestoration' in history) history.scrollRestoration = 'auto';
 export function onHashChange() {
   const r = nav.arrive(location.hash || '#/', markedPos(), navReplacing);
   navReplacing = false;
@@ -98,8 +101,11 @@ export function go(hash) {
   else render();
 }
 export function goHome() {
+  // ya en el inicio: Inicio lleva arriba (como en las apps de Apple)
   if (navPage(location.hash) === '#/' || !location.hash) {
-    render();
+    if (window.scrollY > 0)
+      window.scrollTo({ top: 0, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    else render();
     return;
   }
   // si el inicio está en el historial, se vuelve a él; si no, se va directo

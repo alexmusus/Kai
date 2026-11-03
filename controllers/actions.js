@@ -319,7 +319,7 @@ const ACTIONS = {
     const box = el.closest('.resume-card');
     const open = !box.classList.contains('is-open');
     box.classList.toggle('is-open', open);
-    el.setAttribute('aria-expanded', String(open));
+    box.querySelector('.resume-pill')?.setAttribute('aria-expanded', String(open));
   },
   'resume-dismiss': dismissResume,
 
@@ -333,10 +333,9 @@ const ACTIONS = {
   'movie-dl': (el) => movieAction(el, false),
   'series-dl': downloadNextOfSeries,
   'pick-mode': () => (viewState.picking ? endPicking() : startPicking(Number(route().arg.split('/')[1]) || 0)),
-  'pick-all': () => pickAction('pick-all'),
+  'pick-seen': () => pickAction('pick-seen'),
   'pick-unseen': () => pickAction('pick-unseen'),
   'pick-dl': () => pickAction('pick-dl'),
-  'pick-seen': () => pickAction('pick-seen'),
   translate: translateSynopsis,
   'tmdb-del': () => {
     setTmdbKey('');

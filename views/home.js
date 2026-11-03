@@ -224,7 +224,8 @@ export function resumeCardHTML() {
   const title = isCollection(o.s) ? episodeLabel(o.ep) : `${o.s.name} · ${episodeLabel(o.ep)}`;
   const dn = o.n.dn || 'otro dispositivo';
   // una burbuja flotante, como una notificación: tocarla la abre con el detalle y "Seguir aquí"
-  return `<aside class="resume-card" aria-label="Seguir en este dispositivo">
+  // toda la burbuja se toca (no solo el texto): abre o cierra el detalle; los botones de adentro hacen lo suyo
+  return `<aside class="resume-card" data-act="resume-toggle" aria-label="Seguir en este dispositivo">
     <button class="resume-pill" data-act="resume-toggle" aria-expanded="false">${ICON.play}<span>Seguir de tu ${esc(dn)} · ${fmtTime(o.n.t)}</span></button>
     <div class="resume-more"><div class="resume-in">
       <p class="resume-kicker">En tu ${esc(dn)}, ${when}</p>

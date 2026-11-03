@@ -47,7 +47,7 @@ export function applyTheme() {
   else delete document.documentElement.dataset.dark;
   paintThemeColor();
   emit('theme');
-  document.querySelectorAll('[data-act="theme"]:not(.dock-chip)').forEach((b) => {
+  document.querySelectorAll('[data-act="theme"]:not(.dock-item)').forEach((b) => {
     b.innerHTML = t === 'dark' ? ICON.sun : ICON.moon;
     b.setAttribute('aria-label', `Cambiar a tema ${t === 'dark' ? 'claro' : 'oscuro'}`);
   });
