@@ -1226,3 +1226,196 @@ html.lite #app { transition: none; }
 html.kai-fs-on .ambient, html:has(.stage:fullscreen) .ambient,
 html.kai-fs-on .watch-info, html:has(.stage:fullscreen) .watch-info,
 html.kai-fs-on .watch-list, html:has(.stage:fullscreen) .watch-list { visibility: hidden; }
+
+/* ═════════════════════════ Kai 39 · diseño A (estilo Apple TV) ═════════════════════════
+ * Fondo neutro con un solo brillo del color de la serie, la imagen manda, datos en una línea sin pastillas,
+ * botones lisos (sin vidrio ni borde) y una barra flotante con las páginas principales. Pisa lo de arriba;
+ * lo que quede sin uso se limpia cuando el rediseño esté completo. */
+
+[data-theme='dark'] { --btn: rgba(255, 255, 255, 0.13); --btn-hover: rgba(255, 255, 255, 0.2); }
+[data-theme='dark']:not([data-dark='gris']) {
+  --bg: #000; --text: #f5f5f7; --dim: #98989f; --faint: #6c6c72; --line: rgba(255, 255, 255, 0.1);
+  --glass-solid: rgba(28, 28, 31, 0.94); --glass-strong: rgba(28, 28, 31, 0.78); --thumb-bg: #1c1c1f;
+}
+[data-theme='light'] { --btn: rgba(0, 0, 0, 0.06); --btn-hover: rgba(0, 0, 0, 0.1); }
+
+/* fondo: un solo brillo suave arriba, del color de la serie de la portada; sin manchas que se mueven */
+.ambient::after { display: none; }
+[data-theme] .ambient::before {
+  inset: 0; animation: none; will-change: auto; transition: none;
+  background: radial-gradient(110vmax 62vmax at 50% -20%, color-mix(in srgb, var(--tint, transparent) 34%, transparent), transparent 70%);
+}
+[data-theme='light'] .ambient::before { background: radial-gradient(110vmax 62vmax at 50% -20%, color-mix(in srgb, var(--tint, transparent) 22%, transparent), transparent 70%); }
+
+/* botones: lisos, del mismo alto, sin vidrio */
+.tv-btn {
+  height: 48px; padding: 0 20px; gap: 8px; border-radius: 12px; border: 0; font-size: 16px; font-weight: 600;
+  background: var(--btn); box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+.tv-btn svg { width: 20px; height: 20px; }
+.tv-btn.is-primary { background: var(--primary); color: var(--primary-ink); }
+.tv-btn.is-square, .tv-btn.is-icon { width: 48px; padding: 0; justify-content: center; flex: none; }
+@media (hover: hover) { .tv-btn:hover { transform: none; background: var(--btn-hover); } .tv-btn.is-primary:hover { background: var(--primary); opacity: 0.88; } }
+.tv-btn:focus-visible { transform: none; box-shadow: 0 0 0 3px var(--accent); }
+.tv-icon { width: 38px; height: 38px; background: var(--btn); box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+.tv-icon svg { width: 18px; height: 18px; }
+.tv-more { height: auto; padding: 0; border: 0; background: none; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; color: var(--dim); font-weight: 500; }
+.tv-more svg { display: none; }
+.tv-more::after { content: '›'; margin-left: 4px; font-size: 18px; line-height: 1; }
+
+/* datos en una línea: "2014 · Serie · 19 capítulos · Comedia" (los que llevan al catálogo siguen siendo enlaces) */
+.tv-facts { gap: 0; margin-top: 8px; font-size: 14px; line-height: 1.5; color: var(--dim); }
+.tv-facts span, .tv-facts .fact {
+  padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none;
+  font-size: inherit; font-weight: 500; color: var(--dim);
+}
+.tv-facts > * + *::before { content: '·'; margin: 0 7px; color: var(--faint); }
+.tv-facts .fact-sep { display: none; }
+.tv-facts .fact-sep + *::before { content: '·'; }
+.tv-facts .tv-new { color: var(--accent); background: none; }
+@media (hover: hover) { .tv-facts .fact:hover { color: var(--text); background: none; transform: none; } }
+
+/* ── cabecera del inicio: "Kai", el saludo y la búsqueda ── */
+.tv-top { align-items: center; padding: calc(env(safe-area-inset-top) + 12px) clamp(16px, 4vw, 56px) 6px; }
+.tv-brand { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.tv-word { position: relative; font: 700 26px/1 var(--font-display); letter-spacing: -0.035em; }
+.tv-greet { margin: 0; font-size: 13px; font-weight: 500; letter-spacing: 0; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (min-width: 900px) {
+  /* Kai, el gatito, echado sobre el nombre de la app */
+  .tv.is-home .tv-top { padding-top: calc(env(safe-area-inset-top) + 40px); }
+  .tv-word .kcat-sit.is-top { min-width: 92px; width: 92px; bottom: calc(100% - 7px); }
+}
+
+/* ── portada del inicio: la imagen de la serie a sangre y el texto encima ── */
+.tv.is-home .tv-top { position: absolute; z-index: 4; top: 0; left: 0; right: 0; }
+.tv.is-home .tv-main { padding-top: 0; }
+.tv.is-home .tv-hero {
+  position: relative; isolation: isolate; display: flex; flex-direction: column; justify-content: flex-end; align-items: stretch; gap: 0;
+  max-width: none; min-height: min(78svh, 660px); margin: 0 calc(-1 * clamp(16px, 4vw, 56px)) 8px;
+  padding: calc(env(safe-area-inset-top) + 110px) clamp(16px, 4vw, 56px) 4px;
+}
+.hero-art { position: absolute; inset: 0; z-index: -1; overflow: hidden; background: var(--thumb-bg); }
+.hero-art img, .hero-art [data-thumb], .hero-art [data-thumb] img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 20%; }
+.hero-art::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--bg) 50%, transparent) 0%, transparent 18%, transparent 40%, color-mix(in srgb, var(--bg) 80%, transparent) 74%, var(--bg) 100%);
+}
+.tv.is-home .tvh-text { max-width: 620px; }
+.tv.is-home .tv-title { font: 700 clamp(30px, 8.4vw, 40px)/1.05 var(--font-display); letter-spacing: -0.03em; text-shadow: none; }
+.tv.is-home .tv-alt { margin-top: 6px; font-size: 14px; }
+.tv.is-home .tv-synopsis { display: none; }
+.tv.is-home .tv-actions { margin-top: 18px; gap: 10px; flex-wrap: nowrap; }
+.tv.is-home .tv-actions .tv-btn.is-primary { flex: 1; justify-content: center; }
+.tv.is-home .kcat-sit.is-title { --kh: 64px; }
+@media (min-width: 900px) {
+  /* PC: la imagen entra por la derecha y se funde hacia el texto (en vez del póster y el espacio vacío) */
+  .tv.is-home .tv-hero { min-height: clamp(480px, 66vh, 640px); padding: 150px clamp(16px, 4vw, 56px) 30px; margin-bottom: 18px; }
+  .hero-art { left: auto; width: 74%; -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 42%); mask-image: linear-gradient(to right, transparent 0%, #000 42%); }
+  .hero-art img { object-position: center 30%; }
+  .hero-art::after { background: linear-gradient(180deg, color-mix(in srgb, var(--bg) 35%, transparent) 0%, transparent 25%, transparent 60%, var(--bg) 100%); }
+  .tv.is-home .tvh-text { max-width: 540px; }
+  .tv.is-home .tv-title { font-size: clamp(40px, 4.4vw, 62px); }
+  .tv.is-home .tv-title.is-long { font-size: clamp(34px, 3.6vw, 50px); }
+  .tv.is-home .tv-title.is-xlong { font-size: clamp(30px, 3vw, 42px); }
+  .tv.is-home .tv-synopsis { display: -webkit-box; -webkit-line-clamp: 3; margin-top: 12px; font-size: 15px; color: var(--dim); }
+  .tv.is-home .tv-actions .tv-btn.is-primary { flex: none; }
+}
+
+/* "Seguir aquí lo que quedó a medias": debajo de la portada en el teléfono; en la PC, arriba a la derecha */
+.tv.is-home .resume-card { background: var(--glass-solid); -webkit-backdrop-filter: none; backdrop-filter: none; }
+@media (min-width: 900px) { .tv.is-home .resume-card { top: calc(env(safe-area-inset-top) + 76px); } }
+
+/* ── filas: la imagen arriba y el texto debajo, sin velos ni vidrio ── */
+.tv-row-title { font: 700 20px/1.2 var(--font-display); letter-spacing: -0.015em; }
+.tile {
+  display: grid; grid-template-rows: auto auto; gap: 8px; aspect-ratio: auto; overflow: visible; border-radius: 0;
+  background: none; border: 0; box-shadow: none;
+}
+.tile::after { display: none; }
+.tile-img {
+  position: relative; inset: auto; grid-area: 1 / 1; width: 100%; height: auto; aspect-ratio: 16 / 9; border-radius: 12px; overflow: hidden;
+  background: linear-gradient(160deg, hsl(var(--h) 14% 30%), hsl(var(--h) 12% 16%));
+}
+.tile > .tile-badge {
+  position: static; grid-area: 1 / 1; align-self: start; justify-self: start; margin: 8px; padding: 4px 8px; border-radius: 6px; border: 0;
+  font-size: 11px; background: rgba(0, 0, 0, 0.6); -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+.tile > .tile-bar { position: relative; inset: auto; grid-area: 1 / 1; align-self: end; margin: 0 10px 10px; height: 3px; border-radius: 3px; overflow: hidden; background: rgba(255, 255, 255, 0.3); }
+.tile-text { position: static; grid-area: 2 / 1; color: var(--text); gap: 2px; }
+.tile-title { font: 600 15px/1.25 var(--font); letter-spacing: -0.005em; text-shadow: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tile-sub { color: var(--dim); font-size: 13px; margin: 0; }
+@media (hover: hover) { .tile:hover { transform: none; } .tile:hover .tile-img { filter: brightness(1.08); } }
+.tile:focus-visible { transform: none; box-shadow: none; }
+.tile:focus-visible .tile-img { outline: 3px solid var(--accent); outline-offset: 2px; }
+@media (max-width: 520px) {
+  .tiles.is-grid .tile-title { font-size: 14px; }
+  .tiles.is-grid .tile-sub { font-size: 12px; }
+}
+/* pósters: sin marco ni sombra grande */
+.shelf-poster { border-radius: 10px; border: 0; box-shadow: none; }
+.lang-chip { top: auto; bottom: 6px; right: auto; left: 6px; padding: 3px 5px; border-radius: 4px; border: 0; font-size: 9px; }
+
+/* ── barra flotante: las páginas principales y tu perfil ── */
+.dock { left: 50%; right: auto; transform: translateX(-50%); bottom: calc(8px + env(safe-area-inset-bottom)); display: block; }
+.dock-bar {
+  display: flex; align-items: center; gap: 2px; padding: 5px; border-radius: 30px;
+  background: color-mix(in srgb, var(--glass-solid) 70%, transparent); border: 1px solid var(--glass-edge);
+  box-shadow: inset 0 1px 0 var(--glass-hi), 0 14px 34px rgba(0, 0, 0, 0.35);
+  -webkit-backdrop-filter: blur(18px) saturate(180%); backdrop-filter: blur(18px) saturate(180%);
+}
+.dock-tabs { display: flex; gap: 2px; }
+.dock-tab {
+  position: relative; display: grid; justify-items: center; align-content: center; gap: 3px; width: 66px; height: 52px; border-radius: 24px;
+  color: var(--dim); font: 600 10px/1 var(--font); transition: background-color 0.15s, color 0.15s;
+}
+.dock-tab svg { width: 23px; height: 23px; }
+.dock-tab.is-on { color: var(--text); background: var(--btn); }
+.dock-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.dock-badge { position: absolute; top: 5px; left: calc(50% + 5px); min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--primary); color: var(--primary-ink); font: 700 10px/16px var(--font); text-align: center; }
+.dock-badge:empty { display: none; }
+.dock-tab.has-news::after { content: ''; position: absolute; top: 8px; left: calc(50% + 8px); width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+.dock-btn { width: 52px; height: 52px; opacity: 1; background: none; border: 0; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+.dock-btn .dock-avatar { width: 34px; height: 34px; font-size: 15px; }
+@media (hover: hover) { .dock-btn:hover { transform: none; } .dock-tab:hover { color: var(--text); } }
+body.is-playing:not(:has(.dock.is-open)) .dock-btn { opacity: 1; }
+.dock-panel { position: absolute; right: 0; bottom: calc(100% + 10px); transform-origin: bottom right; }
+html.lite .dock-bar { background: var(--glass-solid); }
+/* en el teléfono, la página del reproductor es solo el video: sin barra */
+@media (max-width: 899px) { body:has(main.watch) .dock { display: none; } }
+/* lo que flota abajo se acomoda sobre la barra (teléfono) */
+@media (max-width: 899px) {
+  body { padding-bottom: calc(76px + env(safe-area-inset-bottom)); }
+  .toast, .pick-bar { bottom: calc(80px + env(safe-area-inset-bottom)); }
+  .mini { bottom: calc(80px + env(safe-area-inset-bottom)); }
+  html.has-mini .dock { bottom: calc(8px + env(safe-area-inset-bottom)); }
+  html.has-mini .pick-bar, html.has-mini .toast { bottom: calc(86px + var(--mini-space) + env(safe-area-inset-bottom)); }
+  body:has(main.watch) { padding-bottom: 0; }
+  body:has(main.watch) .mini { bottom: calc(18px + env(safe-area-inset-bottom)); }
+}
+/* PC: la barra va arriba, al centro, con el texto al lado del ícono */
+@media (min-width: 900px) {
+  .dock { top: 14px; bottom: auto; }
+  html.has-mini .dock { bottom: auto; }
+  .dock-panel { top: calc(100% + 10px); bottom: auto; transform-origin: top right; }
+  .dock-tab { width: auto; height: 40px; padding: 0 14px; grid-auto-flow: column; gap: 8px; border-radius: 20px; font-size: 14px; font-weight: 500; }
+  .dock-tab svg { width: 18px; height: 18px; }
+  .dock-badge { position: static; }
+  .dock-tab.has-news::after { top: 8px; left: auto; right: 6px; }
+  .dock-btn { width: 40px; height: 40px; }
+  .dock-btn .dock-avatar { width: 30px; height: 30px; font-size: 13px; }
+}
+
+/* la barra se achica al bajar (teléfono): queda la pestaña actual y tu perfil; al subir o tocarla vuelve */
+@media (max-width: 899px) {
+  .dock-bar { transition: padding 0.28s cubic-bezier(0.2, 0.8, 0.2, 1); }
+  .dock-tab, .dock-btn { transition: width 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), height 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.18s, background-color 0.15s, color 0.15s; }
+  .dock-tab span { transition: opacity 0.15s; }
+  .dock.is-compact .dock-bar { padding: 4px; }
+  .dock.is-compact .dock-tab { height: 40px; }
+  .dock.is-compact .dock-tab:not(.is-on) { width: 0; opacity: 0; overflow: hidden; pointer-events: none; }
+  .dock.is-compact .dock-tab.is-on { width: 48px; }
+  .dock.is-compact .dock-tab span { opacity: 0; height: 0; overflow: hidden; }
+  .dock.is-compact .dock-tabs { gap: 0; }
+  .dock.is-compact .dock-btn { width: 40px; height: 40px; }
+  .dock.is-compact .dock-btn .dock-avatar { width: 30px; height: 30px; font-size: 13px; }
+}

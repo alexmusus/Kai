@@ -8,16 +8,7 @@ import { app } from './components.js';
 import { movieHref } from '../lib/route.js';
 import { state } from '../models/store.js';
 import { esc, $, fmtLeft, plural, fmtTime } from '../lib/util.js';
-import {
-  catHTML,
-  collageHTML,
-  titleSize,
-  factsHTML,
-  setTint,
-  tileHTML,
-  seriesPosterHTML,
-  moviePosterHTML,
-} from './components.js';
+import { catHTML, titleSize, factsHTML, setTint, tileHTML, seriesPosterHTML, moviePosterHTML } from './components.js';
 import { ICON } from './icons.js';
 import { displayMeta, synopsisOf, seriesColor } from '../models/fichas.js';
 import { heroPlan, shelfItems } from '../models/plans.js';
@@ -72,11 +63,9 @@ setInterval(() => {
 }, 20000);
 
 export function tvTop() {
+  // cabecera compacta: el nombre de la app (con Kai, el gatito, echado encima en la PC), el saludo y la búsqueda
   return `<header class="tv-top">
-    <div class="tv-when">
-      <p class="tv-greet" id="tv-greet">${esc(greeting())}</p>
-      <p class="tv-clock" id="tv-clock">${clockHTML()}</p>
-    </div>
+    <div class="tv-brand"><span class="tv-word">Kai${catHTML('top')}</span><p class="tv-greet" id="tv-greet">${esc(greeting())}</p></div>
     <div class="tv-top-tools">
       <button class="tv-icon" data-act="home-search" aria-label="Buscar" aria-expanded="false">${ICON.search}</button>
     </div>
@@ -88,27 +77,30 @@ export function tvTop() {
   </div>`;
 }
 
+/** La imagen grande de la portada: el póster en el teléfono (vertical) y el banner en la PC (ancho). */
+function heroArtHTML(s, m) {
+  const tall = m && ((m.collage && m.collage[0]) || m.cover);
+  const wide = m && m.banner;
+  if (tall || wide)
+    return `<div class="hero-art" aria-hidden="true"><picture>${wide ? `<source media="(min-width: 900px)" srcset="${esc(wide)}">` : ''}<img src="${esc(tall || wide)}" alt="" decoding="async"></picture></div>`;
+  const coverEp = s.all.find((e) => e.fa);
+  return coverEp
+    ? `<div class="hero-art is-thumb" aria-hidden="true"><span data-thumb="${esc(coverEp.id)}"></span></div>`
+    : '';
+}
+
 export function heroInnerHTML(s, si) {
   const m = displayMeta(s);
   const plan = heroPlan(s);
   const fresh = newEpisodes(s).length;
   const syn = synopsisOf(m);
-  const coverEp = s.all.find((e) => e.fa);
-  const poster =
-    m && m.collage && m.collage.length
-      ? `<a class="hero-poster is-collage" href="#/serie/${si}" aria-hidden="true" tabindex="-1">${collageHTML(m.collage)}</a>`
-      : m && m.cover
-        ? `<a class="hero-poster" href="#/serie/${si}" aria-hidden="true" tabindex="-1"><img src="${esc(m.cover)}" alt="" decoding="async"></a>`
-        : coverEp
-          ? `<a class="hero-poster is-thumb" href="#/serie/${si}" aria-hidden="true" tabindex="-1"><span data-thumb="${esc(coverEp.id)}"></span></a>`
-          : '';
-  return `${poster}<div class="tvh-text"><h2 class="tv-title${titleSize(s.name)}"><span class="tvt">${esc(s.name)}${catHTML('title')}</span></h2>
+  return `${heroArtHTML(s, m)}<div class="tvh-text"><h2 class="tv-title${titleSize(s.name)}"><span class="tvt">${esc(s.name)}${catHTML('title')}</span></h2>
     ${m && m.title && m.title.toLowerCase() !== s.name.toLowerCase() ? `<p class="tv-alt">${esc(m.title)}</p>` : ''}
     <p class="tv-facts">${factsHTML(s, m, fresh ? `<span class="tv-new">${fresh === 1 ? '1 nuevo' : `${fresh} nuevos`}</span>` : '')}</p>
     ${syn ? `<p class="tv-synopsis">${esc(syn.replace(/\s*\n+\s*/g, ' '))}</p>` : ''}
     <div class="tv-actions">
       ${plan.next ? `<a class="tv-btn is-primary" href="#/play/${encodeURIComponent(plan.next.id)}">${ICON.play}<span>${esc(plan.label)}</span></a>` : ''}
-      <a class="tv-btn" href="#/serie/${si}">${ICON.menu}<span>Episodios</span></a>
+      <a class="tv-btn is-square" href="#/serie/${si}" aria-label="Episodios" title="Episodios">${ICON.menu}</a>
     </div></div>`;
 }
 
@@ -169,8 +161,8 @@ export function renderHome() {
   app.innerHTML = `<div class="tv is-home">
     ${tvTop()}
     <main class="tv-main">
-      ${resumeCardHTML()}
       <section class="tv-hero" id="tv-hero">${heroInnerHTML(hs, viewState.heroSi)}</section>
+      ${resumeCardHTML()}
       <section class="tv-row" id="home-results" hidden></section>
       ${
         cont.length

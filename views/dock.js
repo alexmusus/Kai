@@ -26,10 +26,13 @@ export function paintSync() {
 
 export function paintDrawerCount() {
   const el = $('#dock-count');
-  if (el) el.textContent = state.saved.size || '';
+  if (el) el.textContent = state.saved.size ? String(state.saved.size) : '';
 }
 
 export function paintNewsDot() {
   const btn = $('#dock .dock-btn');
   if (btn) btn.classList.toggle('has-news', hasUnreadNews());
+  // las novedades se miran en Ajustes: su pestaña lleva el puntito
+  const tab = $('#dock .dock-tab[data-tab="ajustes"]');
+  if (tab) tab.classList.toggle('has-news', hasUnreadNews());
 }
