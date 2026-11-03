@@ -28,7 +28,7 @@ import { newsHTML, paintSeenByAll, renderSettings, paintCineKey, paintDownloadsW
 import { openDiscoverSheet } from '../views/discover.js';
 import { startPicking, endPicking, pickAction } from './picking.js';
 import { go, goHome, goBack, render, softRender } from './router.js';
-import { paintDock, toggleDock } from './dock.js';
+import { paintDock, toggleDock, dockUp } from './dock.js';
 import { sync, syncing, refreshLibrary, setLater } from './sync.js';
 import { selectProfile } from './account.js';
 import { queueDownload, pickFolder, dropFolder } from './downloads.js';
@@ -286,6 +286,7 @@ const ACTIONS = {
 
   // navegación
   dock: () => toggleDock(),
+  'dock-up': () => dockUp(),
   back: () => goBack(P.playing ? P.playing.ctx.back : '#/'),
   home: () => goHome(),
   'home-search': () => {

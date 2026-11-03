@@ -434,25 +434,33 @@ test('abrir Kai sin # (como la app instalada) deja el inicio en "#/", igual que 
   expect(k.errors).toEqual([]);
 });
 
-test('la barra flotante se achica al bajar y vuelve al subir o al tocarla', async ({ page }, info) => {
+test('la barra flotante se achica al bajar, se queda así hasta tocarla y la burbuja sube', async ({ page }, info) => {
   test.skip(info.project.name !== 'iphone', 'solo en el teléfono');
   const k = await openKai(page, '#/');
   await page.waitForTimeout(600);
   const dock = page.locator('#dock');
-  await page.mouse.wheel(0, 0); // nada
   await page.evaluate(() => window.scrollTo(0, 600));
   await expect(dock).toHaveClass(/is-compact/);
-  await page.screenshot({ path: '/tmp/claude-0/-home-user-Kai/2a50527b-117a-5251-8346-343e47b047cb/scratchpad/new/compact.jpg', type: 'jpeg', quality: 80 });
+  await expect(page.locator('#dock .dock-btn')).toHaveCSS('opacity', '0'); // sin tu perfil, solo la pestaña
   // tocarla achicada solo la agranda: no navega
   await page.locator('#dock .dock-tab.is-on').click();
   await expect(dock).not.toHaveClass(/is-compact/);
   await expect(page).toHaveURL(/#\/$/);
-  // bajar otra vez la achica; subir la agranda
+  // bajar otra vez la achica; subir (el rebote del final) ya no la agranda
   await page.waitForTimeout(1300);
-  await page.evaluate(() => window.scrollTo(0, 1200));
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
   await expect(dock).toHaveClass(/is-compact/);
-  await page.evaluate(() => window.scrollTo(0, 300));
+  await page.evaluate(() => window.scrollBy(0, -200));
+  await page.waitForTimeout(200);
+  await expect(dock).toHaveClass(/is-compact/);
+  // lejos del principio, la burbuja de subir
+  const up = page.locator('#dock .dock-up');
+  await expect(up).toHaveCSS('opacity', '1');
+  await page.screenshot({ path: '/tmp/claude-0/-home-user-Kai/2a50527b-117a-5251-8346-343e47b047cb/scratchpad/new/compact.jpg', type: 'jpeg', quality: 80 });
+  await up.click();
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
   await expect(dock).not.toHaveClass(/is-compact/);
+  await expect(up).toHaveCSS('opacity', '0');
   expect(k.errors).toEqual([]);
 });
 
