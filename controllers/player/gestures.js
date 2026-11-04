@@ -7,9 +7,7 @@ import { stage, video, holdEl, ui } from './dom.js';
 import { P } from './state.js';
 import { goBack, leavePage } from '../router.js';
 import { enterMini } from './mini.js';
-import { LS } from '../../lib/util.js';
 import { isFullscreen, togglePlay, wake, toggleFullscreen, seekBy, exitFullscreen } from './controls.js';
-LS.del('bright'); // la barra de brillo se quitó en v16
 
 ui.tap.addEventListener('pointerdown', (e) => {
   if (e.pointerType !== 'touch' || !e.isPrimary) return;
@@ -56,11 +54,22 @@ ui.tap.addEventListener('pointermove', (e) => {
       t.frame = requestAnimationFrame(() => {
         t.frame = 0;
         if (P.touch !== t) return;
-        const k = Math.min(t.dist || 0, 220);
-        const base = isRotated() ? 'rotate(90deg) ' : '';
         stage.style.transition = 'none';
-        stage.style.transform = `${base}translateY(${k * 0.6}px) scale(${1 - k / 1100})`;
-        stage.style.opacity = String(1 - k / 600);
+        if (t.mode === 'fs-down') {
+          const k = Math.min(t.dist || 0, 220);
+          const base = isRotated() ? 'rotate(90deg) ' : '';
+          stage.style.transform = `${base}translateY(${k * 0.6}px) scale(${1 - k / 1100})`;
+          stage.style.opacity = String(1 - k / 600);
+          return;
+        }
+        /* hacia el mini: el video va bajo el dedo y se achica hacia la esquina de abajo a la izquierda (donde queda el
+         * mini), sin desvanecerse; al soltar, termina el viaje desde ahí */
+        const k = t.dist || 0;
+        const p = Math.min(k / 420, 1);
+        stage.style.transformOrigin = '0 0';
+        stage.style.transform = `translate(${12 * p}px, ${k}px) scale(${1 - 0.55 * p})`;
+        // lo demás de la página se va apagando con el gesto: al soltar ya casi no queda nada que cambie de golpe
+        pullPage(Math.min(k / SWIPE_DOWN, 1));
       });
   } else if (t.mode === 'up') {
     t.dist = Math.max(0, t.y - p.y);
@@ -153,6 +162,18 @@ export function endHold() {
   holdEl.classList.remove('is-on');
 }
 const SWIPE_DOWN = 110;
+/** Apaga la página del reproductor (menos el video) según cuánto se deslizó: 0 = nada, 1 = casi del todo. */
+function pullPage(p) {
+  const app = /** @type {HTMLElement} */ (document.getElementById('app'));
+  if (!app.classList.contains('is-pulling')) app.classList.add('is-pulling');
+  app.style.setProperty('--pull', p.toFixed(3));
+}
+/** Deja la página como estaba (se soltó antes de llegar). */
+function releasePull() {
+  const app = /** @type {HTMLElement} */ (document.getElementById('app'));
+  app.classList.remove('is-pulling');
+  app.style.removeProperty('--pull');
+}
 export function touchEnd(e, cancelled) {
   const t = P.touch;
   if (!t || e.pointerId !== t.id) return;
@@ -174,16 +195,20 @@ export function touchEnd(e, cancelled) {
       // el hueco del video se queda mientras la página se desvanece (si no, lo de abajo subía de golpe)
       const slot = stage.parentElement;
       if (slot && slot.id === 'stage-slot') slot.style.height = slot.offsetHeight + 'px';
-      enterMini({ from, opacity });
+      enterMini({ from, opacity }); // lo apagado se queda así hasta que llega la página de atrás (router.render)
       leavePage();
+      /* la página de atrás se pide de inmediato, para que aparezca debajo mientras el video vuela al mini (esperar a
+       * que llegara dejaba ver solo el fondo durante el vuelo) */
       if (P.playing) goBack(P.playing.ctx.back);
     } else {
-      stage.style.transition = 'transform 0.2s, opacity 0.2s';
+      releasePull();
+      stage.style.transition = 'transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.2s';
       stage.style.transform = '';
       stage.style.opacity = '';
       setTimeout(() => {
         stage.style.transition = '';
-      }, 220);
+        stage.style.transformOrigin = '';
+      }, 260);
       if (far) exitFullscreen(); // vuelve al reproductor normal
     }
   } else if (t.mode === 'up') {

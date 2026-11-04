@@ -7,7 +7,7 @@ import { mergeShared, dedupeProfiles, finalProfileId, normName } from '../../mod
 import { stable } from '../../lib/util.js';
 import { isCollection, isCine, collectionItems, cleanFileTitle, movieTitle } from '../../models/collections.js';
 
-const ep = (path, n) => ({ id: path, name: path.split('/').pop(), path, ep: n, size: 1, key: 'k', fa: null, mime: 'video/mp4', ts: 0, subs: [] });
+const ep = (path, n) => ({ id: path, name: path.split('/').pop(), path, ep: n, size: 1, key: 'k', fa: null, mime: 'video/mp4', ts: 0 });
 const lib = (series) => ({ root: 'Anime', rootId: 'r', v: 2, series, updated: 0 });
 const serie = (name, eps) => ({ name, folderId: name, added: 0, seasons: [{ num: null, title: '', name: '', episodes: eps }] });
 

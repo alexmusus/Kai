@@ -96,7 +96,7 @@ export async function ensureMeta() {
         fichasPulled = true;
       }
     }
-    // 1) las fichas guardadas antes de la v29 no traían la nota: se pide solo la nota, todas juntas (1–2 pedidos),
+    // 1) las fichas guardadas hace tiempo no traían la nota: se pide solo la nota, todas juntas (1–2 pedidos),
     //    en vez de volver a buscar cada serie y película (eso agotaba el límite de AniList y dejaba otras sin ficha)
     const old = Object.values(state.meta).filter(
       (m) => m && !m.none && typeof m.id === 'number' && m.src !== 'TMDB' && ((m.sv && m.sv < 6) || (m.mv && m.mv < 5)),
@@ -173,7 +173,7 @@ export async function ensureMeta() {
           if (!q || q.ovaOf != null) continue; // las OVAs a secas, al final (necesitan la ficha de la temporada de antes)
           const k = itemMetaKey(s, se.name);
           const c = state.meta[k];
-          // las que dicen número de temporada o "Serie - Subtítulo" se buscan de nuevo una vez (v36 las encuentra mejor)
+          // las que dicen número de temporada o "Serie - Subtítulo" se buscan de nuevo una vez (la búsqueda ahora las encuentra mejor)
           const need = /\b(season|temporada)\b|\d(st|nd|rd|th)\b|\s[-–]\s/i.test(se.name) ? 2 : 1;
           if (c && (c.sm || 0) >= need && isFresh(c)) continue;
           let m = null;

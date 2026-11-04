@@ -29,13 +29,13 @@ decide. ESLint lo revisa (`no-restricted-imports`).
 | `profiles.js` | perfiles y lo compartido, duplicados, respaldo |
 | `sync.js` | juntar con MEGA y dejar una sola copia |
 | `quota.js` | transferencia de MEGA (avisa `quota`) |
-| `subs.js` | subtítulos y capítulos dentro del MP4, leídos por rangos; archivos .srt/.vtt/.ass |
+| `mp4.js` | lo que se lee de adentro del MP4 por rangos: formato, idioma del audio y capítulos (la intro) |
 | `meta-api.js` | AniList y TMDB: buscar fichas, notas, recomendaciones; traducir sinopsis |
 | `fichas.js` | leer las fichas guardadas y nombrar las temporadas ("Temporada 2", "OVA", "Memory Snow") |
 | `fichas-sync.js` | buscar lo que falta, traducir sinopsis y compartirlas por MEGA (avisa `meta-changed`, `sync-needed`) |
 | `news.js` | burbujas de "nuevo" y Novedades (avisa `news`) |
 | `thumbs.js` | miniaturas de MEGA, guardadas en IndexedDB |
-| `idb.js` | IndexedDB: descargas, miniaturas, subtítulos leídos |
+| `idb.js` | IndexedDB: descargas, miniaturas, capítulos leídos de los MP4 |
 | `downloads.js` | descargas en pedazos, reanudar, carpeta de descargas (avisa `download-changed`, `download-done`, `notice`…) |
 | `media.js` | leer videos por rangos, códec de cada archivo, si este navegador lo reproduce, capítulos guardados |
 | `plans.js` | qué capítulo toca después y qué ofrece la portada, una temporada o una película |
@@ -74,7 +74,7 @@ Fuera de las capas:
 | Archivo | Por qué está aparte |
 |---|---|
 | `core.js` | Descifrado de MEGA. Script clásico: lo comparten la página y el service worker. |
-| `sw.js` | Service worker: los archivos de la app salen de su caché sin preguntar al servidor (la caché lleva la versión), funciona sin conexión y sirve el video descifrado por rangos (`/__stream`). |
+| `sw.js` | Service worker: los archivos de la app salen de su caché sin preguntar al servidor (la caché lleva la versión; lo que casi nunca cambia va en otra aparte), funciona sin conexión y sirve el video descifrado por rangos (`/__stream`). |
 | `vendor/mega.js` | megajs empaquetado. No se edita a mano. |
 
 ## Estado
@@ -126,6 +126,8 @@ use los mismos tokens (`--btn`, `--card`, `--text`, `--dim`) para que se vea en 
 - Versiones (`sw.js`): `VERSION` es la de Kai y sube solo al pasar `prueba` a `main`; `ENTREGA` sube en cada
   subida a `prueba` (sin cambiar `sw.js` el navegador no instala lo nuevo) y vuelve a 1 al subir `VERSION`.
   GitHub Actions falla si cambia algo de la app sin que cambie una de las dos (`tests/version-check.mjs`).
+- Lo que casi nunca cambia (`vendor/mega.js`, los íconos y el gatito) va en `ASSETS`, en su propia caché, que no se
+  vuelve a bajar con cada versión: si cambia uno de esos archivos sube `ASSETS_V` (el mismo chequeo lo exige).
 
 ## Pruebas
 

@@ -18,7 +18,7 @@ import { dirAccess, flushFolder } from '../../models/downloads.js';
 import { paintThemeColor } from '../../views/theme.js';
 import { route } from '../../lib/route.js';
 import { closeSheet } from '../../views/sheet.js';
-import { closeDrawer } from '../dock.js';
+import { closeDock } from '../dock.js';
 import { viewState } from '../../views/view-state.js';
 import { endPicking } from '../picking.js';
 import { P } from './state.js';
@@ -103,8 +103,35 @@ video.addEventListener('waiting', () => stage.classList.add('is-loading'));
 
 video.addEventListener('volumechange', paintControls);
 
-video.addEventListener('ended', () => {
-  if (!P.playing) return;
+/* Al terminar un capítulo. También cuando el video se queda trabado en los últimos segundos sin avisar que terminó
+ * (pasa con algunos archivos de MEGA cuyo final no llega completo): antes ahí no seguía al siguiente. */
+video.addEventListener('ended', onEnded);
+let endWatch = 0;
+let endWatchAt = -1;
+function watchTheEnd() {
+  clearTimeout(endWatch);
+  const d = video.duration;
+  if (!P.playing || !isFinite(d) || !d || d - video.currentTime > 3 || video.ended) return;
+  endWatchAt = video.currentTime;
+  endWatch = setTimeout(() => {
+    // 4 s sin avanzar a menos de 3 s del final, sin que lo hayas pausado tú: se da por terminado
+    if (!P.playing || video.ended || video.paused || P.playing.endedOnce) return; // pausado: lo pausaste tú
+    if (Math.abs(video.currentTime - endWatchAt) < 0.25 && video.duration - video.currentTime < 3) onEnded();
+  }, 4000);
+}
+['waiting', 'stalled', 'timeupdate'].forEach((ev) => video.addEventListener(ev, watchTheEnd));
+// si vuelves atrás después de terminarlo, al llegar otra vez al final vuelve a seguir al siguiente
+video.addEventListener('seeked', () => {
+  if (P.playing && P.playing.endedOnce && video.duration - video.currentTime > 5) P.playing.endedOnce = false;
+});
+
+/** ¿Hay alguien mirando? Con la pantalla apagada, Kai en segundo plano o en ventana flotante, sigue sin cuenta atrás. */
+const nobodyWatching = () => document.hidden || !!document.pictureInPictureElement;
+
+function onEnded() {
+  clearTimeout(endWatch);
+  if (!P.playing || P.playing.endedOnce) return;
+  P.playing.endedOnce = true;
   setProgress(P.playing.ep, video.duration, video.duration, true);
   sync();
   stage.classList.add('is-ended');
@@ -135,17 +162,33 @@ video.addEventListener('ended', () => {
     </div>`;
   ui.nextCard.hidden = false;
   if (state.settings.autoplay) {
+    if (nobodyWatching()) {
+      ui.nextCard.hidden = true;
+      playNext();
+      return;
+    }
+    /* la cuenta atrás se mide con el reloj (no contando ticks): si el teléfono frena los temporizadores (pantalla
+     * apagada, ahorro de batería), al volver igual sigue cuando toca */
+    const until = Date.now() + left * 1000;
     const tick = () => {
-      left -= 1;
+      left = Math.max(0, Math.ceil((until - Date.now()) / 1000));
       const c = $('#p-count');
-      if (c) c.textContent = left;
-      if (left <= 0) {
+      if (c) c.textContent = String(left);
+      if (left <= 0 || nobodyWatching()) {
         ui.nextCard.hidden = true;
         playNext();
-      } else P.nextTimer = setTimeout(tick, 1000);
+      } else P.nextTimer = setTimeout(tick, 250);
     };
-    P.nextTimer = setTimeout(tick, 1000);
+    P.nextTimer = setTimeout(tick, 250);
   }
+}
+// si el teléfono se apaga durante la cuenta atrás, sigue al siguiente sin esperar
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden || !P.playing || !P.nextTimer || ui.nextCard.hidden) return;
+  if (!ui.nextCard.querySelector('[data-act="p-next-cancel"]')) return;
+  clearTimeout(P.nextTimer);
+  ui.nextCard.hidden = true;
+  playNext();
 });
 
 video.addEventListener('error', async () => {
@@ -279,13 +322,35 @@ stage.addEventListener('click', (e) => {
 });
 
 document.addEventListener('pointerdown', (e) => {
-  if (!ui.menu.hidden && !ui.menu.contains(e.target) && !e.target.closest('[data-act="cc"],[data-act="speed"]'))
-    closeMenu();
+  if (!ui.menu.hidden && !ui.menu.contains(e.target) && !e.target.closest('[data-act="speed"]')) closeMenu();
 });
 
+/* Al salir, lo de detrás sigue sin calcularse hasta que el teléfono termina de girar (styles.css, html.fs-leaving):
+ * se espera a que el tamaño de la pantalla se quede quieto, como mucho 900 ms. */
+let leaveTimer = 0;
+let leaveCap = 0;
+function endLeaving() {
+  clearTimeout(leaveTimer);
+  clearTimeout(leaveCap);
+  removeEventListener('resize', onLeaveResize);
+  document.documentElement.classList.remove('fs-leaving');
+}
+function onLeaveResize() {
+  clearTimeout(leaveTimer);
+  leaveTimer = setTimeout(endLeaving, 150);
+}
 ['fullscreenchange', 'webkitfullscreenchange'].forEach((ev) =>
   document.addEventListener(ev, () => {
-    document.documentElement.classList.toggle('kai-fs-on', isFullscreen());
+    const on = isFullscreen();
+    const html = document.documentElement;
+    if (!on && html.classList.contains('kai-fs-on')) {
+      html.classList.add('fs-leaving');
+      addEventListener('resize', onLeaveResize);
+      onLeaveResize();
+      clearTimeout(leaveCap);
+      leaveCap = setTimeout(endLeaving, 900);
+    } else if (on) endLeaving();
+    html.classList.toggle('kai-fs-on', on);
     paintThemeColor();
     paintControls();
     wake();
@@ -298,7 +363,7 @@ document.addEventListener('keydown', (e) => {
   if (route().view !== 'play' || !P.playing) {
     if (e.key === 'Escape') {
       closeSheet();
-      closeDrawer();
+      closeDock();
       if (viewState.picking) endPicking();
     }
     return;

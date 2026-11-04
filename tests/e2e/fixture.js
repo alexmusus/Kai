@@ -17,7 +17,6 @@ const ep = (folder, file, n, ts = NOW - 86400e3 * 10) => ({
   fa: null,
   mime: 'video/mp4',
   ts,
-  subs: [],
 });
 const season = (num, title, name, eps) => ({ num, title, name, episodes: eps });
 const range = (a, b) => Array.from({ length: b - a + 1 }, (_, i) => a + i);

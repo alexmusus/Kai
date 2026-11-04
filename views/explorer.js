@@ -10,7 +10,7 @@ import { sortEpisodes } from '../models/naming.js';
 import { esc, plural, fmtSize } from '../lib/util.js';
 import { ICON } from './icons.js';
 import { episodeRow } from './episodes.js';
-import { isSubtitleName } from '../models/subs.js';
+import { isSubtitleName } from '../models/naming.js';
 
 export function renderExplorer(arg) {
   const st = state.storage;
@@ -29,9 +29,7 @@ export function renderExplorer(arg) {
   const kids = visibleChildren(node).filter((c) => !c.name.startsWith('.'));
   const folders = kids.filter((c) => c.directory).sort((a, b) => a.name.localeCompare(b.name, 'es', { numeric: true }));
   const here = nodePath(node);
-  const videos = sortEpisodes(
-    kids.filter(isPlayable).map((f) => index.byId.get(f.nodeId)?.ep || makeEpisode(f, here, kids)),
-  );
+  const videos = sortEpisodes(kids.filter(isPlayable).map((f) => index.byId.get(f.nodeId)?.ep || makeEpisode(f, here)));
   videos.forEach((v) => {
     if (!index.byId.has(v.id)) knownEps.set(v.id, v);
   });

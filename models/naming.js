@@ -69,6 +69,9 @@ export const langText = (langs) => (langs.length > 1 ? 'Sub y doblado' : langs.l
 /* ── archivos de video y capítulos ── */
 
 export const VIDEO = /\.(mp4|m4v|webm|mov|mkv)$/i;
+/** ¿Es un archivo de subtítulos suelto? (en Explorar MEGA se marca como tal) */
+export const isSubtitleName = (/** @type {string | null | undefined} */ name) =>
+  /\.(srt|vtt|ass|ssa)$/i.test(name || '');
 /** @type {Record<string, string>} */
 export const MIME = {
   mp4: 'video/mp4',

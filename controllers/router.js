@@ -8,7 +8,7 @@
 
 import { on } from '../lib/events.js';
 import { route } from '../lib/route.js';
-import { closeDrawer, paintDock } from './dock.js';
+import { closeDock, paintDock } from './dock.js';
 import { LS } from '../lib/util.js';
 import { createNavHistory } from '../lib/nav-history.js';
 import { renderLogin, renderProfiles } from '../views/account.js';
@@ -209,16 +209,40 @@ export function softRender() {
   render();
 }
 
+/** La página que llega después de leavePage aparece suave (si llegaba de golpe, su portada "saltaba" a la vista
+ * mientras el video todavía volaba al mini). */
+function arrive() {
+  if (document.documentElement.classList.contains('lite') || matchMedia('(prefers-reduced-motion: reduce)').matches)
+    return;
+  if (!app.animate) return;
+  // aparece y se acomoda desde un poco más chica (medida desde el centro de la pantalla, no desde arriba de la página)
+  app.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 380, delay: 40, easing: 'ease-out', fill: 'backwards' });
+  for (const el of app.children) {
+    const origin = `50% ${Math.round(innerHeight / 2 - el.getBoundingClientRect().top)}px`;
+    el.animate(
+      [
+        { transform: 'scale(0.965)', transformOrigin: origin },
+        { transform: 'none', transformOrigin: origin },
+      ],
+      { duration: 520, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
+    );
+  }
+}
 /** La página actual se desvanece mientras llega la siguiente (al pasar al mini deslizando). */
 export function leavePage() {
   app.classList.add('is-leaving');
   // por si la siguiente no llega a dibujarse
-  setTimeout(() => app.classList.remove('is-leaving'), 800);
+  setTimeout(() => {
+    app.classList.remove('is-leaving', 'is-pulling');
+    app.style.removeProperty('--pull');
+  }, 800);
 }
 
 export function render() {
-  app.classList.remove('is-leaving');
-  closeDrawer();
+  const arriving = app.classList.contains('is-leaving');
+  app.classList.remove('is-leaving', 'is-pulling');
+  app.style.removeProperty('--pull');
+  closeDock();
   if (!LS.get('session', null)) {
     player.stop();
     renderLogin(viewState.loginNote);
@@ -276,4 +300,5 @@ export function render() {
   navWasBack = false;
   if (key !== lastRouteKey && view === 'play' && lastRouteKey.split('/')[0] !== 'play') window.scrollTo(0, 0);
   lastRouteKey = key;
+  if (arriving && view !== 'play') arrive();
 }

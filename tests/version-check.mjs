@@ -31,7 +31,8 @@ function versionAt(ref) {
     return null;
   }
   const num = (name) => (src.match(new RegExp(`const ${name} = (\\d+);`)) || [])[1];
-  return { version: num('VERSION'), entrega: num('ENTREGA') };
+  const assets = [...((src.match(/const ASSETS = \[([\s\S]*?)\];/) || [])[1] || '').matchAll(/'([^']+)'/g)].map((m) => m[1]);
+  return { version: num('VERSION'), entrega: num('ENTREGA'), assetsV: num('ASSETS_V'), assets };
 }
 const before = versionAt(git('merge-base', base, 'HEAD').trim());
 const now = versionAt('HEAD');
@@ -41,6 +42,15 @@ if (before && now && before.version === now.version && before.entrega === now.en
     `Cambió la app (${changed.slice(0, 8).join(', ')}${changed.length > 8 ? '…' : ''}) pero sw.js sigue en ` +
       `Kai ${now.version} · entrega ${now.entrega}.\n` +
       'Sube ENTREGA en sw.js (o VERSION si va a main): si no, los teléfonos siguen con la versión de su caché.',
+  );
+  process.exit(1);
+}
+// lo que va en la caché aparte (sw.js, ASSETS) no se vuelve a bajar si no sube ASSETS_V
+const assetsChanged = now ? changed.filter((f) => now.assets.includes(f)) : [];
+if (assetsChanged.length && before && before.assetsV && before.assetsV === now.assetsV) {
+  console.error(
+    `Cambió ${assetsChanged.join(', ')} pero ASSETS_V sigue en ${now.assetsV}.\n` +
+      'Sube ASSETS_V en sw.js: si no, los teléfonos siguen con la copia que ya tienen guardada.',
   );
   process.exit(1);
 }

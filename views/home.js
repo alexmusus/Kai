@@ -242,7 +242,7 @@ export const HOME_RECENT = 10;
 export const HOME_MOVIES = 10;
 export const HOME_CONTINUE = 3;
 
-/** Fila "Series" del inicio: en orden alfabético, como el catálogo (pedido de Alex, v37). */
+/** Fila "Series" del inicio: en orden alfabético, como el catálogo. */
 export function homeSeries(lib) {
   return lib.series
     .map((s, si) => ({ s, si }))

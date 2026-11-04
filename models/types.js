@@ -8,7 +8,6 @@
 
 /**
  * Subtítulo suelto (.srt/.vtt/.ass) junto a un capítulo.
- * @typedef {{ id: string, name: string, size: number, key: string }} SubFile
  */
 
 /**
@@ -23,7 +22,6 @@
  * @property {string | null} fa atributo de miniatura de MEGA
  * @property {string} mime
  * @property {number} ts       cuándo llegó a MEGA (segundos)
- * @property {SubFile[]} subs
  * @property {Lang | null} [lang] idioma (lo pone buildIndex)
  */
 

@@ -13,6 +13,10 @@ import { app, header, resetPosterCache, posterAny, entryTile } from './component
 import { ICON } from './icons.js';
 import { hydrateThumbs } from './thumbs.js';
 import { emit } from '../lib/events.js';
+import { prog } from '../models/progress.js';
+
+/** ¿Ya se vio todo? (todos sus capítulos, o la película) @param {{ w?: boolean }[]} eps */
+const allSeen = (eps) => eps.length > 0 && eps.every((e) => (prog(e) || {}).w);
 
 export const norm = (t) =>
   String(t ?? '')
@@ -43,6 +47,7 @@ export function catalogEntries() {
           movie: it.key,
           cine: isCine(s),
           langs: langsOf(it.eps),
+          done: allSeen(it.eps),
           words: norm([title, m && m.title, m && m.romaji, m && m.native, s.name].join(' ')),
         });
       }
@@ -59,6 +64,7 @@ export function catalogEntries() {
         added: s.added || 0,
         count: s.all.length,
         langs: langsOf(s.all),
+        done: allSeen(s.all),
         words: norm([s.name, m && m.title, m && m.romaji, m && m.native, ...s.seasons.map((se) => se.title)].join(' ')),
       });
     }
@@ -76,11 +82,17 @@ export function filterEntries(list, { q = '', g = '', y = '', f = '', l = '' }) 
       (!l || (e.langs || []).includes(l)),
   );
 }
+/** Ordena el catálogo; lo que ya viste completo va al final (en el mismo orden), para que no se mezcle con lo
+ * que falta por ver. */
 export function sortEntries(list, o) {
   const az = (a, b) => a.title.localeCompare(b.title, 'es', { numeric: true });
-  if (o === 'recent') return list.sort((a, b) => (b.added || 0) - (a.added || 0) || az(a, b));
-  if (o === 'year') return list.sort((a, b) => (b.year || 0) - (a.year || 0) || az(a, b));
-  return list.sort(az); // por defecto, A–Z (v37)
+  const by =
+    o === 'recent'
+      ? (a, b) => (b.added || 0) - (a.added || 0) || az(a, b)
+      : o === 'year'
+        ? (a, b) => (b.year || 0) - (a.year || 0) || az(a, b)
+        : az; // por defecto, A–Z
+  return list.sort((a, b) => Number(!!a.done) - Number(!!b.done) || by(a, b));
 }
 
 /* Dos catálogos, Series y Películas (?t=series | ?t=peliculas). Al buscar o filtrar por una etiqueta,

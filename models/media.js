@@ -8,7 +8,7 @@
  */
 
 import { LS } from '../lib/util.js';
-import { mp4QuickFormats, mp4Info, mp4Chapters } from './subs.js';
+import { mp4QuickFormats, mp4Info, mp4Chapters } from './mp4.js';
 import { idb } from './idb.js';
 import { C, downloadUrl } from './mega.js';
 import { localBlob } from './downloads.js';
@@ -46,7 +46,7 @@ export async function readCodec(ep) {
 /** Guarda los capítulos del MP4 (sin Infinity, que no se puede guardar). @param {Episode} ep @param {any[] | null} chapters */
 export function saveChapterCache(ep, chapters) {
   const list = (chapters || []).map((c) => ({ ...c, end: isFinite(c.end) ? c.end : null }));
-  idb.put('subcache', { v: 3, tracks: [], chapters: list, at: Date.now() }, ep.id).catch(() => {});
+  idb.put('subcache', { v: 3, chapters: list, at: Date.now() }, ep.id).catch(() => {});
 }
 
 /**

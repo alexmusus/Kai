@@ -82,7 +82,6 @@ export function announceNew() {
     if (!first) noteNews(s.name, fresh.length);
   }
   if (first || added.length) LS.set(pkey('newsIds'), [...seen].slice(-NEWS_IDS_MAX));
-  LS.del(pkey('newsCount'));
   emit('news');
 }
 
