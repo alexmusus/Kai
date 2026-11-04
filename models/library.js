@@ -6,8 +6,7 @@
 
 import { index, state, pkey, setIndex, saveProgressLocal, knownEps } from './store.js';
 import { LS } from '../lib/util.js';
-import { baseName, episodeNumber, MIME, isVideoName, sortEpisodes, seasonInfo, langOf, twinKey } from './naming.js';
-import { isSubtitleName } from './subs.js';
+import { episodeNumber, MIME, isVideoName, sortEpisodes, seasonInfo, langOf, twinKey } from './naming.js';
 import { C, isGone, visibleChildren } from './mega.js';
 
 /** @typedef {import('./types.js').Library} Library */
@@ -70,19 +69,13 @@ const keyOf = (/** @type {MegaNode} */ n) => C.bytesToB64u(new Uint8Array(/** @t
 export const isPlayable = (c) => !c.directory && !!c.name && isVideoName(c.name) && !!c.key && !isGone(c);
 
 /**
- * Capítulo a partir de un nodo de MEGA, con los subtítulos sueltos que se llaman igual ("x.mp4" → "x.srt", "x.es.srt").
+ * Capítulo a partir de un nodo de MEGA.
  * @param {MegaNode} f
  * @param {string} folderPath ruta de su carpeta desde la raíz de MEGA
- * @param {MegaNode[]} [siblings] lo demás que hay en la carpeta
  * @returns {Episode}
  */
-export function makeEpisode(f, folderPath, siblings = []) {
+export function makeEpisode(f, folderPath) {
   const ext = (f.name.split('.').pop() || '').toLowerCase();
-  const base = baseName(f.name);
-  const subs = siblings
-    .filter((s) => !s.directory && s.key && isSubtitleName(s.name) && !isGone(s))
-    .filter((s) => baseName(s.name) === base || baseName(s.name).startsWith(base + '.'))
-    .map((s) => ({ id: s.nodeId, name: s.name, size: s.size || 0, key: keyOf(s) }));
   return {
     id: f.nodeId,
     name: f.name,
@@ -93,13 +86,11 @@ export function makeEpisode(f, folderPath, siblings = []) {
     fa: f.fa || null,
     mime: MIME[ext] || 'video/mp4',
     ts: f.timestamp || 0, // cuándo llegó a MEGA, para "agregados recientemente"
-    subs,
   };
 }
 
-/** @param {MegaNode[]} files @param {string} folderPath @param {MegaNode[]} siblings */
-const episodesOf = (files, folderPath, siblings) =>
-  sortEpisodes(files.map((f) => makeEpisode(f, folderPath, siblings)));
+/** @param {MegaNode[]} files @param {string} folderPath */
+const episodesOf = (files, folderPath) => sortEpisodes(files.map((f) => makeEpisode(f, folderPath)));
 const byName = (/** @type {string} */ a, /** @type {string} */ b) => a.localeCompare(b, 'es', { numeric: true });
 
 /**
@@ -114,7 +105,7 @@ function buildSeries(folder, rootPath) {
   /** @type {Season[]} */
   const seasons = [];
   const direct = kids.filter(isPlayable);
-  if (direct.length) seasons.push({ num: null, title: '', name: '', episodes: episodesOf(direct, path, kids) });
+  if (direct.length) seasons.push({ num: null, title: '', name: '', episodes: episodesOf(direct, path) });
   for (const sub of kids.filter((c) => c.directory)) {
     const inner = visibleChildren(sub);
     const videos = inner.filter(isPlayable);
@@ -122,7 +113,7 @@ function buildSeries(folder, rootPath) {
       seasons.push({
         ...seasonInfo(sub.name),
         name: sub.name,
-        episodes: episodesOf(videos, path + '/' + sub.name, inner),
+        episodes: episodesOf(videos, path + '/' + sub.name),
       });
   }
   if (!seasons.length) return null;
@@ -371,7 +362,7 @@ export function migrateProgressKeys(obj) {
  */
 export function librarySignature(lib) {
   if (!lib) return '';
-  const ep = (/** @type {Episode} */ e) => e.id + (e.fa ? '+' : '') + e.subs.length;
+  const ep = (/** @type {Episode} */ e) => e.id + (e.fa ? '+' : '');
   const season = (/** @type {Season} */ se) => se.name + '=' + (se.full || se.episodes).map(ep).join(',');
   const series = (/** @type {Series} */ s) => `${s.name}@${s.added || 0}:${s.seasons.map(season).join(';')}`;
   return lib.root + '|' + lib.series.map(series).join('|');

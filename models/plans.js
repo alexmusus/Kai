@@ -61,7 +61,7 @@ export function moviePlan(it) {
   return { ep, label, pct, seen: !next, left: next && p && at(p) > 5 ? fmtLeft(p) : '' };
 }
 
-/** Las películas de la colección, en orden alfabético (v37; antes, las más recientes primero). */
+/** Las películas de la colección, en orden alfabético. */
 export function shelfItems(s) {
   return collectionItems(s)
     .map((it) => ({

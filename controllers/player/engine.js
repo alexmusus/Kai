@@ -22,7 +22,7 @@ import { setRouteKey } from '../router.js';
 import { paintMini, leaveMini } from './mini.js';
 import { sync } from '../sync.js';
 import { quotaUntil } from '../../models/quota.js';
-import { mp4Formats } from '../../models/subs.js';
+import { mp4Formats } from '../../models/mp4.js';
 import { rangeReader, rememberCodec, formatProblem, formatSummary } from '../../models/media.js';
 import { paintWatchInfo, parkStage } from './page.js';
 

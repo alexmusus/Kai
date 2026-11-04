@@ -50,7 +50,6 @@ describe('buildLibrary', () => {
     expect(fate.seasons[2].episodes.map((e) => e.ep)).toEqual([0, 1]);
     const ubw = fate.seasons[0].episodes[0];
     expect(ubw.path).toBe('Anime/Fate/1. Fate UBW/1_1_SUB.mp4');
-    expect(ubw.subs.map((s) => s.name)).toEqual(['1_1_SUB.srt']);
     expect(ubw.mime).toBe('video/mp4');
     const dor = lib.series[0];
     expect(dor.seasons).toHaveLength(1);

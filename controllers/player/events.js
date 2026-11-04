@@ -18,7 +18,7 @@ import { dirAccess, flushFolder } from '../../models/downloads.js';
 import { paintThemeColor } from '../../views/theme.js';
 import { route } from '../../lib/route.js';
 import { closeSheet } from '../../views/sheet.js';
-import { closeDrawer } from '../dock.js';
+import { closeDock } from '../dock.js';
 import { viewState } from '../../views/view-state.js';
 import { endPicking } from '../picking.js';
 import { P } from './state.js';
@@ -322,8 +322,7 @@ stage.addEventListener('click', (e) => {
 });
 
 document.addEventListener('pointerdown', (e) => {
-  if (!ui.menu.hidden && !ui.menu.contains(e.target) && !e.target.closest('[data-act="cc"],[data-act="speed"]'))
-    closeMenu();
+  if (!ui.menu.hidden && !ui.menu.contains(e.target) && !e.target.closest('[data-act="speed"]')) closeMenu();
 });
 
 /* Al salir, lo de detrás sigue sin calcularse hasta que el teléfono termina de girar (styles.css, html.fs-leaving):
@@ -364,7 +363,7 @@ document.addEventListener('keydown', (e) => {
   if (route().view !== 'play' || !P.playing) {
     if (e.key === 'Escape') {
       closeSheet();
-      closeDrawer();
+      closeDock();
       if (viewState.picking) endPicking();
     }
     return;

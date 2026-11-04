@@ -30,9 +30,6 @@
   --primary-ink: #0d0e12;
   --danger: #ff8f8f;
   --ok: #7fd8a8;
-  --blob-1: rgba(84, 108, 170, 0.32);
-  --blob-2: rgba(70, 140, 150, 0.2);
-  --blob-3: rgba(130, 100, 160, 0.22);
   --thumb-bg: #1b1d25;
 }
 
@@ -55,9 +52,6 @@
   --primary-ink: #ffffff;
   --danger: #d23c3c;
   --ok: #1f9d63;
-  --blob-1: rgba(150, 175, 255, 0.45);
-  --blob-2: rgba(150, 225, 210, 0.38);
-  --blob-3: rgba(225, 190, 245, 0.4);
   --thumb-bg: #dfe2e9;
 }
 
@@ -66,8 +60,7 @@
   --bg: #4d4d4d; --text: #e4e4e4; --dim: #b0b0b0; --faint: #8a8a8a; --line: rgba(0, 0, 0, 0.38);
   --glass: rgba(40, 40, 40, 0.42); --glass-strong: rgba(52, 52, 52, 0.86); --glass-solid: rgba(50, 50, 50, 0.97);
   --glass-edge: rgba(0, 0, 0, 0.45); --glass-hi: rgba(255, 255, 255, 0.06); --shadow: rgba(0, 0, 0, 0.32);
-  --accent: #8fb6ec; --primary: #e0e0e0; --primary-ink: #1d1d1d;
-  --blob-1: rgba(90, 90, 90, 0.25); --blob-2: rgba(70, 70, 70, 0.2); --blob-3: rgba(85, 85, 85, 0.2); --thumb-bg: #3d3d3d;
+  --accent: #8fb6ec; --primary: #e0e0e0; --primary-ink: #1d1d1d; --thumb-bg: #3d3d3d;
 }
 
 /* Tonos del modo claro: menos brillo que el blanco, para que no canse la vista. Se eligen en Ajustes. */
@@ -75,19 +68,19 @@
   --bg: #c6c8cb; --text: #0f1012; --dim: #3f4247; --faint: #6c7076; --line: rgba(0, 0, 0, 0.12);
   --glass: rgba(222, 223, 225, 0.55); --glass-strong: rgba(214, 215, 218, 0.78); --glass-solid: rgba(210, 212, 215, 0.96);
   --glass-edge: rgba(255, 255, 255, 0.42); --glass-hi: rgba(255, 255, 255, 0.5); --shadow: rgba(0, 0, 0, 0.2);
-  --accent: #2459c2; --blob-1: rgba(120, 124, 132, 0.3); --blob-2: rgba(140, 146, 146, 0.24); --blob-3: rgba(132, 128, 140, 0.24); --thumb-bg: #b6b9bd;
+  --accent: #2459c2; --thumb-bg: #b6b9bd;
 }
 [data-theme='light'][data-tone='celeste'] {
   --bg: #d9e5f0; --text: #14202c; --dim: #4f6072; --faint: #7f90a2; --line: rgba(16, 32, 52, 0.09);
   --glass: rgba(236, 244, 251, 0.5); --glass-strong: rgba(229, 239, 248, 0.72); --glass-solid: rgba(226, 236, 245, 0.95);
   --glass-edge: rgba(255, 255, 255, 0.55); --glass-hi: rgba(255, 255, 255, 0.65); --shadow: rgba(20, 40, 70, 0.14);
-  --accent: #2a63c9; --blob-1: rgba(120, 160, 220, 0.4); --blob-2: rgba(120, 200, 210, 0.32); --blob-3: rgba(160, 170, 230, 0.3); --thumb-bg: #c8d7e5;
+  --accent: #2a63c9; --thumb-bg: #c8d7e5;
 }
 [data-theme='light'][data-tone='arena'] {
   --bg: #e6e0d5; --text: #231f18; --dim: #675f51; --faint: #958c7c; --line: rgba(40, 30, 15, 0.09);
   --glass: rgba(246, 242, 234, 0.5); --glass-strong: rgba(240, 235, 226, 0.74); --glass-solid: rgba(236, 231, 221, 0.95);
   --glass-edge: rgba(255, 252, 245, 0.55); --glass-hi: rgba(255, 252, 245, 0.65); --shadow: rgba(50, 36, 15, 0.14);
-  --accent: #b5652a; --blob-1: rgba(215, 175, 130, 0.38); --blob-2: rgba(190, 200, 160, 0.3); --blob-3: rgba(220, 170, 160, 0.28); --thumb-bg: #d9d1c2;
+  --accent: #b5652a; --thumb-bg: #d9d1c2;
 }
 
 * { box-sizing: border-box; }
@@ -109,30 +102,13 @@ svg.solid, svg .solid { fill: currentColor; stroke: none; }
 [hidden] { display: none !important; }
 .dim { color: var(--dim); }
 
-/* Luz ambiental detrás del vidrio: lo que hace que el desenfoque se note */
-/* Fondo propio de Kai: vidrio líquido que se tiñe con el color de la serie. Nunca una imagen estirada. */
+/* fondo: un solo brillo suave arriba, del color de la serie que estás mirando (--tint) */
 .ambient { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; }
-.ambient::before, .ambient::after {
-  content: ''; position: absolute; inset: -25vmax;
-  /* los degradados ya son suaves: sin filter: blur, el navegador pinta la capa una vez y solo la mueve (antes la redibujaba en cada cuadro) */
-  transition: background 1.2s ease; will-change: transform;
-}
-/* con un video sonando, el fondo deja de moverse (no se ve y gasta batería) */
-body.is-playing .ambient::before, body.is-playing .ambient::after { animation-play-state: paused; }
 .ambient::before {
-  background:
-    radial-gradient(36vmax 30vmax at 22% 18%, color-mix(in srgb, var(--tint, var(--blob-1)) 42%, transparent), transparent 70%),
-    radial-gradient(30vmax 28vmax at 85% 28%, var(--blob-2), transparent 70%);
-  animation: drift-a 38s ease-in-out infinite alternate;
+  content: ''; position: absolute; inset: 0;
+  background: radial-gradient(110vmax 62vmax at 50% -20%, color-mix(in srgb, var(--tint, transparent) 34%, transparent), transparent 70%);
 }
-.ambient::after {
-  background:
-    radial-gradient(40vmax 32vmax at 60% 92%, color-mix(in srgb, var(--tint, var(--blob-3)) 30%, transparent), transparent 70%),
-    radial-gradient(26vmax 22vmax at 8% 75%, var(--blob-3), transparent 70%);
-  animation: drift-b 46s ease-in-out infinite alternate;
-}
-@keyframes drift-a { to { transform: translate3d(6vmax, 4vmax, 0) scale(1.08); } }
-@keyframes drift-b { to { transform: translate3d(-5vmax, -3vmax, 0) scale(1.06); } }
+[data-theme='light'] .ambient::before { background: radial-gradient(110vmax 62vmax at 50% -20%, color-mix(in srgb, var(--tint, transparent) 22%, transparent), transparent 70%); }
 
 /* ───────── superficies de vidrio ───────── */
 
@@ -657,7 +633,7 @@ html.kai-fs-on .dock { display: none; }
 .profile-new { display: grid; gap: 10px; justify-items: center; padding: 10px; }
 .profile-new input { font: inherit; font-size: 17px; text-align: center; color: var(--text); width: 200px; min-height: 48px; border-radius: 999px; background: var(--glass); border: 1px solid var(--glass-edge); padding: 0 16px; }
 
-/* ───────────────────────── v5: botón flotante, portadas, serie y episodios ───────────────────────── */
+/* ───────────────────────── botón flotante, portadas, serie y episodios ───────────────────────── */
 
 /* botón flotante: visible pero discreto */
 /* abajo: más pegado al borde que antes; en iPhone queda justo encima de la barrita de inicio (no la tapa) */
@@ -853,8 +829,7 @@ body:not(.is-playing) .eq i { animation-play-state: paused; }
   position: fixed; z-index: 27; left: 50%; transform: translateX(-50%);
   bottom: calc(18px + env(safe-area-inset-bottom));
   display: flex; align-items: center; gap: 6px; padding: 6px 6px 6px 16px; max-width: calc(100vw - 24px);
-  border-radius: 999px; background: var(--glass-solid); box-shadow: inset 0 0 0 1px var(--glass-edge), inset 0 1px 0 var(--glass-hi), 0 18px 50px var(--shadow);
-  -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur);
+  border-radius: 999px; background: var(--card); box-shadow: 0 0 0 1px var(--card-edge), 0 18px 50px rgba(0, 0, 0, 0.3);
   animation: pick-in 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .pick-bar[hidden] { display: none; }
@@ -895,9 +870,6 @@ html.is-picking .series-main { padding-bottom: calc(110px + env(safe-area-inset-
 /* nada dentro de la página de reproducción debe crear desplazamiento lateral */
 .watch { overflow-x: clip; }
 
-@media (prefers-reduced-motion: reduce) {
-  .ambient::before, .ambient::after { animation: none; }
-}
 
 /* la portada no cambia de alto al pasar entre series: los mosaicos no se mueven bajo el cursor */
 @media (min-width: 900px) {
@@ -1113,7 +1085,7 @@ html.has-mini body { padding-bottom: var(--mini-space); }
 .discover-cover { width: 84px; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 12px; flex: none; }
 .discover-syn { margin: 0 0 12px; font-size: 14px; line-height: 1.5; color: var(--dim); max-height: 40vh; overflow: auto; }
 
-/* etiquetas de la página de una serie (v29): arriba lo informativo | nota; abajo lo que lleva al catálogo */
+/* etiquetas de la página de una serie: arriba lo informativo | nota; abajo lo que lleva al catálogo */
 .facts-rows { display: grid; gap: 8px; margin: 10px 0 0; }
 .facts-rows .tv-facts { margin: 0; }
 .tv-facts .fact-sep { padding: 5px 2px; background: none; box-shadow: none; border: 0; -webkit-backdrop-filter: none; backdrop-filter: none; color: var(--faint); }
@@ -1168,7 +1140,6 @@ img.no-fade { animation: none !important; }
 html.lite *, html.lite *::before, html.lite *::after { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
 html.lite .bar, html.lite .sheet-panel, html.lite .toast, html.lite .st-menu, html.lite .p-card, html.lite .dock-btn, html.lite .dock-panel { background: var(--glass-solid); }
 html.lite .st-bar { background: rgba(22, 24, 30, 0.85); }
-html.lite .ambient::before, html.lite .ambient::after { animation: none; will-change: auto; }
 /* pasar entre el reproductor grande y el mini: animar un video es lo que más le cuesta a un teléfono modesto (se veía
  * trabado); cambia al instante. */
 html.lite .mini { animation: none; }
@@ -1181,10 +1152,10 @@ html.lite #app { transition: none; }
 html:is(.kai-fs-on, .fs-leaving) :is(.watch-info, .watch-list), html:has(.stage:fullscreen) :is(.watch-info, .watch-list) { content-visibility: hidden; }
 html:is(.kai-fs-on, .fs-leaving) :is(.ambient, .dock, .toast), html:has(.stage:fullscreen) :is(.ambient, .dock, .toast) { display: none; }
 
-/* ═════════════════════════ Kai 39 · diseño A (estilo Apple TV) ═════════════════════════
+/* ═════════════════════════ diseño estilo Apple TV ═════════════════════════
  * Fondo neutro con un solo brillo del color de la serie, la imagen manda, datos en una línea sin pastillas,
- * botones lisos (sin vidrio ni borde) y una barra flotante con las páginas principales. Pisa lo de arriba;
- * lo que quede sin uso se limpia cuando el rediseño esté completo. */
+ * botones lisos (sin vidrio ni borde) y una barra flotante con las páginas principales. Lo de aquí en adelante
+ * ajusta las piezas de arriba a este diseño. */
 
 [data-theme='dark'] { --btn: rgba(255, 255, 255, 0.13); --btn-hover: rgba(255, 255, 255, 0.2); }
 [data-theme='dark']:not([data-dark='gris']) {
@@ -1193,13 +1164,6 @@ html:is(.kai-fs-on, .fs-leaving) :is(.ambient, .dock, .toast), html:has(.stage:f
 }
 [data-theme='light'] { --btn: rgba(0, 0, 0, 0.06); --btn-hover: rgba(0, 0, 0, 0.1); }
 
-/* fondo: un solo brillo suave arriba, del color de la serie de la portada; sin manchas que se mueven */
-.ambient::after { display: none; }
-[data-theme] .ambient::before {
-  inset: 0; animation: none; will-change: auto; transition: none;
-  background: radial-gradient(110vmax 62vmax at 50% -20%, color-mix(in srgb, var(--tint, transparent) 34%, transparent), transparent 70%);
-}
-[data-theme='light'] .ambient::before { background: radial-gradient(110vmax 62vmax at 50% -20%, color-mix(in srgb, var(--tint, transparent) 22%, transparent), transparent 70%); }
 
 /* botones: lisos, del mismo alto, sin vidrio */
 .tv-btn {
@@ -1383,6 +1347,7 @@ html.lite .dock-bar { background: var(--glass-solid); }
 }
 
 /* la barra se achica al bajar (teléfono): queda la pestaña actual y tu perfil; al subir o tocarla vuelve */
+.dock-up { display: none; }
 @media (max-width: 899px) {
   .dock-bar { transition: padding 0.28s cubic-bezier(0.2, 0.8, 0.2, 1); }
   .dock-tab, .dock-btn { transition: width 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), height 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.18s, background-color 0.15s, color 0.15s; }
@@ -1401,7 +1366,7 @@ html.lite .dock-bar { background: var(--glass-solid); }
   .dock.is-compact .dock-bar::after { opacity: 1; transform: none; }
   .dock[data-sync='syncing'] .dock-bar::after, .dock[data-sync='pending'] .dock-bar::after { background: var(--accent); }
   .dock[data-sync='offline'] .dock-bar::after { background: var(--faint); }
-  /* la burbuja de subir, al lado de la barra achicada */
+  /* la burbuja de subir, al lado de la barra achicada (solo en el teléfono) */
   .dock-up {
     position: absolute; left: calc(100% + 8px); bottom: 6px; width: 36px; height: 36px; border-radius: 50%;
     display: grid; place-items: center; color: var(--text);
@@ -1417,8 +1382,6 @@ html.lite .dock-bar { background: var(--glass-solid); }
   @media (prefers-reduced-motion: reduce) { .dock-up, .dock.is-compact.is-deep:not(.is-open) .dock-up { transform: none; transition: opacity 0.2s; } }
   html.lite .dock-up { background: var(--glass-solid); -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
-.dock-up { display: none; }
-@media (max-width: 899px) { .dock-up { display: grid; } }
 
 /* el texto de un botón siempre en una línea: si no entra ("Ver Shingeki no Kyojin Kuinaki Sentaku"), termina en … */
 .tv-btn > span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1457,7 +1420,7 @@ body:has(.tv.is-home) .ambient { display: none; }
 /* Kai, el gatito: una sombra oscura suave para que se despegue de la imagen (es claro y se veía con borde blanco) */
 .kcat-sit img { filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.55)); }
 
-/* ═════════════════════════ Kai 39 · etapa 2: página de la serie y de la película ═════════════════════════
+/* ═════════════════════════ página de la serie y de la película ═════════════════════════
  * La misma tarjeta oscura del inicio arriba (imagen, título, datos, Sub/Doblado y botones), la sinopsis debajo,
  * las temporadas como pestañas y los capítulos como lista (teléfono) o cuadrícula liviana (PC). Sin el fondo
  * difuminado de la portada ni el brillo de color: la página queda tan limpia como el inicio. */
@@ -1564,8 +1527,6 @@ body:has(.tv.is-series) .ambient { display: none; }
 .home-link > svg:last-child { width: 16px; height: 16px; color: var(--faint); }
 @media (hover: hover) { .home-link:hover { background: var(--btn-hover); } }
 .home-link:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-/* en la PC la cabecera va a la altura de la barra (Kai ya no está echado sobre el nombre) */
-@media (min-width: 900px) { .tv.is-home .tv-top { padding-top: calc(env(safe-area-inset-top) + 20px); } }
 
 /* ── textos de las filas: títulos, "Ver catálogo" y nombres de los pósters con jerarquía clara ── */
 .tv-row { margin: 6px 0 30px; }
@@ -1578,7 +1539,7 @@ body:has(.tv.is-series) .ambient { display: none; }
 .shelf-title { font-size: 15px; font-weight: 600; line-height: 1.3; letter-spacing: -0.01em; -webkit-line-clamp: 1; }
 .shelf-sub { margin: 0; font-size: 13px; color: var(--dim); }
 
-/* ═════════════════════════ Kai 39 · etapa 3: el reproductor ═════════════════════════
+/* ═════════════════════════ el reproductor ═════════════════════════
  * Como en Apple TV: sin cápsula de vidrio; un degradado oscuro abajo con los controles en blanco, una línea de
  * tiempo fina que engrosa al tocarla, el play del centro sin vidrio y "Saltar intro" como pastilla blanca.
  * Además de verse más limpio, quita todos los desenfoques que se recalculaban sobre el video en movimiento. */
@@ -1725,7 +1686,7 @@ body:has(.tv.is-series) .ambient { display: none; }
 .stage.is-mini .st-big { display: none; }
 .st-big.is-pause svg { margin-left: 0; }
 
-/* ═════════════════════════ Kai 39 · etapa 3b: el resto de las pantallas ═════════════════════════
+/* ═════════════════════════ el resto de las pantallas ═════════════════════════
  * Ajustes en grupos (tarjetas, como los ajustes de iOS), controles segmentados como los de Iconly (la opción
  * elegida es una pastilla que "flota" sobre el carril), campos y filtros lisos, hoja de opciones, avisos y
  * estados vacíos sobre la misma tarjeta. */
@@ -1773,7 +1734,6 @@ body:has(.tv.is-series) .ambient { display: none; }
 .sheet-title { font-size: 19px; }
 .sheet-btn { padding: 15px 2px; font-size: 16px; font-weight: 500; }
 .dock-panel { background: var(--card); border: 0; box-shadow: 0 0 0 1px var(--card-edge), 0 20px 50px rgba(0, 0, 0, 0.3); -webkit-backdrop-filter: none; backdrop-filter: none; }
-.pick-bar { background: var(--card); box-shadow: 0 0 0 1px var(--card-edge), 0 18px 50px rgba(0, 0, 0, 0.3); -webkit-backdrop-filter: none; backdrop-filter: none; }
 .toast { border: 0; border-radius: 16px; background: var(--card); box-shadow: 0 0 0 1px var(--card-edge), 0 12px 30px rgba(0, 0, 0, 0.25); -webkit-backdrop-filter: none; backdrop-filter: none; }
 
 /* estados vacíos ("No hay capítulos descargados", "Explorar necesita conexión"): una tarjeta centrada */
@@ -1785,7 +1745,7 @@ section.empty p:first-child { font-weight: 600; font-size: 16px; }
 section.empty .btn { margin-top: 10px; }
 .tv-empty { background: none; box-shadow: none; }
 
-/* ── PC: Kai acostado sobre el nombre de la app (como antes), y Descubrir en horizontal con Kai sentado a la derecha ── */
+/* ── PC: Kai acostado sobre el nombre de la app, y Descubrir en horizontal con Kai sentado a la derecha ── */
 .kcat-sit.is-top { display: none; }
 @media (min-width: 900px) {
   .tv.is-home .tv-top { padding-top: calc(env(safe-area-inset-top) + 40px); }
@@ -1815,3 +1775,8 @@ section.empty .btn { margin-top: 10px; }
 /* reproductor: los botones de arriba sin barra de fondo, como en el resto de Kai (la barra gris y el brillo de la
  * serie debajo dejaban una franja de otro tono justo encima del video) */
 .bar:has(+ main.watch) { position: relative; background: none; border: 0; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+
+/* deslizar el video hacia el mini: lo demás de la página se apaga con el dedo (gestures.js, --pull de 0 a 1) */
+#app.is-pulling > .bar, #app.is-pulling .watch-info, #app.is-pulling .watch-list { opacity: calc(1 - 0.85 * var(--pull, 0)); will-change: opacity; }
+#app > .bar, .watch-info, .watch-list { transition: opacity 0.2s; }
+#app.is-pulling > .bar, #app.is-pulling .watch-info, #app.is-pulling .watch-list { transition: none; }
