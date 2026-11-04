@@ -91,7 +91,7 @@ export function sortEntries(list, o) {
       ? (a, b) => (b.added || 0) - (a.added || 0) || az(a, b)
       : o === 'year'
         ? (a, b) => (b.year || 0) - (a.year || 0) || az(a, b)
-        : az; // por defecto, A–Z (v37)
+        : az; // por defecto, A–Z
   return list.sort((a, b) => Number(!!a.done) - Number(!!b.done) || by(a, b));
 }
 

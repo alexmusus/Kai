@@ -87,7 +87,7 @@ export function setIndex(x) {
 }
 export const knownEps = new Map(); // capítulos vistos fuera de la biblioteca (explorar, descargados)
 
-// nada descargado se borra solo: se quita a mano desde Descargados (pedido de Alex, v11)
+// nada descargado se borra solo: se quita a mano desde Descargados
 delete state.settings.autoRemoveLocal;
 
 export function saveSettings() {

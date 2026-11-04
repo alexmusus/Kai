@@ -31,8 +31,7 @@ export function swVersion() {
       if (e.data && e.data.type === 'version') {
         navigator.serviceWorker.removeEventListener('message', done);
         const { version: v, entrega: n } = e.data;
-        // las de antes mandaban "kai-v52"
-        res(typeof v === 'number' ? `Kai ${v}${n > 1 ? ` · entrega ${n}` : ''}` : String(v).replace('kai-v', 'Kai '));
+        res(typeof v === 'number' ? `Kai ${v}${n > 1 ? ` · entrega ${n}` : ''}` : '');
       }
     };
     navigator.serviceWorker.addEventListener('message', done);

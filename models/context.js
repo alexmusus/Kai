@@ -53,7 +53,7 @@ export function resolveContext(id) {
     const parent = node.parent;
     const kids = visibleChildren(parent);
     const list = sortEpisodes(
-      kids.filter(isPlayable).map((f) => index.byId.get(f.nodeId)?.ep || makeEpisode(f, nodePath(parent), kids)),
+      kids.filter(isPlayable).map((f) => index.byId.get(f.nodeId)?.ep || makeEpisode(f, nodePath(parent))),
     );
     list.forEach((x) => {
       if (!index.byId.has(x.id)) knownEps.set(x.id, x);

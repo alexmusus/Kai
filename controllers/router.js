@@ -8,7 +8,7 @@
 
 import { on } from '../lib/events.js';
 import { route } from '../lib/route.js';
-import { closeDrawer, paintDock } from './dock.js';
+import { closeDock, paintDock } from './dock.js';
 import { LS } from '../lib/util.js';
 import { createNavHistory } from '../lib/nav-history.js';
 import { renderLogin, renderProfiles } from '../views/account.js';
@@ -242,7 +242,7 @@ export function render() {
   const arriving = app.classList.contains('is-leaving');
   app.classList.remove('is-leaving', 'is-pulling');
   app.style.removeProperty('--pull');
-  closeDrawer();
+  closeDock();
   if (!LS.get('session', null)) {
     player.stop();
     renderLogin(viewState.loginNote);

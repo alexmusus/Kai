@@ -7,9 +7,7 @@ import { stage, video, holdEl, ui } from './dom.js';
 import { P } from './state.js';
 import { goBack, leavePage } from '../router.js';
 import { enterMini } from './mini.js';
-import { LS } from '../../lib/util.js';
 import { isFullscreen, togglePlay, wake, toggleFullscreen, seekBy, exitFullscreen } from './controls.js';
-LS.del('bright'); // la barra de brillo se quitó en v16
 
 ui.tap.addEventListener('pointerdown', (e) => {
   if (e.pointerType !== 'touch' || !e.isPrimary) return;

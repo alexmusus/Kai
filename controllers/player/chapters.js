@@ -8,7 +8,7 @@ import { P } from './state.js';
 import { video, ui } from './dom.js';
 import { idb } from '../../models/idb.js';
 import { rangeReader, saveChapterCache } from '../../models/media.js';
-import { mp4Info, mp4Chapters, pickIntro, OUTRO_RE as OUTRO } from '../../models/subs.js';
+import { mp4Info, mp4Chapters, pickIntro, OUTRO_RE as OUTRO } from '../../models/mp4.js';
 import { learnAudioLang } from '../../models/library.js';
 import { paintControls } from './controls.js';
 import { $ } from '../../lib/util.js';

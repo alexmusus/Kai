@@ -4,7 +4,7 @@ import { state, setIndex } from '../../models/store.js';
 import { buildIndex } from '../../models/library.js';
 import { heroPlan, seasonPlan, moviePlan, nextFor } from '../../models/plans.js';
 
-const ep = (path, n) => ({ id: path, name: path.split('/').pop(), path, ep: n, size: 1, key: 'k', fa: null, mime: 'video/mp4', ts: 0, subs: [] });
+const ep = (path, n) => ({ id: path, name: path.split('/').pop(), path, ep: n, size: 1, key: 'k', fa: null, mime: 'video/mp4', ts: 0 });
 const season = (num, name, n) => ({ num, title: name, name: `${num}. ${name}`, episodes: Array.from({ length: n }, (_, i) => ep(`Anime/S/${num}/${i + 1}_SUB.mp4`, i + 1)) });
 let s;
 beforeEach(() => {

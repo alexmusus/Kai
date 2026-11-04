@@ -179,8 +179,6 @@ export function toggleDock() {
   else openDock();
 }
 
-// nombre antiguo que aún usan otras partes
-export const closeDrawer = closeDock;
 // Con el menú abierto, tocar fuera solo lo cierra: ese toque no abre un capítulo, ni reproduce, ni sigue un enlace.
 let dockSwallow = 0; // hasta cuándo se ignora el clic de ese toque
 document.addEventListener(

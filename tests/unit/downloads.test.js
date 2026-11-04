@@ -64,7 +64,7 @@ beforeAll(async () => {
 });
 
 const MB = 1024 * 1024;
-const ep = (id, size = 9 * MB, path = `Anime/Fate/1. UBW/${id}.mp4`) => ({ id, name: `${id}.mp4`, path, ep: 1, size, key: 'k', fa: null, mime: 'video/mp4', ts: 0, subs: [] });
+const ep = (id, size = 9 * MB, path = `Anime/Fate/1. UBW/${id}.mp4`) => ({ id, name: `${id}.mp4`, path, ep: 1, size, key: 'k', fa: null, mime: 'video/mp4', ts: 0 });
 const waitDone = (id) => dl.downloadAndWait(ep(id), 'Fate');
 
 beforeEach(async () => {

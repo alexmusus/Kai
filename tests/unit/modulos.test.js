@@ -26,7 +26,8 @@ const graph = moduleGraph('app.js');
 
 describe('módulos de Kai', () => {
   it('todos están en la caché del service worker', () => {
-    const shell = [...read('sw.js').match(/const SHELL = \[([\s\S]*?)\];/)[1].matchAll(/'([^']+)'/g)].map((m) => m[1]);
+    const list = (name) => [...read('sw.js').match(new RegExp(`const ${name} = \\[([\\s\\S]*?)\\];`))[1].matchAll(/'([^']+)'/g)].map((m) => m[1]);
+    const shell = [...list('SHELL'), ...list('ASSETS')];
     expect(graph.filter((f) => !shell.includes(f))).toEqual([]);
   });
   it('todos se precargan desde index.html, y no se precarga nada que no exista', () => {

@@ -13,7 +13,7 @@
  *
  * Avisos que emite:
  *  - "download-changed" (id): empezó, avanzó, terminó o se quitó una descarga
- *  - "download-done" (ep): terminó una descarga (para leer sus capítulos y subtítulos)
+ *  - "download-done" (ep): terminó una descarga (para leer sus capítulos)
  *  - "downloads-removed": se quitó algo (para redibujar Descargados)
  *  - "folder-moved" (n): pasaron capítulos a la carpeta
  *  - "notice" (texto): algo que decirle a quien usa Kai

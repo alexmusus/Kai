@@ -4,7 +4,8 @@
  *  - chunks:   pedazos de 4 MB de los capítulos descargados, por [id, número]
  *  - dl:       datos de cada descarga (por id)
  *  - thumbs:   miniaturas de MEGA (por id)
- *  - subcache: subtítulos y capítulos leídos de los MP4
+ *  - subcache: capítulos leídos de los MP4 (y el acceso a la carpeta de descargas); el nombre viene de cuando también
+ *              guardaba subtítulos
  * Cada operación es una transacción; los errores llegan como promesas rechazadas.
  */
 
