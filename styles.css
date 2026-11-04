@@ -1815,3 +1815,8 @@ section.empty .btn { margin-top: 10px; }
 /* reproductor: los botones de arriba sin barra de fondo, como en el resto de Kai (la barra gris y el brillo de la
  * serie debajo dejaban una franja de otro tono justo encima del video) */
 .bar:has(+ main.watch) { position: relative; background: none; border: 0; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+
+/* deslizar el video hacia el mini: lo demás de la página se apaga con el dedo (gestures.js, --pull de 0 a 1) */
+#app.is-pulling > .bar, #app.is-pulling .watch-info, #app.is-pulling .watch-list { opacity: calc(1 - 0.85 * var(--pull, 0)); will-change: opacity; }
+#app > .bar, .watch-info, .watch-list { transition: opacity 0.2s; }
+#app.is-pulling > .bar, #app.is-pulling .watch-info, #app.is-pulling .watch-list { transition: none; }
