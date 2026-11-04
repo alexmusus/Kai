@@ -28,7 +28,7 @@ import { newsHTML, paintSeenByAll, renderSettings, paintCineKey, paintDownloadsW
 import { openDiscoverSheet } from '../views/discover.js';
 import { startPicking, endPicking, pickAction } from './picking.js';
 import { go, goHome, goBack, render, softRender } from './router.js';
-import { paintDock, toggleDock } from './dock.js';
+import { paintDock, toggleDock, dockUp } from './dock.js';
 import { sync, syncing, refreshLibrary, setLater } from './sync.js';
 import { selectProfile } from './account.js';
 import { queueDownload, pickFolder, dropFolder } from './downloads.js';
@@ -39,6 +39,7 @@ import { stage } from './player/dom.js';
 import { togglePlay, setLights } from './player/controls.js';
 import { switchTo, stopPlayback } from './player/engine.js';
 import { paintWatchInfo } from './player/page.js';
+import { openFromMini } from './player/mini.js';
 
 const seriesAt = (el) => state.library && state.library.series[Number(el.dataset.si)];
 const isQueued = (id) => !!state.dls[id] || state.queue.some((q) => q.ep.id === id);
@@ -286,6 +287,7 @@ const ACTIONS = {
 
   // navegación
   dock: () => toggleDock(),
+  'dock-up': () => dockUp(),
   back: () => goBack(P.playing ? P.playing.ctx.back : '#/'),
   home: () => goHome(),
   'home-search': () => {
@@ -301,7 +303,7 @@ const ACTIONS = {
   'discover-open': (el) => openDiscoverSheet(Number(el.dataset.id)),
 
   // mini reproductor
-  'mini-open': () => P.playing && go('#/play/' + encodeURIComponent(P.playing.ep.id)),
+  'mini-open': () => openFromMini(),
   'mini-toggle': () => togglePlay(),
   'mini-close': () => stopPlayback(),
 

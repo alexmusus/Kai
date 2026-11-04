@@ -56,11 +56,20 @@ ui.tap.addEventListener('pointermove', (e) => {
       t.frame = requestAnimationFrame(() => {
         t.frame = 0;
         if (P.touch !== t) return;
-        const k = Math.min(t.dist || 0, 220);
-        const base = isRotated() ? 'rotate(90deg) ' : '';
         stage.style.transition = 'none';
-        stage.style.transform = `${base}translateY(${k * 0.6}px) scale(${1 - k / 1100})`;
-        stage.style.opacity = String(1 - k / 600);
+        if (t.mode === 'fs-down') {
+          const k = Math.min(t.dist || 0, 220);
+          const base = isRotated() ? 'rotate(90deg) ' : '';
+          stage.style.transform = `${base}translateY(${k * 0.6}px) scale(${1 - k / 1100})`;
+          stage.style.opacity = String(1 - k / 600);
+          return;
+        }
+        /* hacia el mini: el video va bajo el dedo y se achica hacia la esquina de abajo a la izquierda (donde queda el
+         * mini), sin desvanecerse; al soltar, termina el viaje desde ahí */
+        const k = t.dist || 0;
+        const p = Math.min(k / 420, 1);
+        stage.style.transformOrigin = '0 0';
+        stage.style.transform = `translate(${12 * p}px, ${k}px) scale(${1 - 0.55 * p})`;
       });
   } else if (t.mode === 'up') {
     t.dist = Math.max(0, t.y - p.y);
@@ -174,16 +183,27 @@ export function touchEnd(e, cancelled) {
       // el hueco del video se queda mientras la página se desvanece (si no, lo de abajo subía de golpe)
       const slot = stage.parentElement;
       if (slot && slot.id === 'stage-slot') slot.style.height = slot.offsetHeight + 'px';
-      enterMini({ from, opacity });
+      const back = P.playing.ctx.back;
+      const fly = enterMini({ from, opacity });
       leavePage();
-      if (P.playing) goBack(P.playing.ctx.back);
+      /* la página de atrás se dibuja cuando el video ya llegó al mini: dibujarla mientras vuela (sobre todo en teléfonos
+       * de gama media) lo hacía ir a tirones */
+      let went = false;
+      const goOn = () => {
+        if (went) return;
+        went = true;
+        goBack(back);
+      };
+      if (fly) fly.finished.then(goOn, goOn);
+      setTimeout(goOn, fly ? 450 : 0);
     } else {
-      stage.style.transition = 'transform 0.2s, opacity 0.2s';
+      stage.style.transition = 'transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.2s';
       stage.style.transform = '';
       stage.style.opacity = '';
       setTimeout(() => {
         stage.style.transition = '';
-      }, 220);
+        stage.style.transformOrigin = '';
+      }, 260);
       if (far) exitFullscreen(); // vuelve al reproductor normal
     }
   } else if (t.mode === 'up') {

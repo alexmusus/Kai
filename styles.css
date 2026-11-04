@@ -669,14 +669,7 @@ html.kai-fs-on .dock { display: none; }
   border-radius: 50%;
   transition: opacity 0.2s, transform 0.2s;
 }
-/* ir arriba: el avatar se cambia por una flecha mientras dura */
 .dock-btn .dock-avatar { transition: opacity 0.18s, transform 0.18s; }
-.dock-top { position: absolute; inset: 0; display: grid; place-items: center; opacity: 0; transform: translateY(6px); transition: opacity 0.18s, transform 0.18s; pointer-events: none; }
-.dock-top svg { width: 24px; height: 24px; fill: none; stroke: var(--text); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
-.dock.is-up .dock-top { opacity: 1; transform: none; }
-.dock.is-up .dock-avatar { opacity: 0; transform: scale(0.7); }
-.dock.is-up .dock-state, .dock.is-up .dock-btn::after { display: none; }
-.dock.is-up .dock-btn { opacity: 0.9; }
 /* sincronización: ruedita azul alrededor mientras sincroniza; puntito abajo a la derecha (verde al día, azul por sincronizar, gris sin conexión) */
 .dock-ring { position: absolute; inset: -4px; border-radius: 50%; border: 2.5px solid transparent; border-top-color: var(--accent); border-right-color: color-mix(in srgb, var(--accent) 45%, transparent); display: none; animation: dock-spin 0.9s linear infinite; pointer-events: none; }
 .dock[data-sync='syncing'] .dock-ring { display: block; }
@@ -690,9 +683,10 @@ html.kai-fs-on .dock { display: none; }
 .dock-btn:focus-visible, .dock.is-open .dock-btn { opacity: 1; }
 body.lights-off .dock { opacity: 0; pointer-events: none; }
 .dock-panel {
-  width: 220px;
-  padding: 8px;
-  border-radius: 22px;
+  width: max-content;
+  min-width: 168px;
+  padding: 6px;
+  border-radius: 20px;
   display: grid;
   gap: 2px;
   transform: scale(0.92) translateY(8px);
@@ -700,11 +694,11 @@ body.lights-off .dock { opacity: 0; pointer-events: none; }
   transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.18s;
 }
 .dock-panel.is-in { transform: none; opacity: 1; }
-.dock-profile { display: flex; align-items: center; gap: 10px; padding: 6px 8px 10px; margin-bottom: 4px; border-bottom: 1px solid var(--line); border-radius: 14px 14px 0 0; }
+.dock-profile { display: flex; align-items: center; gap: 10px; padding: 6px 14px 10px 8px; margin-bottom: 4px; border-bottom: 1px solid var(--line); border-radius: 14px 14px 0 0; }
 .dock-profile > span:last-child { display: grid; }
 .dock-pname { font-weight: 650; }
 .dock-psub { font-size: 12px; color: var(--dim); }
-.dock-item { display: flex; align-items: center; gap: 12px; width: 100%; padding: 11px 10px; border-radius: 14px; font-size: 15px; font-weight: 500; text-align: left; }
+.dock-item { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 14px 10px 10px; border-radius: 14px; font-size: 15px; font-weight: 500; text-align: left; }
 .dock-item svg { width: 20px; height: 20px; color: var(--dim); }
 @media (hover: hover) { .dock-item:hover, .dock-profile:hover { background: var(--glass); } }
 .dock-item.is-spinning svg { animation: spin 0.9s linear infinite; }
@@ -1180,11 +1174,12 @@ html.lite .ambient::before, html.lite .ambient::after { animation: none; will-ch
 html.lite .mini { animation: none; }
 html.lite #app { transition: none; }
 
-/* En pantalla completa lo de detrás del video no se ve: se deja de dibujar (al girar el teléfono y al entrar o salir
- * el navegador ya no tiene que acomodar la lista de capítulos ni el fondo). */
-html.kai-fs-on .ambient, html:has(.stage:fullscreen) .ambient,
-html.kai-fs-on .watch-info, html:has(.stage:fullscreen) .watch-info,
-html.kai-fs-on .watch-list, html:has(.stage:fullscreen) .watch-list { visibility: hidden; }
+/* En pantalla completa lo de detrás del video no se ve: no se calcula ni se dibuja. Con solo ocultarlo (visibility)
+ * el navegador igual lo acomodaba al girar el teléfono, y además en horizontal con el diseño de PC (la barra de
+ * arriba, la lista al lado): en Android se entrecortaba al entrar y salir. Sigue así un momento después de salir
+ * (html.fs-leaving), mientras el teléfono termina de girar, para acomodarlo una sola vez, ya en vertical. */
+html:is(.kai-fs-on, .fs-leaving) :is(.watch-info, .watch-list), html:has(.stage:fullscreen) :is(.watch-info, .watch-list) { content-visibility: hidden; }
+html:is(.kai-fs-on, .fs-leaving) :is(.ambient, .dock, .toast), html:has(.stage:fullscreen) :is(.ambient, .dock, .toast) { display: none; }
 
 /* ═════════════════════════ Kai 39 · diseño A (estilo Apple TV) ═════════════════════════
  * Fondo neutro con un solo brillo del color de la serie, la imagen manda, datos en una línea sin pastillas,
@@ -1394,13 +1389,36 @@ html.lite .dock-bar { background: var(--glass-solid); }
   .dock-tab span { transition: opacity 0.15s; }
   .dock.is-compact .dock-bar { padding: 4px; }
   .dock.is-compact .dock-tab { height: 40px; }
-  .dock.is-compact .dock-tab:not(.is-on) { width: 0; opacity: 0; overflow: hidden; pointer-events: none; }
-  .dock.is-compact .dock-tab.is-on { width: 48px; }
+  /* achicada queda siempre la casita (estés en la pestaña que estés) */
+  .dock.is-compact .dock-tab:not([data-tab='home']) { width: 0; opacity: 0; overflow: hidden; pointer-events: none; }
+  .dock.is-compact .dock-tab[data-tab='home'] { width: 48px; color: var(--text); }
   .dock.is-compact .dock-tab span { opacity: 0; height: 0; overflow: hidden; }
   .dock.is-compact .dock-tabs { gap: 0; }
-  .dock.is-compact .dock-btn { width: 40px; height: 40px; }
-  .dock.is-compact .dock-btn .dock-avatar { width: 30px; height: 30px; font-size: 13px; }
+  /* achicada: solo la casita, con el punto de sincronización de tu perfil en su esquina */
+  .dock-bar { position: relative; }
+  .dock.is-compact .dock-btn { width: 0; height: 40px; opacity: 0; overflow: hidden; pointer-events: none; }
+  .dock-bar::after { content: ''; position: absolute; right: 3px; bottom: 3px; width: 11px; height: 11px; border-radius: 50%; background: var(--ok); border: 2px solid var(--bg); opacity: 0; transform: scale(0.5); transition: opacity 0.18s, transform 0.18s; pointer-events: none; }
+  .dock.is-compact .dock-bar::after { opacity: 1; transform: none; }
+  .dock[data-sync='syncing'] .dock-bar::after, .dock[data-sync='pending'] .dock-bar::after { background: var(--accent); }
+  .dock[data-sync='offline'] .dock-bar::after { background: var(--faint); }
+  /* la burbuja de subir, al lado de la barra achicada */
+  .dock-up {
+    position: absolute; left: calc(100% + 8px); bottom: 6px; width: 36px; height: 36px; border-radius: 50%;
+    display: grid; place-items: center; color: var(--text);
+    background: var(--glass-solid); box-shadow: inset 0 0 0 1px var(--glass-edge), 0 10px 30px var(--shadow);
+    -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur);
+    opacity: 0; transform: translateX(-22px) scale(0.4); pointer-events: none;
+    /* sale de detrás de la barra con un pequeño rebote; al irse, se recoge rápido */
+    transition: opacity 0.16s, transform 0.2s ease-in;
+  }
+  .dock.is-compact.is-deep:not(.is-open) .dock-up { transition: opacity 0.2s, transform 0.42s cubic-bezier(0.34, 1.56, 0.64, 1); }
+  .dock-up svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+  .dock.is-compact.is-deep:not(.is-open) .dock-up { opacity: 1; transform: none; pointer-events: auto; }
+  @media (prefers-reduced-motion: reduce) { .dock-up, .dock.is-compact.is-deep:not(.is-open) .dock-up { transform: none; transition: opacity 0.2s; } }
+  html.lite .dock-up { background: var(--glass-solid); -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
+.dock-up { display: none; }
+@media (max-width: 899px) { .dock-up { display: grid; } }
 
 /* el texto de un botón siempre en una línea: si no entra ("Ver Shingeki no Kyojin Kuinaki Sentaku"), termina en … */
 .tv-btn > span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1786,3 +1804,10 @@ section.empty .btn { margin-top: 10px; }
 @media (min-width: 900px) {
   .hero-card, .tv.is-home .tv-hero { min-height: 400px; padding-top: 44px; padding-bottom: 32px; }
 }
+
+/* al pasar al mini deslizando, vuela solo el video; la tarjeta (fondo, título y botones) aparece cuando llega
+ * (si no, por un instante se veía toda la tarjeta agrandada al tamaño del video) */
+.mini { transition: background-color 0.18s, box-shadow 0.18s, border-color 0.18s; }
+.mini > :not(.mini-video) { transition: opacity 0.18s; }
+.mini.is-flying { background: transparent; box-shadow: none; border-color: transparent; }
+.mini.is-flying > :not(.mini-video) { opacity: 0; transition: none; }

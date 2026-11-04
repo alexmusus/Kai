@@ -15,7 +15,7 @@ Reproductor de las series y películas de anime guardadas en una cuenta de MEGA.
 **Inicio y búsqueda**
 - Portada con la serie que estás viendo, **Continuar viendo**, **Más tarde** y filas de **Series** y **Películas**.
 - Ofrece seguir en el mismo segundo lo que dejaste a medias en otro dispositivo.
-- Catálogos de series y películas con buscador y filtros por género, año, tipo e idioma.
+- Catálogos de series y películas con buscador y filtros por género, año, tipo e idioma; lo que ya viste completo queda al final.
 - **Descubrir:** recomendaciones según lo que tienes y lo que está en emisión, con cuándo sale el próximo capítulo.
 
 **Ver**
@@ -23,7 +23,7 @@ Reproductor de las series y películas de anime guardadas en una cuenta de MEGA.
 - Gestos en el teléfono: doble toque para ±10 s, mantener presionado para 2×, deslizar hacia arriba para pantalla completa y hacia abajo para el mini reproductor.
 - Mini reproductor: el capítulo sigue sonando mientras recorres Kai.
 - Subtitulado y doblado del mismo capítulo en una sola lista, con un botón para cambiar; cada perfil recuerda cuál prefiere.
-- Pasa al siguiente capítulo dentro de la temporada y se detiene al terminarla.
+- Pasa al siguiente capítulo dentro de la temporada (también con la pantalla apagada) y se detiene al terminarla.
 - Muestra el formato de cada video y avisa si el dispositivo no lo puede reproducir.
 
 **Perfiles y sincronización**

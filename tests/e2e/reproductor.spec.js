@@ -102,6 +102,16 @@ test('al terminar un capítulo queda visto y ofrece el siguiente', async ({ page
   expect(k.errors).toEqual([]);
 });
 
+test('con "seguir solo", al terminar pasa al siguiente tras la cuenta atrás', async ({ page }) => {
+  const k = await openWithDownloads(page, '#/', { settings: { root: 'Anime', autoplay: true, autoSkip: false, theme: 'dark', cat: false } });
+  await page.evaluate((id) => { location.hash = '#/play/' + id; }, k.eps[0].id);
+  await expect.poll(() => page.evaluate(() => document.querySelector('#video').readyState), { timeout: 10000 }).toBeGreaterThan(1);
+  await page.evaluate(() => { const v = document.querySelector('#video'); v.muted = true; v.currentTime = 147; return v.play(); });
+  await expect(page.locator('#p-count')).toBeVisible({ timeout: 15000 });
+  await expect(page).toHaveURL(new RegExp(`#/play/${k.eps[1].id}$`), { timeout: 10000 });
+  expect(k.errors).toEqual([]);
+});
+
 test('quitar un capítulo y quitar todas las descargas preguntan con la hoja de Kai', async ({ page }) => {
   const k = await openWithDownloads(page, '#/descargas');
   page.on('dialog', (d) => { k.errors.push('ventana del navegador: ' + d.message()); d.dismiss(); });
@@ -175,5 +185,22 @@ test('deslizar hacia abajo en el video pasa al mini reproductor, y tocar el mini
   await expect(page).toHaveURL(/#\/play\//);
   expect(await page.evaluate(() => window.__grow)).toBe(true);
   await expect(page.locator('#mini')).toBeHidden();
+  expect(k.errors).toEqual([]);
+});
+
+test('pantalla completa: lo de detrás no se calcula, y sigue así un momento al salir', async ({ page }, info) => {
+  test.skip(info.project.name !== 'pc', 'en la PC el navegador deja entrar a pantalla completa en la prueba');
+  const k = await openWithDownloads(page);
+  await page.evaluate((id) => { location.hash = '#/play/' + id; }, k.eps[0].id);
+  await expect.poll(() => page.evaluate(() => document.querySelector('#video').readyState), { timeout: 10000 }).toBeGreaterThan(1);
+  const cv = () => page.evaluate(() => getComputedStyle(document.querySelector('#watch-list')).contentVisibility);
+  expect(await cv()).toBe('visible');
+  await page.evaluate(() => document.querySelector('#stage').requestFullscreen());
+  await expect.poll(() => page.evaluate(() => document.documentElement.classList.contains('kai-fs-on'))).toBe(true);
+  expect(await cv()).toBe('hidden');
+  await page.evaluate(() => document.exitFullscreen());
+  await expect.poll(() => page.evaluate(() => !!document.fullscreenElement)).toBe(false);
+  await expect.poll(cv, { timeout: 3000 }).toBe('visible');
+  await expect(page.locator('html')).not.toHaveClass(/fs-leaving|kai-fs-on/);
   expect(k.errors).toEqual([]);
 });

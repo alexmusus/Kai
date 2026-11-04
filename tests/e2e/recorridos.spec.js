@@ -195,6 +195,20 @@ test('etiqueta de códec: nombre y puntito rojo si este navegador no lo reproduc
   expect(k.errors).toEqual([]);
 });
 
+test('catálogo: lo que ya viste completo va al final', async ({ page }) => {
+  const { buildFixture, NOW } = await import('./fixture.js');
+  const { ls } = buildFixture();
+  const dor = ls.library.series.find((s) => s.name === 'Dorohedoro');
+  const progress = { ...ls['p.pA.progress'] };
+  for (const e of dor.seasons.flatMap((x) => x.episodes)) progress[e.path] = { t: 1400, d: 1440, u: NOW - 3600e3, w: 1 };
+  const k = await openKai(page, '#/', { extraLS: { 'p.pA.progress': progress } });
+  await go(page, '#/catalogo?t=series');
+  const titles = page.locator('#cat-results .shelf-title');
+  await expect(titles.last()).toHaveText('Dorohedoro'); // en A–Z iría primero
+  await expect(titles.first()).not.toHaveText('Dorohedoro');
+  expect(k.errors).toEqual([]);
+});
+
 test('seguir aquí lo que quedó a medias en otro dispositivo', async ({ page }, info) => {
   const { buildFixture, NOW } = await import('./fixture.js');
   const { ls } = buildFixture();
@@ -434,25 +448,49 @@ test('abrir Kai sin # (como la app instalada) deja el inicio en "#/", igual que 
   expect(k.errors).toEqual([]);
 });
 
-test('la barra flotante se achica al bajar y vuelve al subir o al tocarla', async ({ page }, info) => {
+test('la barra flotante se achica al bajar en la casita, se queda así hasta tocarla y la burbuja sube', async ({ page }, info) => {
   test.skip(info.project.name !== 'iphone', 'solo en el teléfono');
   const k = await openKai(page, '#/');
   await page.waitForTimeout(600);
   const dock = page.locator('#dock');
-  await page.mouse.wheel(0, 0); // nada
-  await page.evaluate(() => window.scrollTo(0, 600));
+  const up = page.locator('#dock .dock-up');
+  const scrollY = () => page.evaluate(() => window.scrollY);
+  // inicio: bajar la achica; subir (el rebote del final) ya no la agranda; no hay burbuja (la casita sube)
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
   await expect(dock).toHaveClass(/is-compact/);
-  await page.screenshot({ path: '/tmp/claude-0/-home-user-Kai/2a50527b-117a-5251-8346-343e47b047cb/scratchpad/new/compact.jpg', type: 'jpeg', quality: 80 });
-  // tocarla achicada solo la agranda: no navega
-  await page.locator('#dock .dock-tab.is-on').click();
+  await expect(page.locator('#dock .dock-btn')).toHaveCSS('opacity', '0'); // sin tu perfil, solo la casita
+  await page.evaluate(() => window.scrollBy(0, -200));
+  await page.waitForTimeout(200);
+  await expect(dock).toHaveClass(/is-compact/);
+  await expect(up).toHaveCSS('opacity', '0');
+  await page.locator('#dock .dock-tab[data-tab="home"]').click();
+  await expect.poll(scrollY).toBe(0);
   await expect(dock).not.toHaveClass(/is-compact/);
   await expect(page).toHaveURL(/#\/$/);
-  // bajar otra vez la achica; subir la agranda
-  await page.waitForTimeout(1300);
-  await page.evaluate(() => window.scrollTo(0, 1200));
+  // en otra pestaña, achicada también queda la casita: tocarla solo la agranda
+  await go(page, '#/ajustes');
+  await page.waitForTimeout(700);
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
   await expect(dock).toHaveClass(/is-compact/);
-  await page.evaluate(() => window.scrollTo(0, 300));
+  await expect(page.locator('#dock .dock-tab[data-tab="home"]')).toHaveCSS('width', '48px');
+  await expect(page.locator('#dock .dock-tab[data-tab="ajustes"]')).toHaveCSS('opacity', '0');
+  // y lejos del principio, al lado, la burbuja de subir
+  await expect(up).toHaveCSS('opacity', '1');
+  await page.screenshot({ path: '/tmp/claude-0/-home-user-Kai/2a50527b-117a-5251-8346-343e47b047cb/scratchpad/new/compact-ajustes.png', clip: { x: 0, y: 700, width: 390, height: 144 } });
+  const y = await scrollY();
+  await page.locator('#dock .dock-tab[data-tab="home"]').click();
   await expect(dock).not.toHaveClass(/is-compact/);
+  await expect(page).toHaveURL(/#\/ajustes$/);
+  expect(await scrollY()).toBe(y);
+  await page.waitForTimeout(1300);
+  await page.evaluate(() => window.scrollBy(0, -300));
+  await page.waitForTimeout(100);
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await expect(dock).toHaveClass(/is-compact/);
+  await up.click();
+  await expect.poll(scrollY).toBe(0);
+  await expect(dock).not.toHaveClass(/is-compact/);
+  await expect(up).toHaveCSS('opacity', '0');
   expect(k.errors).toEqual([]);
 });
 
