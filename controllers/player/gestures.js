@@ -183,19 +183,11 @@ export function touchEnd(e, cancelled) {
       // el hueco del video se queda mientras la página se desvanece (si no, lo de abajo subía de golpe)
       const slot = stage.parentElement;
       if (slot && slot.id === 'stage-slot') slot.style.height = slot.offsetHeight + 'px';
-      const back = P.playing.ctx.back;
-      const fly = enterMini({ from, opacity });
+      enterMini({ from, opacity });
       leavePage();
-      /* la página de atrás se dibuja cuando el video ya llegó al mini: dibujarla mientras vuela (sobre todo en teléfonos
-       * de gama media) lo hacía ir a tirones */
-      let went = false;
-      const goOn = () => {
-        if (went) return;
-        went = true;
-        goBack(back);
-      };
-      if (fly) fly.finished.then(goOn, goOn);
-      setTimeout(goOn, fly ? 450 : 0);
+      /* la página de atrás se pide de inmediato, para que aparezca debajo mientras el video vuela al mini (esperar a
+       * que llegara dejaba ver solo el fondo durante el vuelo) */
+      if (P.playing) goBack(P.playing.ctx.back);
     } else {
       stage.style.transition = 'transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.2s';
       stage.style.transform = '';
