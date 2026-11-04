@@ -102,6 +102,16 @@ test('al terminar un capítulo queda visto y ofrece el siguiente', async ({ page
   expect(k.errors).toEqual([]);
 });
 
+test('con "seguir solo", al terminar pasa al siguiente tras la cuenta atrás', async ({ page }) => {
+  const k = await openWithDownloads(page, '#/', { settings: { root: 'Anime', autoplay: true, autoSkip: false, theme: 'dark', cat: false } });
+  await page.evaluate((id) => { location.hash = '#/play/' + id; }, k.eps[0].id);
+  await expect.poll(() => page.evaluate(() => document.querySelector('#video').readyState), { timeout: 10000 }).toBeGreaterThan(1);
+  await page.evaluate(() => { const v = document.querySelector('#video'); v.muted = true; v.currentTime = 147; return v.play(); });
+  await expect(page.locator('#p-count')).toBeVisible({ timeout: 15000 });
+  await expect(page).toHaveURL(new RegExp(`#/play/${k.eps[1].id}$`), { timeout: 10000 });
+  expect(k.errors).toEqual([]);
+});
+
 test('quitar un capítulo y quitar todas las descargas preguntan con la hoja de Kai', async ({ page }) => {
   const k = await openWithDownloads(page, '#/descargas');
   page.on('dialog', (d) => { k.errors.push('ventana del navegador: ' + d.message()); d.dismiss(); });

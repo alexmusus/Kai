@@ -195,6 +195,20 @@ test('etiqueta de códec: nombre y puntito rojo si este navegador no lo reproduc
   expect(k.errors).toEqual([]);
 });
 
+test('catálogo: lo que ya viste completo va al final', async ({ page }) => {
+  const { buildFixture, NOW } = await import('./fixture.js');
+  const { ls } = buildFixture();
+  const dor = ls.library.series.find((s) => s.name === 'Dorohedoro');
+  const progress = { ...ls['p.pA.progress'] };
+  for (const e of dor.seasons.flatMap((x) => x.episodes)) progress[e.path] = { t: 1400, d: 1440, u: NOW - 3600e3, w: 1 };
+  const k = await openKai(page, '#/', { extraLS: { 'p.pA.progress': progress } });
+  await go(page, '#/catalogo?t=series');
+  const titles = page.locator('#cat-results .shelf-title');
+  await expect(titles.last()).toHaveText('Dorohedoro'); // en A–Z iría primero
+  await expect(titles.first()).not.toHaveText('Dorohedoro');
+  expect(k.errors).toEqual([]);
+});
+
 test('seguir aquí lo que quedó a medias en otro dispositivo', async ({ page }, info) => {
   const { buildFixture, NOW } = await import('./fixture.js');
   const { ls } = buildFixture();

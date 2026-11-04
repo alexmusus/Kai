@@ -15,6 +15,40 @@ import { setKaiFullscreen, isFullscreen, exitFullscreen, setLights, closeMenu } 
 
 video.addEventListener('leavepictureinpicture', backFromSystemPip);
 
+/** Vuelve del mini al reproductor grande. */
+export function openFromMini() {
+  if (mini.hidden || !P.playing) return;
+  go('#/play/' + encodeURIComponent(P.playing.ep.id));
+}
+/* En Android a veces había que tocar el mini dos veces: el primer toque no llegaba como clic. Con el dedo se abre al
+ * soltarlo (si no se movió), sin esperar ese clic; el clic que llega después ya no hace nada (el mini se cerró). */
+let downAt = /** @type {{ x: number, y: number, t: number } | null} */ (null);
+mini.addEventListener('pointerdown', (e) => {
+  downAt = e.pointerType === 'touch' ? { x: e.clientX, y: e.clientY, t: Date.now() } : null;
+});
+mini.addEventListener('pointerup', (e) => {
+  const d = downAt;
+  downAt = null;
+  if (!d || e.pointerType !== 'touch') return;
+  if (!(/** @type {Element} */ (e.target).closest('[data-act="mini-open"]'))) return;
+  if (Math.hypot(e.clientX - d.x, e.clientY - d.y) > 12 || Date.now() - d.t > 800) return;
+  openFromMini();
+  swallowUntil = Date.now() + 700;
+});
+mini.addEventListener('pointercancel', () => (downAt = null));
+// el clic de ese mismo toque llega después a lo que quedó bajo el dedo (ya es la página del reproductor): se ignora
+let swallowUntil = 0;
+document.addEventListener(
+  'click',
+  (e) => {
+    if (Date.now() > swallowUntil) return;
+    swallowUntil = 0;
+    e.preventDefault();
+    e.stopPropagation();
+  },
+  true,
+);
+
 video.addEventListener('webkitpresentationmodechanged', () => {
   if (video.webkitPresentationMode === 'inline') backFromSystemPip();
 });
@@ -30,12 +64,14 @@ export const calmMotion = () =>
  * @param {DOMRect} from dónde se veía antes
  * @param {DOMRect} to dónde se ve ahora la parte de `el` que tiene que coincidir con `from`
  * @param {number} [opacity] con qué opacidad empieza
+ * @param {number} [duration] ms
+ * @returns {Animation | null}
  */
-export function flyFrom(el, from, to, opacity = 1) {
-  if (calmMotion() || !from.width || !to.width || !el.animate) return;
+export function flyFrom(el, from, to, opacity = 1, duration = 300) {
+  if (calmMotion() || !from.width || !to.width || !el.animate) return null;
   const box = el.getBoundingClientRect();
   const s = from.width / to.width;
-  el.animate(
+  return el.animate(
     [
       {
         transformOrigin: `${to.left - box.left}px ${to.top - box.top}px`,
@@ -44,7 +80,7 @@ export function flyFrom(el, from, to, opacity = 1) {
       },
       { transformOrigin: `${to.left - box.left}px ${to.top - box.top}px`, transform: 'none', opacity: 1 },
     ],
-    { duration: 300, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' },
+    { duration, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
   );
 }
 
@@ -52,9 +88,10 @@ export function flyFrom(el, from, to, opacity = 1) {
  * Pasa al mini reproductor. Con `from` (deslizar hacia abajo), el mini sale volando desde donde quedó el video bajo el
  * dedo, sin esperar a que el navegador termine de volver atrás (en iPhone eso tarda y el video se quedaba congelado).
  * @param {{ from?: DOMRect, opacity?: number }} [opts]
+ * @returns {Animation | null} el vuelo, si lo hay
  */
 export function enterMini({ from, opacity } = {}) {
-  if (!P.playing) return;
+  if (!P.playing) return null;
   const wasHidden = mini.hidden;
   if (stage.classList.contains('kai-fs')) setKaiFullscreen(false);
   else if (isFullscreen()) exitFullscreen();
@@ -65,6 +102,7 @@ export function enterMini({ from, opacity } = {}) {
   // lo que le dejó el gesto de deslizar hacia abajo
   stage.style.transition = '';
   stage.style.transform = '';
+  stage.style.transformOrigin = '';
   stage.style.opacity = '';
   stage.classList.add('is-mini');
   stage.hidden = false;
@@ -73,8 +111,15 @@ export function enterMini({ from, opacity } = {}) {
   paintMini();
   if (from && wasHidden && !calmMotion()) {
     mini.style.animation = 'none'; // la entrada de siempre (CSS) no se suma al vuelo
-    flyFrom(mini, from, /** @type {HTMLElement} */ ($('#mini-slot')).getBoundingClientRect(), opacity);
+    const fly = flyFrom(mini, from, /** @type {HTMLElement} */ ($('#mini-slot')).getBoundingClientRect(), opacity, 380);
+    if (fly) {
+      mini.classList.add('is-flying');
+      const land = () => mini.classList.remove('is-flying');
+      fly.finished.then(land, land);
+    }
+    return fly;
   }
+  return null;
 }
 export function leaveMini() {
   stage.classList.remove('is-mini');

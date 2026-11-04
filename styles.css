@@ -1804,3 +1804,10 @@ section.empty .btn { margin-top: 10px; }
 @media (min-width: 900px) {
   .hero-card, .tv.is-home .tv-hero { min-height: 400px; padding-top: 44px; padding-bottom: 32px; }
 }
+
+/* al pasar al mini deslizando, vuela solo el video; la tarjeta (fondo, título y botones) aparece cuando llega
+ * (si no, por un instante se veía toda la tarjeta agrandada al tamaño del video) */
+.mini { transition: background-color 0.18s, box-shadow 0.18s, border-color 0.18s; }
+.mini > :not(.mini-video) { transition: opacity 0.18s; }
+.mini.is-flying { background: transparent; box-shadow: none; border-color: transparent; }
+.mini.is-flying > :not(.mini-video) { opacity: 0; transition: none; }
