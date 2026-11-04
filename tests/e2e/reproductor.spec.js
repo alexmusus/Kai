@@ -183,7 +183,8 @@ test('deslizar hacia abajo en el video pasa al mini reproductor, y tocar el mini
   });
   await page.locator('#mini .mini-open').click();
   await expect(page).toHaveURL(/#\/play\//);
-  expect(await page.evaluate(() => window.__grow)).toBe(true);
+  // 'hashchange' llega un momento después de que cambia la dirección: se espera a que llegue
+  await expect.poll(() => page.evaluate(() => window.__grow)).toBe(true);
   await expect(page.locator('#mini')).toBeHidden();
   expect(k.errors).toEqual([]);
 });
