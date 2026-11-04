@@ -1811,3 +1811,7 @@ section.empty .btn { margin-top: 10px; }
 .mini > :not(.mini-video) { transition: opacity 0.18s; }
 .mini.is-flying { background: transparent; box-shadow: none; border-color: transparent; }
 .mini.is-flying > :not(.mini-video) { opacity: 0; transition: none; }
+
+/* reproductor: los botones de arriba sin barra de fondo, como en el resto de Kai (la barra gris y el brillo de la
+ * serie debajo dejaban una franja de otro tono justo encima del video) */
+.bar:has(+ main.watch) { position: relative; background: none; border: 0; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
