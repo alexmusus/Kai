@@ -10,6 +10,7 @@ Reproductor de las series y películas de anime guardadas en una cuenta de MEGA.
 - Muestra un menú de temporadas en las series que tienen varias, y la lista de capítulos directa en las que tienen una.
 - Traduce las sinopsis al español y las comparte con todos los dispositivos.
 - Separa una sección de **Cine** para las películas que no son anime, con ficha en español.
+- **Studio:** música en vivo, con la imagen y la descripción que tú le pongas a cada video.
 - Avisa con una burbuja de "Nuevo" lo que se agregó a MEGA y lo lista en **Novedades**.
 
 **Inicio y búsqueda**
@@ -19,8 +20,9 @@ Reproductor de las series y películas de anime guardadas en una cuenta de MEGA.
 - **Descubrir:** recomendaciones según lo que tienes y lo que está en emisión, con cuándo sale el próximo capítulo.
 
 **Ver**
-- Reproductor con marcas de capítulos, salto de intro automático, ±10 s, velocidad, pantalla completa y ventana flotante.
-- Gestos en el teléfono: doble toque para ±10 s, mantener presionado para 2×, deslizar hacia arriba para pantalla completa y hacia abajo para el mini reproductor.
+- Reproductor con marcas de capítulos, salto de intro automático, adelantar y retroceder, velocidad, pantalla completa y ventana flotante.
+- Gestos en el teléfono: doble toque para adelantar o retroceder, mantener presionado para cambiar la velocidad, deslizar hacia arriba para pantalla completa y hacia abajo para el mini reproductor. En la computadora, mantener la barra espaciadora cambia la velocidad.
+- Cada perfil elige cuánto saltan los botones (5, 10, 15 o 30 s) y la velocidad al mantener presionado (0,5×, 2× o 3×).
 - Mini reproductor: el capítulo sigue sonando mientras recorres Kai.
 - Subtitulado y doblado del mismo capítulo en una sola lista, con un botón para cambiar; cada perfil recuerda cuál prefiere.
 - Pasa al siguiente capítulo dentro de la temporada (también con la pantalla apagada) y se detiene al terminarla.

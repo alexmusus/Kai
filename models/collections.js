@@ -6,6 +6,11 @@
  * Cine: películas que no son anime (p. ej. "El gigante de hierro"). Carpeta "Cine" (u "Otras películas") dentro de
  * Anime: funciona como Películas pero no sale en el inicio ni en los catálogos, solo con su botón al final del inicio
  * y al buscar. Sus fichas vienen de TMDB (con la clave que se pone en Ajustes).
+ *
+ * Studio: música en vivo (carpeta "Studio" dentro de Anime), un video por canción. Tampoco sale en el inicio ni en
+ * los catálogos: tiene su botón al final del inicio. No hay de dónde sacar fichas: el nombre del archivo dice el
+ * artista, la canción y un detalle ("Juan Gabriel - Querida (Bellas Artes, 1990).mp4"), la imagen es un archivo
+ * con el mismo nombre (.jpg, .png o .webp) y la descripción, si la hay, un .txt con el mismo nombre.
  */
 
 import { stripLang, baseName } from './naming.js';
@@ -25,6 +30,7 @@ import { index, state } from './store.js';
 // "Películas" puede venir con la tilde en cualquier codificación (macOS la guarda separada), o sin tilde
 export const COLLECTION_RE = /^(peliculas?|movies?|films?|filmes)\b/i;
 export const CINE_RE = /^(cine|otras peliculas)\b/i;
+export const STUDIO_RE = /^studio\b/i;
 
 /** El nombre sin tildes. @param {{ name?: string } | null | undefined} s */
 export const plainName = (s) =>
@@ -35,7 +41,41 @@ export const plainName = (s) =>
 /** @param {{ name?: string } | null | undefined} s */
 export const isCine = (s) => !!s && CINE_RE.test(plainName(s));
 /** @param {{ name?: string } | null | undefined} s */
-export const isCollection = (s) => !!s && (COLLECTION_RE.test(plainName(s)) || isCine(s));
+export const isStudio = (s) => !!s && STUDIO_RE.test(plainName(s));
+/** @param {{ name?: string } | null | undefined} s */
+export const isCollection = (s) => !!s && (COLLECTION_RE.test(plainName(s)) || isCine(s) || isStudio(s));
+/** Estantes aparte (Cine y Studio): no salen en el inicio ni en los catálogos, solo con su botón y al buscar. */
+export const isAside = (/** @type {{ name?: string } | null | undefined} */ s) => isCine(s) || isStudio(s);
+
+/**
+ * Artista, canción y detalle de un video de Studio, por su nombre: "Juan Gabriel - Querida (Bellas Artes, 1990)".
+ * Sin " - ", todo es la canción.
+ * @param {string} name nombre del archivo
+ * @returns {{ artist: string, song: string, detail: string }}
+ */
+export function studioTitle(name) {
+  let t = String(name)
+    .replace(/\.[^.]+$/, '')
+    .replace(/_/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  let detail = '';
+  const m = /\s*[([]([^)\]]+)[)\]]\s*$/.exec(t);
+  if (m) {
+    detail = m[1].trim();
+    t = t.slice(0, m.index).trim();
+  }
+  const cut = t.search(/\s[-–—]\s/);
+  if (cut < 0) return { artist: '', song: t, detail };
+  return {
+    artist: t.slice(0, cut).trim(),
+    song: t
+      .slice(cut)
+      .replace(/^\s*[-–—]\s*/, '')
+      .trim(),
+    detail,
+  };
+}
 
 const JUNK_WORDS =
   /\b(1080p|720p|480p|2160p|4k|x26[45]|hevc|aac|sub|subs|subtitulado|vose|dub|dob|doblado|lat|latino|castellano|esp|spa|bd|bdrip|web|webrip)\b/gi;
@@ -113,6 +153,7 @@ export function movieTitle(s, it) {
 export function episodeLabel(ep) {
   const e = index.byId.get(ep.id);
   const s = e && state.library && state.library.series && state.library.series[e.si];
+  if (s && isStudio(s)) return studioTitle(ep.name).song;
   const it = s && isCollection(s) ? itemFor(s, ep) : null;
   if (s && it) {
     const m = itemMeta(s, it.key);

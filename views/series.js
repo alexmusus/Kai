@@ -7,7 +7,7 @@
 import { emit } from '../lib/events.js';
 import { langPref, langsOf, epById } from '../models/library.js';
 import { state, index } from '../models/store.js';
-import { isCollection, collectionItems, itemMeta, movieTitle } from '../models/collections.js';
+import { isCollection, isStudio, studioTitle, collectionItems, itemMeta, movieTitle } from '../models/collections.js';
 import { viewState } from './view-state.js';
 import { seasonPlan, heroPlan, shelfItems, moviePlan } from '../models/plans.js';
 import {
@@ -74,6 +74,10 @@ export function renderSeries(arg) {
   const s = lib && lib.series && lib.series[si];
   if (!s) {
     emit('navigate', { hash: '#/' });
+    return;
+  }
+  if (isStudio(s)) {
+    renderStudio(s, si);
     return;
   }
   if (isCollection(s)) {
@@ -271,6 +275,36 @@ export function renderSeasonMenu(s, si) {
     </main>
   </div>`;
   if (fresh.size) {
+    markSeriesSeen(s);
+    announceNew();
+  }
+}
+
+/** Studio: todos los videos, cada uno con su imagen (la que pusiste con el mismo nombre) y quién canta. */
+export function renderStudio(s, si) {
+  setTint(seriesColor(s));
+  const eps = [...s.all].sort((a, b) => {
+    const x = studioTitle(a.name);
+    const y = studioTitle(b.name);
+    return (x.artist || x.song).localeCompare(y.artist || y.song, 'es') || x.song.localeCompare(y.song, 'es');
+  });
+  const tile = (/** @type {import('../models/types.js').Episode} */ e) => {
+    const { artist, song, detail } = studioTitle(e.name);
+    const p = prog(e) || {};
+    const pct = p.d && p.t && !p.w ? Math.round((p.t / p.d) * 100) : 0;
+    return `<a class="tile studio-tile" href="#/play/${encodeURIComponent(e.id)}" style="--h:${hue(song)}">
+      <span class="tile-img is-fallback" ${e.art || e.fa ? `data-thumb="${esc(e.id)}"` : ''}><span class="cover-glyph">${esc([...(artist || song).trim()][0] || '·')}</span></span>
+      <span class="tile-text"><span class="tile-title">${esc(song)}</span><span class="tile-sub">${esc([artist, detail].filter(Boolean).join(' · '))}</span></span>
+      ${pct ? `<span class="tile-bar"><span style="width:${pct}%"></span></span>` : ''}
+    </a>`;
+  };
+  app.innerHTML =
+    header(esc(s.name)) +
+    `<main class="shelf-main studio">
+    <p class="dim shelf-count">${plural(eps.length, 'canción', 'canciones')} en vivo</p>
+    <div class="tiles is-grid studio-grid" role="list">${eps.map(tile).join('')}</div>
+  </main>`;
+  if (newEpisodes(s).length) {
     markSeriesSeen(s);
     announceNew();
   }

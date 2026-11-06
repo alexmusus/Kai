@@ -5,7 +5,7 @@
  */
 
 import { state } from './store.js';
-import { isCine, isCollection, collectionItems, itemMeta } from './collections.js';
+import { isAside, isCollection, collectionItems, itemMeta } from './collections.js';
 import { movieHref } from '../lib/route.js';
 import { metaFor, seasonMeta } from './fichas.js';
 import { LS } from '../lib/util.js';
@@ -26,7 +26,7 @@ export function ownedIds() {
   const lib = state.library;
   if (!lib || lib.v !== 2) return out;
   lib.series.forEach((s, si) => {
-    if (isCine(s)) return;
+    if (isAside(s)) return;
     if (isCollection(s)) {
       for (const it of collectionItems(s)) {
         const m = itemMeta(s, it.key);

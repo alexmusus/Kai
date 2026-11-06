@@ -1,12 +1,13 @@
 // @ts-check
 /*
- * models/thumbs.js — miniaturas de MEGA (el atributo "fa" de cada video): se piden a MEGA, se descifran y se guardan
- * en IndexedDB. Máximo 3 a la vez; cada capítulo se pide una sola vez por sesión.
+ * models/thumbs.js — miniaturas de MEGA (el atributo "fa" de cada video), o la imagen propia de un video (un archivo
+ * con su mismo nombre, como en Studio): se piden a MEGA, se descifran y se guardan en IndexedDB. Máximo 3 a la vez;
+ * cada capítulo se pide una sola vez por sesión.
  */
 
 import { idb } from './idb.js';
 import { state } from './store.js';
-import { C } from './mega.js';
+import { C, downloadUrl } from './mega.js';
 
 /** @type {Map<string, Promise<string | null>>} id → URL de la imagen (blob:) */
 const thumbUrls = new Map();
@@ -22,17 +23,19 @@ let thumbActive = 0;
  * @returns {Promise<string | null>}
  */
 export function thumbFor(ep) {
-  if (!ep || !ep.fa) return Promise.resolve(null);
+  if (!ep || !(ep.fa || ep.art)) return Promise.resolve(null);
+  // la imagen propia manda; se guarda por el id de la imagen (si la cambias en MEGA, se baja la nueva)
+  const cacheKey = ep.art ? 'art:' + ep.art.id : ep.id;
   const known = thumbUrls.get(ep.id);
   if (known) return known;
   /** @type {Promise<string | null>} */
   const p = new Promise((resolve) => {
     thumbQueue.push(async () => {
       try {
-        let blob = await idb.get('thumbs', ep.id).catch(() => null);
+        let blob = await idb.get('thumbs', cacheKey).catch(() => null);
         if (!blob && state.storage && navigator.onLine) {
-          blob = await fetchThumb(ep);
-          if (blob) idb.put('thumbs', blob, ep.id).catch(() => {});
+          blob = ep.art ? await fetchArt(ep.art) : await fetchThumb(ep);
+          if (blob) idb.put('thumbs', blob, cacheKey).catch(() => {});
         }
         resolve(blob ? URL.createObjectURL(blob) : null);
       } catch {
@@ -61,6 +64,14 @@ function pumpThumbs() {
       pumpThumbs();
     });
   }
+}
+
+/** Baja y descifra la imagen propia de un video (un archivo chico de MEGA). @param {import('./types.js').SideFile} f */
+async function fetchArt(f) {
+  if (!f.size || f.size > 8 * 1024 * 1024) return null; // una miniatura, no una foto enorme
+  const bytes = await C.readRange(await downloadUrl(f.id, true), await C.fileKey(f.key), 0, f.size - 1);
+  const type = bytes[0] === 0x89 ? 'image/png' : bytes[0] === 0x52 ? 'image/webp' : 'image/jpeg';
+  return new Blob([bytes], { type });
 }
 
 /** Pide la miniatura a MEGA y la descifra. @param {import('./types.js').Episode} ep @returns {Promise<Blob | null>} */

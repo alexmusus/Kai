@@ -4,7 +4,7 @@
  * serie), cómo se llama esa lista y a qué página se vuelve desde el reproductor.
  */
 
-import { isCollection, itemFor } from './collections.js';
+import { isCollection, isStudio, itemFor } from './collections.js';
 import { movieHref } from '../lib/route.js';
 import { index, state, knownEps } from './store.js';
 import { seasonLabel } from './fichas.js';
@@ -44,7 +44,11 @@ export function resolveContext(id) {
             ? season.title
             : '',
       ki: e.ki,
-      back: isCollection(s) ? movieHref(e.si, (itemFor(s, e.ep) || { key: '' }).key) : seasonHref(e.si, s, e.ki),
+      back: isStudio(s)
+        ? `#/serie/${e.si}`
+        : isCollection(s)
+          ? movieHref(e.si, (itemFor(s, e.ep) || { key: '' }).key)
+          : seasonHref(e.si, s, e.ki),
       si: e.si,
     };
   }

@@ -53,7 +53,7 @@ export function episodeRow(ep, { current = false, extra = '', fresh = false, nex
       : episodeStatus(ep);
   return `<li class="ep ${seen ? 'is-seen' : ''} ${current ? 'is-current' : ''} ${next ? 'is-next' : ''}" data-id="${esc(ep.id)}">
     <a class="ep-main" href="#/play/${encodeURIComponent(ep.id)}" ${current ? 'aria-current="true"' : ''}>
-      <span class="ep-thumb ${art ? 'has-img is-art' : ''}" ${!art && ep.fa ? `data-thumb="${esc(ep.id)}"` : ''}>
+      <span class="ep-thumb ${art ? 'has-img is-art' : ''}" ${!art && (ep.fa || ep.art) ? `data-thumb="${esc(ep.id)}"` : ''}>
         ${art ? `<img src="${esc(art)}" alt="" loading="lazy" decoding="async">` : ''}
         <span class="ep-num" aria-hidden="true">${movie ? '' : ep.ep != null ? esc(ep.ep) : '·'}</span>
         <span class="ep-flags">${only ? `<span class="ep-new is-lang">${only}</span>` : ''}${fresh ? '<span class="ep-new">Nuevo</span>' : ''}${state.saved.has(ep.id) ? `<span class="ep-flag" title="Descargado">${ICON.saved}</span>` : ''}${seen ? `<span class="ep-flag is-seen" title="Visto">${ICON.check}</span>` : ''}</span>

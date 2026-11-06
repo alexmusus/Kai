@@ -28,6 +28,9 @@ import {
   wake,
   togglePlay,
   seekBy,
+  seekStep,
+  startFast,
+  stopFast,
   setLights,
   toggleFullscreen,
   togglePip,
@@ -303,8 +306,8 @@ stage.addEventListener('click', (e) => {
   const act = el.dataset.act;
   wake();
   if (act === 'toggle') togglePlay();
-  else if (act === 'back10') seekBy(-10);
-  else if (act === 'fwd10') seekBy(10);
+  else if (act === 'back10') seekBy(-seekStep());
+  else if (act === 'fwd10') seekBy(seekStep());
   else if (act === 'next') playNext();
   else if (act === 'skip') doSkip();
   else if (act === 'lights') setLights(!document.body.classList.contains('lights-off'));
@@ -378,6 +381,27 @@ function onLeaveResize() {
 
 if (!(document.pictureInPictureEnabled || video.webkitSupportsPresentationMode)) ui.pip.hidden = true;
 
+/* barra espaciadora: se decide al soltarla si fue un toque (play/pausa) o la mantuviste (más rápido) */
+let spaceTimer = 0;
+let spaceHeld = false;
+document.addEventListener('keyup', (e) => {
+  if (e.key !== ' ') return;
+  if (spaceHeld) {
+    spaceHeld = false;
+    stopFast();
+  } else if (spaceTimer) {
+    clearTimeout(spaceTimer);
+    spaceTimer = 0;
+    togglePlay();
+    wake();
+  }
+});
+addEventListener('blur', () => {
+  clearTimeout(spaceTimer);
+  spaceTimer = 0;
+  if (spaceHeld) ((spaceHeld = false), stopFast());
+});
+
 document.addEventListener('keydown', (e) => {
   if (route().view !== 'play' || !P.playing) {
     if (e.key === 'Escape') {
@@ -389,15 +413,25 @@ document.addEventListener('keydown', (e) => {
   }
   if (e.target.closest('input:not([type="range"]), textarea, select')) return;
   const k = e.key.toLowerCase();
-  if (k === ' ' || k === 'k') {
+  if (k === ' ') {
+    // un toque pausa o reproduce (al soltar); mantenerla presionada acelera mientras dura, como el dedo en el teléfono
+    e.preventDefault();
+    if (e.repeat || spaceTimer || spaceHeld) return;
+    spaceTimer = setTimeout(() => {
+      spaceTimer = 0;
+      spaceHeld = true;
+      startFast();
+    }, 350);
+    return;
+  } else if (k === 'k') {
     e.preventDefault();
     togglePlay();
   } else if (k === 'arrowright' || k === 'l') {
     e.preventDefault();
-    seekBy(10);
+    seekBy(seekStep());
   } else if (k === 'arrowleft' || k === 'j') {
     e.preventDefault();
-    seekBy(-10);
+    seekBy(-seekStep());
   } else if (k === 'f') toggleFullscreen();
   else if (k === 'm') video.muted = !video.muted;
   else if (k === 'n') playNext();

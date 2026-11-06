@@ -41,10 +41,14 @@ export function setTint(color) {
   else r.removeProperty('--tint');
 }
 
-export function tileHTML(s, si, { href, label = '', sub = '', pct = 0, badge = '', img: own = '' } = {}) {
-  const m = own ? null : displayMeta(s);
+export function tileHTML(
+  s,
+  si,
+  { href, label = '', sub = '', pct = 0, badge = '', img: own = '', thumbEp = null } = {},
+) {
+  const m = own || thumbEp ? null : displayMeta(s);
   const img = own || (m && (m.banner || m.cover));
-  const coverEp = s.all.find((e) => e.fa);
+  const coverEp = thumbEp || s.all.find((e) => e.fa);
   return `<a class="tile" href="${href}" data-si="${si}" style="--h:${hue(s.name)}">
     ${m && m.collage && m.collage.length ? collageHTML(m.collage, 'tile-img') : img ? `<img class="tile-img" src="${esc(img)}" alt="" loading="lazy" decoding="async">` : `<span class="tile-img is-fallback" ${coverEp ? `data-thumb="${esc(coverEp.id)}"` : ''}><span class="cover-glyph">${esc([...s.name.trim()][0] || '·')}</span></span>`}
     ${badge ? `<span class="tile-badge">${esc(badge)}</span>` : ''}
