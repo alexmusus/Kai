@@ -34,7 +34,6 @@ import {
   isCine,
   isStudio,
   isAside,
-  studioTitle,
 } from '../models/collections.js';
 
 export function greeting() {
@@ -117,7 +116,7 @@ export function renderHome() {
     app.innerHTML = `<div class="tv">${tvTop()}<main class="tv-main">${body}</main></div>`;
     return;
   }
-  const cont = continueList();
+  const cont = continueList().filter((c) => !isStudio(c.series)); // Studio es para escuchar otra vez, no para seguir
   const later = laterList();
   const siOf = (s) => lib.series.indexOf(s);
   // la portada muestra una serie (la carpeta de películas no tiene una ficha propia que mostrar)
@@ -146,20 +145,13 @@ export function renderHome() {
           .slice(0, HOME_CONTINUE)
           .map((c) =>
             tileHTML(c.series, siOf(c.series), {
-              // primero la página de la serie (o de la película), con "Continuar" listo; una canción de Studio, directo
-              href: isStudio(c.series)
-                ? '#/play/' + encodeURIComponent(c.ep.id)
-                : isCollection(c.series)
-                  ? movieHref(siOf(c.series), itemFor(c.series, c.ep).key)
-                  : '#/serie/' + siOf(c.series),
-              label: isStudio(c.series)
-                ? episodeLabel(c.ep)
-                : isCollection(c.series)
-                  ? movieTitle(c.series, itemFor(c.series, c.ep))
-                  : '',
-              img: isCollection(c.series) && !isStudio(c.series) ? movieImage(c.series, itemFor(c.series, c.ep)) : '',
-              thumbEp: isStudio(c.series) ? c.ep : null,
-              sub: `${isStudio(c.series) ? studioTitle(c.ep.name).artist || c.series.name : episodeLabel(c.ep)}${c.p && c.p.t > 5 ? `, ${fmtLeft(c.p)}` : ''}`,
+              // primero la página de la serie (o de la película), con "Continuar" listo
+              href: isCollection(c.series)
+                ? movieHref(siOf(c.series), itemFor(c.series, c.ep).key)
+                : '#/serie/' + siOf(c.series),
+              label: isCollection(c.series) ? movieTitle(c.series, itemFor(c.series, c.ep)) : '',
+              img: isCollection(c.series) ? movieImage(c.series, itemFor(c.series, c.ep)) : '',
+              sub: `${episodeLabel(c.ep)}${c.p && c.p.t > 5 ? `, ${fmtLeft(c.p)}` : ''}`,
               pct: c.p && c.p.d ? Math.min(100, (c.p.t / c.p.d) * 100) : 0,
             }),
           )
