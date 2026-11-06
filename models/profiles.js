@@ -171,3 +171,29 @@ export function useProfile(p) {
   initKnown();
   announceNew();
 }
+
+/* ── lo del reproductor que elige cada perfil (Ajustes) ──
+ * Va en el perfil, dentro de lo compartido: se sincroniza con los demás dispositivos como el nombre o el color. */
+export const HOLD_RATES = [0.5, 2, 3];
+export const SEEK_STEPS = [5, 10, 15, 30];
+
+/** @returns {Required<import('./types.js').ProfilePrefs>} */
+export function profilePrefs() {
+  const id = state.profile && state.profile.id;
+  const p = id && /** @type {any} */ (state.shared.profiles.find((x) => x.id === id));
+  const prefs = (p && p.prefs) || {};
+  return {
+    hold: HOLD_RATES.includes(prefs.hold) ? prefs.hold : 2,
+    step: SEEK_STEPS.includes(prefs.step) ? prefs.step : 10,
+  };
+}
+
+/** Cambia una preferencia del perfil activo (queda por sincronizar). @param {'hold' | 'step'} key @param {number} value */
+export function setProfilePref(key, value) {
+  const id = state.profile && state.profile.id;
+  const p = id && /** @type {any} */ (state.shared.profiles.find((x) => x.id === id));
+  if (!p) return;
+  p.prefs = { ...(p.prefs || {}), [key]: value };
+  p.u = Date.now();
+  saveShared();
+}

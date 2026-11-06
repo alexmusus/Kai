@@ -233,3 +233,33 @@ test('en pausa queda la imagen limpia; el doble toque adelanta sin mostrar la ba
   await expect(stage).toHaveClass(/is-idle/);
   expect(k.errors).toEqual([]);
 });
+
+test('cada perfil elige la velocidad al mantener presionado y cuánto saltan los ±; en la PC, la barra espaciadora', async ({ page }, info) => {
+  test.skip(info.project.name !== 'pc', 'teclado');
+  const k = await openWithDownloads(page);
+  await page.evaluate(() => { location.hash = '#/ajustes'; });
+  await page.locator('[data-act="set-step"][data-v="30"]').click();
+  await page.locator('[data-act="set-hold"][data-v="3"]').click();
+  await expect(page.locator('[data-act="set-step"][data-v="30"]')).toHaveClass(/is-on/);
+  // queda en el perfil (lo compartido), no en los ajustes generales
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('kai.shared')).profiles.find((p) => p.id === 'pA').prefs)).toEqual({ step: 30, hold: 3 });
+  await page.evaluate((id) => { location.hash = '#/play/' + id; }, k.eps[0].id);
+  await expect.poll(() => page.evaluate(() => document.querySelector('#video').readyState), { timeout: 10000 }).toBeGreaterThan(1);
+  await page.evaluate(() => { const v = document.querySelector('#video'); v.muted = true; v.currentTime = 20; return v.play(); });
+  await expect(page.locator('[data-act="fwd10"]')).toHaveAttribute('aria-label', 'Adelantar 30 segundos');
+  await expect(page.locator('[data-act="fwd10"] .st-num')).toHaveText('30');
+  const t0 = await page.evaluate(() => document.querySelector('#video').currentTime);
+  await page.keyboard.press('ArrowRight');
+  await expect.poll(() => page.evaluate(() => document.querySelector('#video').currentTime)).toBeGreaterThan(t0 + 28);
+  // barra espaciadora mantenida: 3× mientras dura
+  await page.keyboard.down(' ');
+  await expect.poll(() => page.evaluate(() => document.querySelector('#video').playbackRate)).toBe(3);
+  await expect(page.locator('#st-hold')).toContainText('3×');
+  await page.keyboard.up(' ');
+  await expect.poll(() => page.evaluate(() => document.querySelector('#video').playbackRate)).toBe(1);
+  expect(await page.evaluate(() => document.querySelector('#video').paused)).toBe(false); // mantener no pausa
+  // un toque: pausa
+  await page.keyboard.press(' ');
+  await expect.poll(() => page.evaluate(() => document.querySelector('#video').paused)).toBe(true);
+  expect(k.errors).toEqual([]);
+});

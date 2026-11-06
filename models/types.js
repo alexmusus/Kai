@@ -84,7 +84,8 @@
 
 /** @typedef {Record<string, Progress>} ProgressMap */
 
-/** @typedef {{ id: string, name: string, deleted?: boolean, u?: number }} Profile */
+/** @typedef {{ hold?: number, step?: number }} ProfilePrefs lo del reproductor que elige cada perfil */
+/** @typedef {{ id: string, name: string, deleted?: boolean, u?: number, prefs?: ProfilePrefs }} Profile */
 
 /**
  * Nodo del árbol de MEGA (megajs), solo lo que Kai usa.

@@ -24,7 +24,15 @@ import { toast, toastCount } from '../views/toast.js';
 import { resolvedTheme, applyTheme } from '../views/theme.js';
 import { app } from '../views/components.js';
 import { openHomeSearch, closeHomeSearch } from '../views/catalog.js';
-import { newsHTML, paintSeenByAll, renderSettings, paintCineKey, paintDownloadsWhere } from '../views/settings.js';
+import {
+  newsHTML,
+  paintSeenByAll,
+  renderSettings,
+  paintCineKey,
+  paintDownloadsWhere,
+  playerPrefsHTML,
+} from '../views/settings.js';
+import { setProfilePref } from '../models/profiles.js';
 import { openDiscoverSheet } from '../views/discover.js';
 import { startPicking, endPicking, pickAction } from './picking.js';
 import { go, goHome, goBack, render, softRender } from './router.js';
@@ -36,7 +44,7 @@ import { openSheet } from './sheet.js';
 import { checkUpdate, applyUpdate } from './updates.js';
 import { P } from './player/state.js';
 import { stage } from './player/dom.js';
-import { togglePlay, setLights } from './player/controls.js';
+import { togglePlay, setLights, paintControls } from './player/controls.js';
 import { switchTo, stopPlayback } from './player/engine.js';
 import { paintWatchInfo } from './player/page.js';
 import { openFromMini } from './player/mini.js';
@@ -370,6 +378,8 @@ const ACTIONS = {
   // tema y luz
   theme: () => setThemeSetting('theme', resolvedTheme() === 'dark' ? 'light' : 'dark', false),
   'set-theme': (el) => setThemeSetting('theme', el.dataset.v),
+  'set-hold': (el) => setPlayerPref('hold', Number(el.dataset.v)),
+  'set-step': (el) => setPlayerPref('step', Number(el.dataset.v)),
   'set-dark-tone': (el) => setThemeSetting('darkTone', el.dataset.v),
   'set-tone': (el) => setThemeSetting('tone', el.dataset.v),
   lights: () => setLights(false),
@@ -410,6 +420,15 @@ function closeSearchOutside(e) {
   if (!bar || bar.hidden) return;
   if (e.target.closest('#home-search, #home-results, [data-act="home-search"]')) return;
   closeHomeSearch();
+}
+
+/** Una preferencia del reproductor del perfil activo (Ajustes): se guarda, se redibuja su sección y se sincroniza. */
+function setPlayerPref(/** @type {'hold' | 'step'} */ key, /** @type {number} */ v) {
+  setProfilePref(key, v);
+  const box = $('#player-prefs');
+  if (box) box.innerHTML = playerPrefsHTML();
+  paintControls();
+  sync();
 }
 
 export function initActions() {

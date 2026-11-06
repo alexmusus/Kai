@@ -4,6 +4,7 @@
  */
 
 import { state, visibleProfiles, profileFile, TONES, DARK_TONES, saveSettings } from '../models/store.js';
+import { profilePrefs, HOLD_RATES, SEEK_STEPS } from '../models/profiles.js';
 import { newsList, newEpisodes, hasUnreadNews, markNewsRead } from '../models/news.js';
 import { esc, $, fmtSize, LS, plural } from '../lib/util.js';
 import { filesNamed, readJson, megaMessage } from '../models/mega.js';
@@ -17,6 +18,25 @@ import { tmdbKey } from '../models/fichas.js';
 import { tmdbCheckKey } from '../models/meta-api.js';
 import { setTmdbKey } from '../models/fichas-sync.js';
 import { canFolder, currentDir, getDir, dirPermission, refreshSaved } from '../models/downloads.js';
+
+/** Lo del reproductor que elige cada perfil: la velocidad al mantener presionado y cuánto saltan los ±. */
+export function playerPrefsHTML() {
+  const { hold, step } = profilePrefs();
+  const seg = (
+    /** @type {string} */ act,
+    /** @type {number} */ v,
+    /** @type {boolean} */ on,
+    /** @type {string} */ label,
+  ) =>
+    `<button class="seg ${on ? 'is-on' : ''}" data-act="${act}" data-v="${v}" aria-pressed="${on}">${label}</button>`;
+  const name = state.profile ? esc(state.profile.name) : '';
+  return `<p class="settings-label">Reproductor${name ? ` · ${name}` : ''}</p>
+      <p class="settings-label">Al mantener presionado</p>
+      <div class="segmented" role="group" aria-label="Velocidad al mantener presionado">${HOLD_RATES.map((v) => seg('set-hold', v, v === hold, `${String(v).replace('.', ',')}×`)).join('')}</div>
+      <p class="settings-label">Saltos</p>
+      <div class="segmented" role="group" aria-label="Cuánto saltan los botones de adelantar y retroceder">${SEEK_STEPS.map((v) => seg('set-step', v, v === step, `${v} s`)).join('')}</div>
+      <p class="dim settings-hint">Mantener presionado el video (o la barra espaciadora en la computadora) cambia la velocidad mientras dura; los saltos son el doble toque, las flechas y los botones. Cada perfil tiene los suyos.</p>`;
+}
 
 export function newsHTML() {
   const lib = state.library && state.library.v === 2 ? state.library : null;
@@ -157,6 +177,7 @@ export function renderSettings() {
         .join('')}</div>
       <p class="dim settings-hint">El tono claro se usa con el tema Claro y el oscuro con el tema Oscuro; en Automático, cada uno según la hora del sistema.</p>
     </section>
+    <section class="settings-group" id="player-prefs">${playerPrefsHTML()}</section>
     <section class="settings-group" id="cine-key">${cineKeyHTML()}</section>
     <section class="settings-group">
       <p class="settings-label">Carpeta de series</p>

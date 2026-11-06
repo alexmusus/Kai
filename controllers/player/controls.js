@@ -1,9 +1,10 @@
 /*
- * controllers/player/controls.js — Los controles: dibujarlos, mostrarlos al moverse, reproducir y pausar, ±10 s,
+ * controllers/player/controls.js — Los controles: dibujarlos, mostrarlos al moverse, reproducir y pausar, ± segundos,
  * pantalla completa (también la propia de Kai en iPhone), ventana flotante, velocidad y luz apagada.
  */
 
-import { video, ui, stage } from './dom.js';
+import { profilePrefs } from '../../models/profiles.js';
+import { video, ui, stage, holdEl } from './dom.js';
 import { ICON } from '../../views/icons.js';
 import { P } from './state.js';
 import { fmtTime, $ } from '../../lib/util.js';
@@ -30,6 +31,19 @@ export function paintControls() {
     ui.big.innerHTML = v ? ICON.play : ICON.pause;
     ui.big.setAttribute('aria-label', v ? 'Reproducir' : 'Pausar');
     ui.big.classList.toggle('is-pause', !v);
+  });
+  // los botones de ± dicen cuánto saltan (lo elige cada perfil)
+  setOnce('step', seekStep(), (v) => {
+    for (const [act, dir] of [
+      ['back10', 'Retroceder'],
+      ['fwd10', 'Adelantar'],
+    ]) {
+      const b = stage.querySelector(`[data-act="${act}"]`);
+      if (!b) continue;
+      b.setAttribute('aria-label', `${dir} ${v} segundos`);
+      const n = b.querySelector('.st-num');
+      if (n) n.textContent = String(v);
+    }
   });
   // en medio de la barra: qué se está viendo
   const what = P.playing
@@ -90,6 +104,27 @@ export function togglePlay() {
 
 /** ±s segundos. Con `quiet` (doble toque en el teléfono) los controles se esconden para ver el video mientras
  * adelanta; solo se ve el aviso de cuánto. @param {number} s @param {{ quiet?: boolean }} [opts] */
+/** Cuántos segundos salta cada ±, según el perfil. */
+export const seekStep = () => profilePrefs().step;
+
+/* Mantener presionado (el dedo en el video, o la barra espaciadora en la PC): otra velocidad mientras dura. */
+let fast = false;
+export function startFast() {
+  if (fast || !video.currentSrc || video.paused || video.ended) return;
+  fast = true;
+  const rate = profilePrefs().hold;
+  video.playbackRate = rate;
+  const label = holdEl.firstChild;
+  if (label && label.nodeType === 3) label.textContent = `${String(rate).replace('.', ',')}× `;
+  holdEl.classList.add('is-on');
+}
+export function stopFast() {
+  if (!fast) return;
+  fast = false;
+  video.playbackRate = P.speed;
+  holdEl.classList.remove('is-on');
+}
+
 export function seekBy(s, { quiet = false } = {}) {
   if (!video.duration) return;
   video.currentTime = Math.max(0, Math.min(video.duration - 0.5, video.currentTime + s));
