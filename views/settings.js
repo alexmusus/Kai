@@ -44,6 +44,29 @@ export function newsHTML() {
     ${!rows.length && lib && lib.series.some((s) => newEpisodes(s).length) ? '<button class="btn btn-quiet" data-act="news-clear">Quitar las burbujas de "nuevo"</button>' : ''}`;
 }
 
+/* ── Ajustes: lo que se copió entre perfiles, para elegir de quién es cada serie ── */
+/**
+ * @param {import('../models/profile-copies.js').CopyGroup[]} groups
+ * @param {Record<number, string>} picks grupo → perfil dueño ('' = de los dos)
+ */
+export function copiesHTML(groups, picks) {
+  if (!groups.length) return '<p class="dim">No hay nada copiado entre perfiles.</p>';
+  const nameOf = (/** @type {string} */ id) => (visibleProfiles().find((p) => p.id === id) || { name: '?' }).name;
+  const rows = groups.map((g, i) => {
+    const what = [g.eps ? plural(g.eps, 'capítulo', 'capítulos') : '', g.later ? 'Más tarde' : '']
+      .filter(Boolean)
+      .join(' · ');
+    const pick = picks[i] ?? '';
+    const opt = (/** @type {string} */ v, /** @type {string} */ label) =>
+      `<button class="seg ${pick === v ? 'is-on' : ''}" data-act="copy-pick" data-g="${i}" data-v="${esc(v)}" aria-pressed="${pick === v}">${esc(label)}</button>`;
+    return `<li class="copy-row"><p><strong>${esc(g.name)}</strong> <span class="dim">${esc(what)}</span></p>
+      <div class="segmented" role="group" aria-label="De quién es ${esc(g.name)}">${g.pids.map((p) => opt(p, 'De ' + nameOf(p))).join('')}${opt('', g.pids.length > 2 ? 'De todos' : 'De los dos')}</div></li>`;
+  });
+  return `<p class="dim">Esto quedó igual en más de un perfil por un error de Kai al cambiar de perfil. Elige de quién es cada serie: se quita de los demás.</p>
+    <ul class="copy-list">${rows.join('')}</ul>
+    <button class="btn btn-lamp" data-act="copies-apply" ${Object.values(picks).some(Boolean) ? '' : 'disabled'}>Separar</button>`;
+}
+
 /* ── Ajustes: lo que ya vieron todos los perfiles (solo informa; no borra nada) ── */
 export async function paintSeenByAll(btn) {
   const box = $('#seen-all-list');
@@ -147,6 +170,16 @@ export function renderSettings() {
       <label class="switch"><input type="checkbox" name="prefetchNext" ${s.prefetchNext !== false ? 'checked' : ''}><span>Preparar el siguiente capítulo para que empiece sin espera (usa unos 3 MB de MEGA)</span></label>
     </form>
     <section class="settings-group" id="dl-where">${downloadsWhereHTML()}</section>
+    ${
+      visibleProfiles().filter((p) => !p.mergedInto).length > 1
+        ? `<section class="settings-group" id="copies">
+      <p class="settings-label">Perfiles mezclados</p>
+      <p class="dim">Si lo visto o Más tarde de un perfil apareció también en otro, aquí puedes separarlo.</p>
+      <div id="copies-list"></div>
+      <button class="btn" data-act="copies-check">${ICON.refresh}<span>Revisar</span></button>
+    </section>`
+        : ''
+    }
     <section class="settings-group" id="seen-all">
       <p class="settings-label">Visto por todos</p>
       <p class="dim">Capítulos que ya terminaron todos los perfiles. Es solo un aviso, por si quieres liberar espacio en MEGA; Kai no borra nada.</p>

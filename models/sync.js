@@ -105,6 +105,10 @@ export async function syncProgress(home, io = REAL_IO) {
     remote = mergeProgress(remote, items);
     if (data.intros) state.shared.intros = mergeShared(state.shared, { intros: data.intros }).intros;
   }
+  /* Si mientras se leía MEGA este dispositivo cambió de perfil, lo leído es de otro perfil: no se junta con nada
+   * ni se escribe (antes se mezclaba con el perfil nuevo y quedaban los dos con lo mismo visto). La sincronización
+   * del perfil nuevo viene después (controllers/sync.js). */
+  if (!state.profile || state.profile.id !== pid) return false;
   const merged = mergeProgress(state.progress, remote);
   const changed = JSON.stringify(merged) !== JSON.stringify(state.progress);
   const hasData = Object.keys(merged).length > 0;
@@ -112,6 +116,8 @@ export async function syncProgress(home, io = REAL_IO) {
   state.progress = merged;
   if (hasData && (nodes.length !== 1 || extra.length > 0 || remoteIsBehind)) {
     await io.writeJson(home, profileFile(pid), { v: 3, app: 'kai', profile: pid, items: merged }, [...nodes, ...extra]);
+    // lo subido es de este perfil; si mientras tanto se cambió a otro, lo de ese no se toca
+    if (!state.profile || state.profile.id !== pid) return false;
   }
   state.dirty = false;
   saveProgressLocal();

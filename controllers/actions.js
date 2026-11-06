@@ -30,7 +30,7 @@ import { startPicking, endPicking, pickAction } from './picking.js';
 import { go, goHome, goBack, render, softRender } from './router.js';
 import { paintDock, toggleDock, dockUp } from './dock.js';
 import { sync, syncing, refreshLibrary, setLater } from './sync.js';
-import { selectProfile } from './account.js';
+import { selectProfile, checkCopies, pickCopy, applyCopies } from './account.js';
 import { queueDownload, pickFolder, dropFolder } from './downloads.js';
 import { openSheet } from './sheet.js';
 import { checkUpdate, applyUpdate } from './updates.js';
@@ -316,6 +316,9 @@ const ACTIONS = {
   'set-root': setRoot,
   'news-clear': clearNews,
   'seen-all': (el) => paintSeenByAll(el),
+  'copies-check': (el) => checkCopies(/** @type {HTMLButtonElement} */ (el)),
+  'copy-pick': (el) => pickCopy(el),
+  'copies-apply': () => applyCopies(),
   'resume-here': resumeHere,
   'resume-toggle': (el) => {
     const box = el.closest('.resume-card');

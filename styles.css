@@ -1780,3 +1780,8 @@ section.empty .btn { margin-top: 10px; }
 #app.is-pulling > .bar, #app.is-pulling .watch-info, #app.is-pulling .watch-list { opacity: calc(1 - 0.85 * var(--pull, 0)); will-change: opacity; }
 #app > .bar, .watch-info, .watch-list { transition: opacity 0.2s; }
 #app.is-pulling > .bar, #app.is-pulling .watch-info, #app.is-pulling .watch-list { transition: none; }
+
+/* Ajustes → Perfiles mezclados: una fila por serie, con de quién es */
+.copy-list { list-style: none; margin: 8px 0 14px; padding: 0; display: grid; gap: 14px; }
+.copy-row p { margin: 0 0 6px; }
+.copy-row .segmented { flex-wrap: wrap; }
