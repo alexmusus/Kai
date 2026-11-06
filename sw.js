@@ -9,7 +9,7 @@ importScripts('core.js');
 /* VERSION es la de Kai que se ve en Ajustes: sube solo al pasar algo a main (lo publicado). ENTREGA cuenta las
  * subidas a prueba dentro de esa versión: sube en cada una (el navegador solo instala de nuevo si este archivo
  * cambia) y vuelve a 1 cuando sube VERSION. */
-const VERSION = 40;
+const VERSION = 41;
 const ENTREGA = 1;
 const CACHE = `kai-${VERSION}.${ENTREGA}`;
 const SHELL = [

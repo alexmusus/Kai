@@ -76,8 +76,9 @@ export function paintControls() {
 export function wake() {
   stage.classList.remove('is-idle');
   clearTimeout(P.idleTimer);
+  // también en pausa: como en YouTube, al rato queda solo la imagen (tocar la vuelve a mostrar)
   P.idleTimer = setTimeout(() => {
-    if (!video.paused && ui.menu.hidden && !P.seeking) stage.classList.add('is-idle');
+    if (ui.menu.hidden && !P.seeking) stage.classList.add('is-idle');
   }, 2800);
 }
 
@@ -87,7 +88,9 @@ export function togglePlay() {
   else video.pause();
 }
 
-export function seekBy(s) {
+/** ±s segundos. Con `quiet` (doble toque en el teléfono) los controles se esconden para ver el video mientras
+ * adelanta; solo se ve el aviso de cuánto. @param {number} s @param {{ quiet?: boolean }} [opts] */
+export function seekBy(s, { quiet = false } = {}) {
   if (!video.duration) return;
   video.currentTime = Math.max(0, Math.min(video.duration - 0.5, video.currentTime + s));
   ui.flash.textContent = s > 0 ? `+${s} s` : `−${-s} s`;
@@ -95,6 +98,11 @@ export function seekBy(s) {
   ui.flash.classList.remove('is-on');
   void ui.flash.offsetWidth;
   ui.flash.classList.add('is-on');
+  if (quiet) {
+    clearTimeout(P.idleTimer);
+    stage.classList.add('is-idle');
+    return;
+  }
   wake();
 }
 
