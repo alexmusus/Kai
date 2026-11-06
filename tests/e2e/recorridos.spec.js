@@ -523,6 +523,15 @@ test('Studio: su botón al final del inicio, sus videos con quién canta, y no s
   await expect(page.locator('#watch-info')).toContainText('Juan Gabriel · Bellas Artes, 1990');
   await expect(page.locator('.watch-note')).toHaveText('Concierto en el Palacio de Bellas Artes.');
   await expect(page.locator('.watch-series')).toHaveAttribute('href', `#/serie/${k.si('Studio')}`);
+  // a medias no sale en "Continuar viendo"
+  await page.evaluate(async () => {
+    const { setProgress } = await import('/models/progress.js');
+    const { epById } = await import('/models/library.js');
+    setProgress(epById(decodeURIComponent(location.hash.split('/').pop())), 60, 240, false);
+  });
+  await go(page, '#/');
+  await expect(page.locator('.tv-main')).toContainText('Continuar viendo');
+  await expect(page.locator('.tv-main')).not.toContainText('Querida');
   // ni en el catálogo ni en la fila de Películas
   await go(page, '#/catalogo');
   await expect(page.locator('.catalog')).not.toContainText('Querida');
