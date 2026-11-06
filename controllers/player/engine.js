@@ -6,7 +6,7 @@
 
 import { P } from './state.js';
 import { ui, stage, video } from './dom.js';
-import { closeMenu, paintControls, seekBy, setLights, isFullscreen, exitFullscreen } from './controls.js';
+import { closeMenu, paintControls, seekBy, seekStep, setLights, isFullscreen, exitFullscreen } from './controls.js';
 import { resetChapters, initChapters } from './chapters.js';
 import { $, sleep, esc } from '../../lib/util.js';
 import { localBlob } from '../../models/downloads.js';
@@ -170,8 +170,8 @@ export function setMediaSession(ep, ctx) {
     };
     set('nexttrack', () => playNext());
     set('previoustrack', () => playPrev());
-    set('seekbackward', () => seekBy(-10));
-    set('seekforward', () => seekBy(10));
+    set('seekbackward', () => seekBy(-seekStep()));
+    set('seekforward', () => seekBy(seekStep()));
   } catch {
     /* nada */
   }

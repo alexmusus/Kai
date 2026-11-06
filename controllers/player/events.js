@@ -28,6 +28,9 @@ import {
   wake,
   togglePlay,
   seekBy,
+  seekStep,
+  startFast,
+  stopFast,
   setLights,
   toggleFullscreen,
   togglePip,
@@ -89,7 +92,7 @@ video.addEventListener('play', () => {
 video.addEventListener('pause', () => {
   paintControls();
   savePosition(true);
-  stage.classList.remove('is-idle');
+  wake(); // se ven los controles un momento y luego queda la imagen limpia
   document.body.classList.remove('is-playing');
 });
 
@@ -191,7 +194,26 @@ document.addEventListener('visibilitychange', () => {
   playNext();
 });
 
-video.addEventListener('error', async () => {
+/* Al reanudar después de una pausa, a veces (sobre todo en iPhone, tras pausas largas: el enlace de MEGA vence)
+ * el video queda en "reproduciendo" pero no avanza, y sin avisar error: parecía trabado. Si en 6 s no avanzó, se
+ * recupera igual que ante un error (enlace nuevo y sigue en el mismo punto). */
+let resumeWatch = 0;
+video.addEventListener('playing', () => P.playing && (P.playing.started = true));
+video.addEventListener('play', () => {
+  clearTimeout(resumeWatch);
+  const tok = P.playing;
+  if (!tok || !tok.started || tok.objectUrl) return; // el primer arranque desde MEGA puede tardar más
+  const t0 = video.currentTime;
+  resumeWatch = setTimeout(() => {
+    if (P.playing !== tok || video.paused || video.ended || P.seeking) return;
+    if (Math.abs(video.currentTime - t0) < 0.25) recoverStream();
+  }, 6000);
+});
+video.addEventListener('pause', () => clearTimeout(resumeWatch));
+
+video.addEventListener('error', recoverStream);
+async function recoverStream() {
+  clearTimeout(resumeWatch);
   if (!P.playing || !video.getAttribute('src')) return;
   const { ep } = P.playing;
   const at = video.currentTime;
@@ -253,7 +275,7 @@ video.addEventListener('error', async () => {
       detail,
     );
   else playerMessage('No se pudo reproducir este capítulo en este navegador.');
-});
+}
 
 ui.seek.addEventListener('input', () => {
   if (!P.seeking) P.seekFrom = video.currentTime;
@@ -284,8 +306,8 @@ stage.addEventListener('click', (e) => {
   const act = el.dataset.act;
   wake();
   if (act === 'toggle') togglePlay();
-  else if (act === 'back10') seekBy(-10);
-  else if (act === 'fwd10') seekBy(10);
+  else if (act === 'back10') seekBy(-seekStep());
+  else if (act === 'fwd10') seekBy(seekStep());
   else if (act === 'next') playNext();
   else if (act === 'skip') doSkip();
   else if (act === 'lights') setLights(!document.body.classList.contains('lights-off'));
@@ -359,6 +381,27 @@ function onLeaveResize() {
 
 if (!(document.pictureInPictureEnabled || video.webkitSupportsPresentationMode)) ui.pip.hidden = true;
 
+/* barra espaciadora: se decide al soltarla si fue un toque (play/pausa) o la mantuviste (más rápido) */
+let spaceTimer = 0;
+let spaceHeld = false;
+document.addEventListener('keyup', (e) => {
+  if (e.key !== ' ') return;
+  if (spaceHeld) {
+    spaceHeld = false;
+    stopFast();
+  } else if (spaceTimer) {
+    clearTimeout(spaceTimer);
+    spaceTimer = 0;
+    togglePlay();
+    wake();
+  }
+});
+addEventListener('blur', () => {
+  clearTimeout(spaceTimer);
+  spaceTimer = 0;
+  if (spaceHeld) ((spaceHeld = false), stopFast());
+});
+
 document.addEventListener('keydown', (e) => {
   if (route().view !== 'play' || !P.playing) {
     if (e.key === 'Escape') {
@@ -370,15 +413,25 @@ document.addEventListener('keydown', (e) => {
   }
   if (e.target.closest('input:not([type="range"]), textarea, select')) return;
   const k = e.key.toLowerCase();
-  if (k === ' ' || k === 'k') {
+  if (k === ' ') {
+    // un toque pausa o reproduce (al soltar); mantenerla presionada acelera mientras dura, como el dedo en el teléfono
+    e.preventDefault();
+    if (e.repeat || spaceTimer || spaceHeld) return;
+    spaceTimer = setTimeout(() => {
+      spaceTimer = 0;
+      spaceHeld = true;
+      startFast();
+    }, 350);
+    return;
+  } else if (k === 'k') {
     e.preventDefault();
     togglePlay();
   } else if (k === 'arrowright' || k === 'l') {
     e.preventDefault();
-    seekBy(10);
+    seekBy(seekStep());
   } else if (k === 'arrowleft' || k === 'j') {
     e.preventDefault();
-    seekBy(-10);
+    seekBy(-seekStep());
   } else if (k === 'f') toggleFullscreen();
   else if (k === 'm') video.muted = !video.muted;
   else if (k === 'n') playNext();

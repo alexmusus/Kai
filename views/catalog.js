@@ -4,7 +4,7 @@
  */
 
 import { state } from '../models/store.js';
-import { isCollection, collectionItems, itemMeta, movieTitle, isCine } from '../models/collections.js';
+import { isCollection, collectionItems, itemMeta, movieTitle, isAside } from '../models/collections.js';
 import { movieHref, route } from '../lib/route.js';
 import { langsOf } from '../models/library.js';
 import { metaFor } from '../models/fichas.js';
@@ -45,7 +45,7 @@ export function catalogEntries() {
           added: Math.max(0, ...it.eps.map((e) => e.ts || 0)),
           href: movieHref(si, it.key),
           movie: it.key,
-          cine: isCine(s),
+          cine: isAside(s), // Cine y Studio: solo al buscar
           langs: langsOf(it.eps),
           done: allSeen(it.eps),
           words: norm([title, m && m.title, m && m.romaji, m && m.native, s.name].join(' ')),

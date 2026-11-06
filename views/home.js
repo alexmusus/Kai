@@ -25,7 +25,16 @@ import { newEpisodes } from '../models/news.js';
 import { viewState } from './view-state.js';
 import { hydrateThumbs } from './thumbs.js';
 import { continueList, laterList } from '../models/progress.js';
-import { isCollection, itemFor, movieTitle, movieImage, episodeLabel, isCine } from '../models/collections.js';
+import {
+  isCollection,
+  itemFor,
+  movieTitle,
+  movieImage,
+  episodeLabel,
+  isCine,
+  isStudio,
+  isAside,
+} from '../models/collections.js';
 
 export function greeting() {
   const h = new Date().getHours();
@@ -107,7 +116,7 @@ export function renderHome() {
     app.innerHTML = `<div class="tv">${tvTop()}<main class="tv-main">${body}</main></div>`;
     return;
   }
-  const cont = continueList();
+  const cont = continueList().filter((c) => !isStudio(c.series)); // Studio es para escuchar otra vez, no para seguir
   const later = laterList();
   const siOf = (s) => lib.series.indexOf(s);
   // la portada muestra una serie (la carpeta de películas no tiene una ficha propia que mostrar)
@@ -182,6 +191,7 @@ export function renderHome() {
 /** El final del inicio: "Descubrir" (Cine, Porque viste…, En emisión) y Kai, el gatito, sentado encima. */
 function homeFootHTML(lib) {
   const cine = lib.series.findIndex(isCine);
+  const studio = lib.series.findIndex(isStudio);
   const link = (href, icon, title, sub, tone) =>
     `<a class="home-link" href="${href}" data-tone="${tone}"><span class="home-link-ic">${icon}</span><span class="home-link-text"><b>${esc(title)}</b><span>${esc(sub)}</span></span>${ICON.chev}</a>`;
   return `<section class="tv-row home-foot" aria-labelledby="home-disc">
@@ -190,6 +200,7 @@ function homeFootHTML(lib) {
       ${catHTML('foot')}
       <nav class="home-links" aria-label="Descubrir">
         ${cine >= 0 ? link(`#/serie/${cine}`, ICON.film, lib.series[cine].name, 'Películas que no son anime', 'cine') : ''}
+        ${studio >= 0 ? link(`#/serie/${studio}`, ICON.mic, lib.series[studio].name, 'Música en vivo', 'studio') : ''}
         ${link('#/descubrir/porque', ICON.spark, 'Porque viste…', 'Recomendaciones según lo que tienes', 'porque')}
         ${link('#/descubrir/emision', ICON.live, 'En emisión', 'Lo que está saliendo ahora', 'emision')}
       </nav>
@@ -199,7 +210,7 @@ function homeFootHTML(lib) {
 
 /** Fila "Películas" del inicio: las 10 primeras en orden alfabético y el enlace al estante completo. */
 export function homeMoviesHTML(lib) {
-  const si = lib.series.findIndex((x) => isCollection(x) && !isCine(x));
+  const si = lib.series.findIndex((x) => isCollection(x) && !isAside(x));
   if (si < 0) return '';
   const s = lib.series[si];
   const items = shelfItems(s);

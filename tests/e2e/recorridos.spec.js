@@ -507,3 +507,34 @@ test('tema claro: el inicio y una serie se ven con fondo claro y sin errores', a
   expect(light(await bg())).toBe(true);
   expect(k.errors).toEqual([]);
 });
+
+test('Studio: su botón al final del inicio, sus videos con quién canta, y no sale en el catálogo', async ({ page }) => {
+  const k = await openKai(page, '#/', { extraLS: { 'note.txt1': 'Concierto en el Palacio de Bellas Artes.' } });
+  const studio = page.locator('.home-links a', { hasText: 'Studio' });
+  await expect(studio).toContainText('Música en vivo');
+  await studio.click();
+  await expect(page).toHaveURL(new RegExp(`#/serie/${k.si('Studio')}$`));
+  await expect(page.locator('.shelf-count')).toHaveText('2 canciones en vivo');
+  await expect(page.locator('.studio-tile .tile-title')).toHaveText(['Querida', 'Amor eterno']);
+  await expect(page.locator('.studio-tile .tile-sub').first()).toHaveText('Juan Gabriel · Bellas Artes, 1990');
+  await page.locator('.studio-tile').first().click();
+  await expect(page).toHaveURL(/#\/play\//);
+  await expect(page.locator('.watch-title')).toHaveText('Querida');
+  await expect(page.locator('#watch-info')).toContainText('Juan Gabriel · Bellas Artes, 1990');
+  await expect(page.locator('.watch-note')).toHaveText('Concierto en el Palacio de Bellas Artes.');
+  await expect(page.locator('.watch-series')).toHaveAttribute('href', `#/serie/${k.si('Studio')}`);
+  // a medias no sale en "Continuar viendo"
+  await page.evaluate(async () => {
+    const { setProgress } = await import('/models/progress.js');
+    const { epById } = await import('/models/library.js');
+    setProgress(epById(decodeURIComponent(location.hash.split('/').pop())), 60, 240, false);
+  });
+  await go(page, '#/');
+  await expect(page.locator('.tv-main')).toContainText('Continuar viendo');
+  await expect(page.locator('.tv-main')).not.toContainText('Querida');
+  // ni en el catálogo ni en la fila de Películas
+  await go(page, '#/catalogo');
+  await expect(page.locator('.catalog')).not.toContainText('Querida');
+  await expect(page.locator('.catalog')).not.toContainText('Studio');
+  expect(k.errors).toEqual([]);
+});

@@ -10,7 +10,7 @@
  */
 
 import { isBareSpecial, hasOwnTitle, SPECIAL_RE, seasonOrdinal, isSpecialSeason } from './naming.js';
-import { isCollection, collectionItems, itemMetaKey, isCine } from './collections.js';
+import { isCollection, collectionItems, itemMetaKey, isCine, isStudio } from './collections.js';
 import { state, SYN_FILE, FICHAS_FILE, saveShared } from './store.js';
 import {
   scoresByIds,
@@ -118,6 +118,7 @@ export async function ensureMeta() {
     // 2) primero lo que todavía no tiene ficha (p. ej. temporadas recién organizadas), después el resto
     const order = [...state.library.series].sort((a, b) => Number(hasAllMeta(a)) - Number(hasAllMeta(b)));
     for (const s of order) {
+      if (isStudio(s)) continue; // Studio no tiene fichas: la imagen y la descripción las pones tú
       if (isCine(s)) {
         // Cine: cada película en TMDB (sin clave no se busca nada)
         const key = tmdbKey();

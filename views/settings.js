@@ -4,6 +4,7 @@
  */
 
 import { state, visibleProfiles, profileFile, TONES, DARK_TONES, saveSettings } from '../models/store.js';
+import { profilePrefs, HOLD_RATES, SEEK_STEPS } from '../models/profiles.js';
 import { newsList, newEpisodes, hasUnreadNews, markNewsRead } from '../models/news.js';
 import { esc, $, fmtSize, LS, plural } from '../lib/util.js';
 import { filesNamed, readJson, megaMessage } from '../models/mega.js';
@@ -17,6 +18,25 @@ import { tmdbKey } from '../models/fichas.js';
 import { tmdbCheckKey } from '../models/meta-api.js';
 import { setTmdbKey } from '../models/fichas-sync.js';
 import { canFolder, currentDir, getDir, dirPermission, refreshSaved } from '../models/downloads.js';
+
+/** Lo del reproductor que elige cada perfil: la velocidad al mantener presionado y cuánto saltan los ±. */
+export function playerPrefsHTML() {
+  const { hold, step } = profilePrefs();
+  const seg = (
+    /** @type {string} */ act,
+    /** @type {number} */ v,
+    /** @type {boolean} */ on,
+    /** @type {string} */ label,
+  ) =>
+    `<button class="seg ${on ? 'is-on' : ''}" data-act="${act}" data-v="${v}" aria-pressed="${on}">${label}</button>`;
+  const name = state.profile ? esc(state.profile.name) : '';
+  return `<p class="settings-label">Reproductor${name ? ` · ${name}` : ''}</p>
+      <p class="settings-label">Al mantener presionado</p>
+      <div class="segmented" role="group" aria-label="Velocidad al mantener presionado">${HOLD_RATES.map((v) => seg('set-hold', v, v === hold, `${String(v).replace('.', ',')}×`)).join('')}</div>
+      <p class="settings-label">Saltos</p>
+      <div class="segmented" role="group" aria-label="Cuánto saltan los botones de adelantar y retroceder">${SEEK_STEPS.map((v) => seg('set-step', v, v === step, `${v} s`)).join('')}</div>
+      <p class="dim settings-hint">Mantener presionado el video (o la barra espaciadora en la computadora) cambia la velocidad mientras dura; los saltos son el doble toque, las flechas y los botones. Cada perfil tiene los suyos.</p>`;
+}
 
 export function newsHTML() {
   const lib = state.library && state.library.v === 2 ? state.library : null;
@@ -42,6 +62,29 @@ export function newsHTML() {
         : '<p class="dim">Aquí aparece lo que se agregue a tu MEGA. Por ahora no hay nada nuevo.</p>'
     }
     ${!rows.length && lib && lib.series.some((s) => newEpisodes(s).length) ? '<button class="btn btn-quiet" data-act="news-clear">Quitar las burbujas de "nuevo"</button>' : ''}`;
+}
+
+/* ── Ajustes: lo que se copió entre perfiles, para elegir de quién es cada serie ── */
+/**
+ * @param {import('../models/profile-copies.js').CopyGroup[]} groups
+ * @param {Record<number, string>} picks grupo → perfil dueño ('' = de los dos)
+ */
+export function copiesHTML(groups, picks) {
+  if (!groups.length) return '<p class="dim">No hay nada copiado entre perfiles.</p>';
+  const nameOf = (/** @type {string} */ id) => (visibleProfiles().find((p) => p.id === id) || { name: '?' }).name;
+  const rows = groups.map((g, i) => {
+    const what = [g.eps ? plural(g.eps, 'capítulo', 'capítulos') : '', g.later ? 'Más tarde' : '']
+      .filter(Boolean)
+      .join(' · ');
+    const pick = picks[i] ?? '';
+    const opt = (/** @type {string} */ v, /** @type {string} */ label) =>
+      `<button class="seg ${pick === v ? 'is-on' : ''}" data-act="copy-pick" data-g="${i}" data-v="${esc(v)}" aria-pressed="${pick === v}">${esc(label)}</button>`;
+    return `<li class="copy-row"><p><strong>${esc(g.name)}</strong> <span class="dim">${esc(what)}</span></p>
+      <div class="segmented" role="group" aria-label="De quién es ${esc(g.name)}">${g.pids.map((p) => opt(p, 'De ' + nameOf(p))).join('')}${opt('', g.pids.length > 2 ? 'De todos' : 'De los dos')}</div></li>`;
+  });
+  return `<p class="dim">Esto quedó igual en más de un perfil por un error de Kai al cambiar de perfil. Elige de quién es cada serie: se quita de los demás.</p>
+    <ul class="copy-list">${rows.join('')}</ul>
+    <button class="btn btn-lamp" data-act="copies-apply" ${Object.values(picks).some(Boolean) ? '' : 'disabled'}>Separar</button>`;
 }
 
 /* ── Ajustes: lo que ya vieron todos los perfiles (solo informa; no borra nada) ── */
@@ -134,6 +177,7 @@ export function renderSettings() {
         .join('')}</div>
       <p class="dim settings-hint">El tono claro se usa con el tema Claro y el oscuro con el tema Oscuro; en Automático, cada uno según la hora del sistema.</p>
     </section>
+    <section class="settings-group" id="player-prefs">${playerPrefsHTML()}</section>
     <section class="settings-group" id="cine-key">${cineKeyHTML()}</section>
     <section class="settings-group">
       <p class="settings-label">Carpeta de series</p>
@@ -147,6 +191,16 @@ export function renderSettings() {
       <label class="switch"><input type="checkbox" name="prefetchNext" ${s.prefetchNext !== false ? 'checked' : ''}><span>Preparar el siguiente capítulo para que empiece sin espera (usa unos 3 MB de MEGA)</span></label>
     </form>
     <section class="settings-group" id="dl-where">${downloadsWhereHTML()}</section>
+    ${
+      visibleProfiles().filter((p) => !p.mergedInto).length > 1
+        ? `<section class="settings-group" id="copies">
+      <p class="settings-label">Perfiles mezclados</p>
+      <p class="dim">Si lo visto o Más tarde de un perfil apareció también en otro, aquí puedes separarlo.</p>
+      <div id="copies-list"></div>
+      <button class="btn" data-act="copies-check">${ICON.refresh}<span>Revisar</span></button>
+    </section>`
+        : ''
+    }
     <section class="settings-group" id="seen-all">
       <p class="settings-label">Visto por todos</p>
       <p class="dim">Capítulos que ya terminaron todos los perfiles. Es solo un aviso, por si quieres liberar espacio en MEGA; Kai no borra nada.</p>

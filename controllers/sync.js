@@ -17,10 +17,19 @@ import { toast } from '../views/toast.js';
 
 /** @type {Promise<void> | null} */
 export let syncing = null;
+let again = false;
+/** Sincroniza; si ya hay una en curso, se hace otra al terminar (p. ej. la del perfil que se acaba de elegir). */
 export function sync() {
-  if (syncing) return syncing;
+  if (syncing) {
+    again = true;
+    return syncing;
+  }
   syncing = doSync().finally(() => {
     syncing = null;
+    if (again) {
+      again = false;
+      sync();
+    }
   });
   return syncing;
 }

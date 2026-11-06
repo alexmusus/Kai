@@ -23,8 +23,9 @@ decide. ESLint lo revisa (`no-restricted-imports`).
 | `types.js` | la forma de los datos (solo tipos JSDoc) |
 | `naming.js` | qué dicen los nombres: capítulo, idioma, temporada, OVAs |
 | `mega.js` | sesión, árbol, leer y escribir archivos (avisa `tree-changed`) |
-| `library.js` | biblioteca desde el árbol, índice, Sub/Doblado, carpetas renombradas |
-| `collections.js` | Peliculas y Cine |
+| `library.js` | biblioteca desde el árbol, índice, Sub/Doblado, carpetas renombradas; la imagen y el .txt con el nombre de un video |
+| `profile-copies.js` | encontrar y separar lo que se copió entre perfiles |
+| `collections.js` | Peliculas, Cine y Studio (música en vivo: artista y canción salen del nombre del archivo) |
 | `progress.js` | lo visto, Más tarde, Continuar viendo, seguir en otro dispositivo |
 | `profiles.js` | perfiles y lo compartido, duplicados, respaldo |
 | `sync.js` | juntar con MEGA y dejar una sola copia |

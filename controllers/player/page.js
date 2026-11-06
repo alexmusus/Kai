@@ -15,7 +15,8 @@ import { leaveMini, flyFrom, calmMotion } from './mini.js';
 import { startPlayback } from './engine.js';
 import { route } from '../../lib/route.js';
 import { nextUnseen, prog } from '../../models/progress.js';
-import { episodeLabel } from '../../models/collections.js';
+import { episodeLabel, isStudio, studioTitle } from '../../models/collections.js';
+import { readNodeText } from '../../models/mega.js';
 import { ICON } from '../../views/icons.js';
 import { watchDlButton } from '../../views/watch.js';
 import { episodeRow } from '../../views/episodes.js';
@@ -81,10 +82,12 @@ export function paintWatchInfo() {
   const upcoming = nextUnseen(ep, ctx.list, 3).filter((x) => !state.saved.has(x.id) && !state.dls[x.id]);
   const info = $('#watch-info');
   if (!info) return;
+  const studio = isStudio(state.library && ctx.si != null ? state.library.series[ctx.si] : null);
   info.innerHTML = `<div class="watch-text">
       <a class="watch-series" href="${ctx.back}">${esc(ctx.title)}</a>
       <h2 class="watch-title">${esc(episodeLabel(ep))}</h2>
       ${ctx.sub ? `<p class="watch-sub">${esc(ctx.sub)}</p>` : ''}
+      ${studio ? studioAbout(ep) : ''}
     </div>
     <div class="watch-actions">
       ${prev ? `<a class="btn" href="#/play/${encodeURIComponent(prev.id)}" data-replace>${ICON.prev}<span>Anterior</span></a>` : ''}
@@ -101,6 +104,37 @@ export function paintWatchInfo() {
   hydrateThumbs(list);
   const cur = list.querySelector('.is-current');
   if (cur && list.scrollHeight > list.clientHeight) cur.scrollIntoView({ block: 'nearest' });
+}
+
+/** Studio: quién canta y dónde, y la descripción del .txt si la hay (se lee una vez y queda guardada aquí). */
+function studioAbout(/** @type {import('../../models/types.js').Episode} */ ep) {
+  const { artist, detail } = studioTitle(ep.name);
+  const who = [artist, detail].filter(Boolean).join(' · ');
+  const note = ep.note ? noteText(ep) : '';
+  return `${who ? `<p class="watch-sub">${esc(who)}</p>` : ''}${note ? `<p class="watch-note">${esc(note)}</p>` : ''}`;
+}
+/** @type {Map<string, string>} */
+const notes = new Map();
+function noteText(/** @type {import('../../models/types.js').Episode} */ ep) {
+  const f = /** @type {import('../../models/types.js').SideFile} */ (ep.note);
+  const key = 'note.' + f.id;
+  if (notes.has(key)) return notes.get(key) || '';
+  const saved = LS.get(key, null);
+  if (typeof saved === 'string') {
+    notes.set(key, saved);
+    return saved;
+  }
+  notes.set(key, '');
+  if (f.size > 0 && f.size < 64 * 1024)
+    readNodeText(f)
+      .then((t) => {
+        const text = t.trim();
+        notes.set(key, text);
+        LS.set(key, text);
+        if (text && P.playing && P.playing.ep.id === ep.id) paintWatchInfo();
+      })
+      .catch(() => notes.delete(key)); // sin conexión: se intenta otra vez la próxima
+  return '';
 }
 
 export function parkStage() {

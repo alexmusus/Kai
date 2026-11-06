@@ -1,13 +1,24 @@
 /*
- * controllers/player/gestures.js — Gestos en el teléfono: doble toque a los lados para ±10 s, mantener presionado
- * para 2×, deslizar arriba para pantalla completa y abajo para salir o pasar al mini reproductor.
+ * controllers/player/gestures.js — Gestos en el teléfono: doble toque a los lados para ± segundos, mantener
+ * presionado para otra velocidad (las dos cosas las elige cada perfil), deslizar arriba para pantalla completa y
+ * abajo para salir o pasar al mini reproductor.
  */
 
-import { stage, video, holdEl, ui } from './dom.js';
+import { stage, video, ui } from './dom.js';
 import { P } from './state.js';
 import { goBack, leavePage } from '../router.js';
 import { enterMini } from './mini.js';
-import { isFullscreen, togglePlay, wake, toggleFullscreen, seekBy, exitFullscreen } from './controls.js';
+import {
+  isFullscreen,
+  togglePlay,
+  wake,
+  toggleFullscreen,
+  seekBy,
+  exitFullscreen,
+  startFast,
+  stopFast,
+  seekStep,
+} from './controls.js';
 
 ui.tap.addEventListener('pointerdown', (e) => {
   if (e.pointerType !== 'touch' || !e.isPrimary) return;
@@ -27,8 +38,7 @@ ui.tap.addEventListener('pointerdown', (e) => {
     if (P.touch !== t || t.mode || !video.currentSrc || video.paused || video.ended) return;
     t.hold = true;
     t.mode = 'hold';
-    video.playbackRate = 2;
-    holdEl.classList.add('is-on');
+    startFast();
     clearTimeout(P.tapTimer);
   }, 500);
 });
@@ -131,7 +141,7 @@ export function handleTouchTap(fx, downAt = Date.now()) {
   // racha de toques: tras un doble toque, cada toque rápido del mismo lado suma otros 10 s
   if (P.lastTapSide === side + '-streak' && gap < 650 && side !== 'center') {
     P.lastTap = now;
-    seekBy(side === 'left' ? -10 : 10);
+    seekBy(side === 'left' ? -seekStep() : seekStep(), { quiet: true });
     return;
   }
   if (gap < DOUBLE_TAP && P.lastTapSide === side) {
@@ -143,23 +153,25 @@ export function handleTouchTap(fx, downAt = Date.now()) {
       return;
     }
     P.lastTapSide = side + '-streak';
-    seekBy(side === 'left' ? -10 : 10);
+    seekBy(side === 'left' ? -seekStep() : seekStep(), { quiet: true });
     return;
   }
   P.lastTap = now;
   P.lastTapSide = side;
   clearTimeout(P.tapTimer);
   P.tapTimer = setTimeout(() => {
-    if (stage.classList.contains('is-idle') || video.paused) wake();
-    else stage.classList.add('is-idle');
+    if (stage.classList.contains('is-idle')) wake();
+    else {
+      clearTimeout(P.idleTimer);
+      stage.classList.add('is-idle');
+    }
   }, DOUBLE_TAP + 60);
 }
 
 export function endHold() {
   if (!P.touch || !P.touch.hold) return;
   P.touch.hold = false;
-  video.playbackRate = P.speed;
-  holdEl.classList.remove('is-on');
+  stopFast();
 }
 const SWIPE_DOWN = 110;
 /** Apaga la página del reproductor (menos el video) según cuánto se deslizó: 0 = nada, 1 = casi del todo. */

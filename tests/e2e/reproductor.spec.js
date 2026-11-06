@@ -205,3 +205,61 @@ test('pantalla completa: lo de detrás no se calcula, y sigue así un momento al
   await expect(page.locator('html')).not.toHaveClass(/fs-leaving|kai-fs-on/);
   expect(k.errors).toEqual([]);
 });
+
+test('en pausa queda la imagen limpia; el doble toque adelanta sin mostrar la barra', async ({ page }, info) => {
+  test.skip(info.project.name !== 'iphone', 'gestos táctiles');
+  const k = await openWithDownloads(page);
+  await page.evaluate((id) => { location.hash = '#/play/' + id; }, k.eps[0].id);
+  await expect.poll(() => page.evaluate(() => document.querySelector('#video').readyState), { timeout: 10000 }).toBeGreaterThan(1);
+  await page.evaluate(() => { const v = document.querySelector('#video'); v.muted = true; v.currentTime = 30; return v.play(); });
+  await page.evaluate(() => document.querySelector('#video').pause());
+  const stage = page.locator('#stage');
+  await expect(stage).not.toHaveClass(/is-idle/); // al pausar se ven los controles un momento…
+  await expect(stage).toHaveClass(/is-idle/, { timeout: 5000 }); // …y luego queda solo la imagen
+  await expect(page.locator('#st-big')).toHaveCSS('opacity', '0');
+  // doble toque a la derecha: +10 s y los controles siguen escondidos
+  const before = await page.evaluate(() => document.querySelector('#video').currentTime);
+  await page.evaluate(async () => {
+    const tap = document.querySelector('#st-tap');
+    const r = tap.getBoundingClientRect();
+    const ev = (type) => tap.dispatchEvent(new PointerEvent(type, { pointerId: 3, pointerType: 'touch', isPrimary: true, clientX: r.right - 30, clientY: r.top + r.height / 2, bubbles: true }));
+    ev('pointerdown'); ev('pointerup');
+    await new Promise((res) => setTimeout(res, 120));
+    ev('pointerdown'); ev('pointerup');
+  });
+  await expect.poll(() => page.evaluate(() => document.querySelector('#video').currentTime)).toBeGreaterThan(before + 9);
+  await expect(stage).toHaveClass(/is-idle/);
+  await page.waitForTimeout(500);
+  await expect(stage).toHaveClass(/is-idle/);
+  expect(k.errors).toEqual([]);
+});
+
+test('cada perfil elige la velocidad al mantener presionado y cuánto saltan los ±; en la PC, la barra espaciadora', async ({ page }, info) => {
+  test.skip(info.project.name !== 'pc', 'teclado');
+  const k = await openWithDownloads(page);
+  await page.evaluate(() => { location.hash = '#/ajustes'; });
+  await page.locator('[data-act="set-step"][data-v="30"]').click();
+  await page.locator('[data-act="set-hold"][data-v="3"]').click();
+  await expect(page.locator('[data-act="set-step"][data-v="30"]')).toHaveClass(/is-on/);
+  // queda en el perfil (lo compartido), no en los ajustes generales
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('kai.shared')).profiles.find((p) => p.id === 'pA').prefs)).toEqual({ step: 30, hold: 3 });
+  await page.evaluate((id) => { location.hash = '#/play/' + id; }, k.eps[0].id);
+  await expect.poll(() => page.evaluate(() => document.querySelector('#video').readyState), { timeout: 10000 }).toBeGreaterThan(1);
+  await page.evaluate(() => { const v = document.querySelector('#video'); v.muted = true; v.currentTime = 20; return v.play(); });
+  await expect(page.locator('[data-act="fwd10"]')).toHaveAttribute('aria-label', 'Adelantar 30 segundos');
+  await expect(page.locator('[data-act="fwd10"] .st-num')).toHaveText('30');
+  const t0 = await page.evaluate(() => document.querySelector('#video').currentTime);
+  await page.keyboard.press('ArrowRight');
+  await expect.poll(() => page.evaluate(() => document.querySelector('#video').currentTime)).toBeGreaterThan(t0 + 28);
+  // barra espaciadora mantenida: 3× mientras dura
+  await page.keyboard.down(' ');
+  await expect.poll(() => page.evaluate(() => document.querySelector('#video').playbackRate)).toBe(3);
+  await expect(page.locator('#st-hold')).toContainText('3×');
+  await page.keyboard.up(' ');
+  await expect.poll(() => page.evaluate(() => document.querySelector('#video').playbackRate)).toBe(1);
+  expect(await page.evaluate(() => document.querySelector('#video').paused)).toBe(false); // mantener no pausa
+  // un toque: pausa
+  await page.keyboard.press(' ');
+  await expect.poll(() => page.evaluate(() => document.querySelector('#video').paused)).toBe(true);
+  expect(k.errors).toEqual([]);
+});
