@@ -205,3 +205,31 @@ test('pantalla completa: lo de detrás no se calcula, y sigue así un momento al
   await expect(page.locator('html')).not.toHaveClass(/fs-leaving|kai-fs-on/);
   expect(k.errors).toEqual([]);
 });
+
+test('en pausa queda la imagen limpia; el doble toque adelanta sin mostrar la barra', async ({ page }, info) => {
+  test.skip(info.project.name !== 'iphone', 'gestos táctiles');
+  const k = await openWithDownloads(page);
+  await page.evaluate((id) => { location.hash = '#/play/' + id; }, k.eps[0].id);
+  await expect.poll(() => page.evaluate(() => document.querySelector('#video').readyState), { timeout: 10000 }).toBeGreaterThan(1);
+  await page.evaluate(() => { const v = document.querySelector('#video'); v.muted = true; v.currentTime = 30; return v.play(); });
+  await page.evaluate(() => document.querySelector('#video').pause());
+  const stage = page.locator('#stage');
+  await expect(stage).not.toHaveClass(/is-idle/); // al pausar se ven los controles un momento…
+  await expect(stage).toHaveClass(/is-idle/, { timeout: 5000 }); // …y luego queda solo la imagen
+  await expect(page.locator('#st-big')).toHaveCSS('opacity', '0');
+  // doble toque a la derecha: +10 s y los controles siguen escondidos
+  const before = await page.evaluate(() => document.querySelector('#video').currentTime);
+  await page.evaluate(async () => {
+    const tap = document.querySelector('#st-tap');
+    const r = tap.getBoundingClientRect();
+    const ev = (type) => tap.dispatchEvent(new PointerEvent(type, { pointerId: 3, pointerType: 'touch', isPrimary: true, clientX: r.right - 30, clientY: r.top + r.height / 2, bubbles: true }));
+    ev('pointerdown'); ev('pointerup');
+    await new Promise((res) => setTimeout(res, 120));
+    ev('pointerdown'); ev('pointerup');
+  });
+  await expect.poll(() => page.evaluate(() => document.querySelector('#video').currentTime)).toBeGreaterThan(before + 9);
+  await expect(stage).toHaveClass(/is-idle/);
+  await page.waitForTimeout(500);
+  await expect(stage).toHaveClass(/is-idle/);
+  expect(k.errors).toEqual([]);
+});

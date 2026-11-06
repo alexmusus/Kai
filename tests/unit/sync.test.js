@@ -159,6 +159,21 @@ describe('el progreso', () => {
     expect(m.named(profileFile('dup'))).toEqual([]);
   });
 
+  it('cambiar de perfil mientras se lee MEGA no mezcla el progreso de los dos', async () => {
+    const m = fakeMega([[profileFile('p1'), { items: { deAlex: { w: true, u: 5 } } }]]);
+    // mientras se lee el archivo de Alex, alguien cambia a Antwan en este dispositivo
+    const read = m.io.readJson;
+    m.io.readJson = async (n) => {
+      const d = await read(n);
+      state.profile = { id: 'p2', name: 'Antwan' };
+      state.progress = { deAntwan: { w: true, u: 7 } };
+      return d;
+    };
+    await syncProgress(m.home, m.io);
+    expect(state.progress).toEqual({ deAntwan: { w: true, u: 7 } }); // Antwan no recibe lo de Alex
+    expect(m.writes).toEqual([]); // y no se escribe nada mezclado en el archivo de Alex
+  });
+
   it('otro perfil no ve mi progreso', async () => {
     const m = fakeMega([[profileFile('p2'), { items: { suyo: { u: 1 } } }]]);
     await syncProgress(m.home, m.io);

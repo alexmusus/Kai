@@ -131,7 +131,7 @@ export function handleTouchTap(fx, downAt = Date.now()) {
   // racha de toques: tras un doble toque, cada toque rápido del mismo lado suma otros 10 s
   if (P.lastTapSide === side + '-streak' && gap < 650 && side !== 'center') {
     P.lastTap = now;
-    seekBy(side === 'left' ? -10 : 10);
+    seekBy(side === 'left' ? -10 : 10, { quiet: true });
     return;
   }
   if (gap < DOUBLE_TAP && P.lastTapSide === side) {
@@ -143,15 +143,18 @@ export function handleTouchTap(fx, downAt = Date.now()) {
       return;
     }
     P.lastTapSide = side + '-streak';
-    seekBy(side === 'left' ? -10 : 10);
+    seekBy(side === 'left' ? -10 : 10, { quiet: true });
     return;
   }
   P.lastTap = now;
   P.lastTapSide = side;
   clearTimeout(P.tapTimer);
   P.tapTimer = setTimeout(() => {
-    if (stage.classList.contains('is-idle') || video.paused) wake();
-    else stage.classList.add('is-idle');
+    if (stage.classList.contains('is-idle')) wake();
+    else {
+      clearTimeout(P.idleTimer);
+      stage.classList.add('is-idle');
+    }
   }, DOUBLE_TAP + 60);
 }
 

@@ -89,7 +89,7 @@ video.addEventListener('play', () => {
 video.addEventListener('pause', () => {
   paintControls();
   savePosition(true);
-  stage.classList.remove('is-idle');
+  wake(); // se ven los controles un momento y luego queda la imagen limpia
   document.body.classList.remove('is-playing');
 });
 
@@ -191,7 +191,26 @@ document.addEventListener('visibilitychange', () => {
   playNext();
 });
 
-video.addEventListener('error', async () => {
+/* Al reanudar después de una pausa, a veces (sobre todo en iPhone, tras pausas largas: el enlace de MEGA vence)
+ * el video queda en "reproduciendo" pero no avanza, y sin avisar error: parecía trabado. Si en 6 s no avanzó, se
+ * recupera igual que ante un error (enlace nuevo y sigue en el mismo punto). */
+let resumeWatch = 0;
+video.addEventListener('playing', () => P.playing && (P.playing.started = true));
+video.addEventListener('play', () => {
+  clearTimeout(resumeWatch);
+  const tok = P.playing;
+  if (!tok || !tok.started || tok.objectUrl) return; // el primer arranque desde MEGA puede tardar más
+  const t0 = video.currentTime;
+  resumeWatch = setTimeout(() => {
+    if (P.playing !== tok || video.paused || video.ended || P.seeking) return;
+    if (Math.abs(video.currentTime - t0) < 0.25) recoverStream();
+  }, 6000);
+});
+video.addEventListener('pause', () => clearTimeout(resumeWatch));
+
+video.addEventListener('error', recoverStream);
+async function recoverStream() {
+  clearTimeout(resumeWatch);
   if (!P.playing || !video.getAttribute('src')) return;
   const { ep } = P.playing;
   const at = video.currentTime;
@@ -253,7 +272,7 @@ video.addEventListener('error', async () => {
       detail,
     );
   else playerMessage('No se pudo reproducir este capítulo en este navegador.');
-});
+}
 
 ui.seek.addEventListener('input', () => {
   if (!P.seeking) P.seekFrom = video.currentTime;
