@@ -131,3 +131,17 @@ describe('orden de capítulos', () => {
     expect(sortEpisodes(eps).map((e) => e.name)).toEqual(['472_1.5_SUB.mp4', '472_2_SUB.mp4', 'Anexo 2.mp4', '472_10_SUB.mp4', 'Extra.mp4']);
   });
 });
+
+import { studioTitle } from '../../models/collections.js';
+describe('Studio: artista, canción y detalle del nombre del video', () => {
+  it('"Artista - Canción (detalle)"', () => {
+    expect(studioTitle('Juan Gabriel - Querida (Bellas Artes, 1990).mp4')).toEqual({ artist: 'Juan Gabriel', song: 'Querida', detail: 'Bellas Artes, 1990' });
+  });
+  it('sin detalle, con guiones bajos o con otro guion', () => {
+    expect(studioTitle('Rocio_Durcal_-_Amor_eterno.mp4')).toEqual({ artist: 'Rocio Durcal', song: 'Amor eterno', detail: '' });
+    expect(studioTitle('Juanes – La camisa negra [MTV Unplugged].mp4')).toEqual({ artist: 'Juanes', song: 'La camisa negra', detail: 'MTV Unplugged' });
+  });
+  it('sin " - ", todo es la canción', () => {
+    expect(studioTitle('Querida.mp4')).toEqual({ artist: '', song: 'Querida', detail: '' });
+  });
+});

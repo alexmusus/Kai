@@ -25,7 +25,17 @@ import { newEpisodes } from '../models/news.js';
 import { viewState } from './view-state.js';
 import { hydrateThumbs } from './thumbs.js';
 import { continueList, laterList } from '../models/progress.js';
-import { isCollection, itemFor, movieTitle, movieImage, episodeLabel, isCine } from '../models/collections.js';
+import {
+  isCollection,
+  itemFor,
+  movieTitle,
+  movieImage,
+  episodeLabel,
+  isCine,
+  isStudio,
+  isAside,
+  studioTitle,
+} from '../models/collections.js';
 
 export function greeting() {
   const h = new Date().getHours();
@@ -136,13 +146,20 @@ export function renderHome() {
           .slice(0, HOME_CONTINUE)
           .map((c) =>
             tileHTML(c.series, siOf(c.series), {
-              // primero la página de la serie (o de la película), con "Continuar" listo
-              href: isCollection(c.series)
-                ? movieHref(siOf(c.series), itemFor(c.series, c.ep).key)
-                : '#/serie/' + siOf(c.series),
-              label: isCollection(c.series) ? movieTitle(c.series, itemFor(c.series, c.ep)) : '',
-              img: isCollection(c.series) ? movieImage(c.series, itemFor(c.series, c.ep)) : '',
-              sub: `${episodeLabel(c.ep)}${c.p && c.p.t > 5 ? `, ${fmtLeft(c.p)}` : ''}`,
+              // primero la página de la serie (o de la película), con "Continuar" listo; una canción de Studio, directo
+              href: isStudio(c.series)
+                ? '#/play/' + encodeURIComponent(c.ep.id)
+                : isCollection(c.series)
+                  ? movieHref(siOf(c.series), itemFor(c.series, c.ep).key)
+                  : '#/serie/' + siOf(c.series),
+              label: isStudio(c.series)
+                ? episodeLabel(c.ep)
+                : isCollection(c.series)
+                  ? movieTitle(c.series, itemFor(c.series, c.ep))
+                  : '',
+              img: isCollection(c.series) && !isStudio(c.series) ? movieImage(c.series, itemFor(c.series, c.ep)) : '',
+              thumbEp: isStudio(c.series) ? c.ep : null,
+              sub: `${isStudio(c.series) ? studioTitle(c.ep.name).artist || c.series.name : episodeLabel(c.ep)}${c.p && c.p.t > 5 ? `, ${fmtLeft(c.p)}` : ''}`,
               pct: c.p && c.p.d ? Math.min(100, (c.p.t / c.p.d) * 100) : 0,
             }),
           )
@@ -182,6 +199,7 @@ export function renderHome() {
 /** El final del inicio: "Descubrir" (Cine, Porque viste…, En emisión) y Kai, el gatito, sentado encima. */
 function homeFootHTML(lib) {
   const cine = lib.series.findIndex(isCine);
+  const studio = lib.series.findIndex(isStudio);
   const link = (href, icon, title, sub, tone) =>
     `<a class="home-link" href="${href}" data-tone="${tone}"><span class="home-link-ic">${icon}</span><span class="home-link-text"><b>${esc(title)}</b><span>${esc(sub)}</span></span>${ICON.chev}</a>`;
   return `<section class="tv-row home-foot" aria-labelledby="home-disc">
@@ -190,6 +208,7 @@ function homeFootHTML(lib) {
       ${catHTML('foot')}
       <nav class="home-links" aria-label="Descubrir">
         ${cine >= 0 ? link(`#/serie/${cine}`, ICON.film, lib.series[cine].name, 'Películas que no son anime', 'cine') : ''}
+        ${studio >= 0 ? link(`#/serie/${studio}`, ICON.mic, lib.series[studio].name, 'Música en vivo', 'studio') : ''}
         ${link('#/descubrir/porque', ICON.spark, 'Porque viste…', 'Recomendaciones según lo que tienes', 'porque')}
         ${link('#/descubrir/emision', ICON.live, 'En emisión', 'Lo que está saliendo ahora', 'emision')}
       </nav>
@@ -199,7 +218,7 @@ function homeFootHTML(lib) {
 
 /** Fila "Películas" del inicio: las 10 primeras en orden alfabético y el enlace al estante completo. */
 export function homeMoviesHTML(lib) {
-  const si = lib.series.findIndex((x) => isCollection(x) && !isCine(x));
+  const si = lib.series.findIndex((x) => isCollection(x) && !isAside(x));
   if (si < 0) return '';
   const s = lib.series[si];
   const items = shelfItems(s);

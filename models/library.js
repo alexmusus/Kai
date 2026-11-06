@@ -6,7 +6,7 @@
 
 import { index, state, pkey, setIndex, saveProgressLocal, knownEps } from './store.js';
 import { LS } from '../lib/util.js';
-import { episodeNumber, MIME, isVideoName, sortEpisodes, seasonInfo, langOf, twinKey } from './naming.js';
+import { baseName, episodeNumber, MIME, isVideoName, sortEpisodes, seasonInfo, langOf, twinKey } from './naming.js';
 import { C, isGone, visibleChildren } from './mega.js';
 
 /** @typedef {import('./types.js').Library} Library */
@@ -89,8 +89,37 @@ export function makeEpisode(f, folderPath) {
   };
 }
 
-/** @param {MegaNode[]} files @param {string} folderPath */
-const episodesOf = (files, folderPath) => sortEpisodes(files.map((f) => makeEpisode(f, folderPath)));
+/* Archivos que acompañan a un video con su mismo nombre: la imagen (.jpg, .png, .webp) se usa como su miniatura y
+ * el .txt como su descripción (Studio los usa; sirven en cualquier carpeta). */
+const ART_EXT = /\.(jpe?g|png|webp)$/i;
+const NOTE_EXT = /\.txt$/i;
+/** @param {MegaNode} n @returns {import('./types.js').SideFile} */
+const sideFile = (n) => ({ id: n.nodeId, key: keyOf(n), size: n.size || 0 });
+/**
+ * @param {MegaNode[]} files los videos
+ * @param {string} folderPath
+ * @param {MegaNode[]} kids todo lo que hay en la carpeta
+ */
+function episodesOf(files, folderPath, kids) {
+  /** @type {Map<string, { art?: MegaNode, note?: MegaNode }>} */
+  const side = new Map();
+  for (const k of kids) {
+    if (k.directory || !k.key || isGone(k)) continue;
+    const kind = ART_EXT.test(k.name) ? 'art' : NOTE_EXT.test(k.name) ? 'note' : '';
+    if (!kind) continue;
+    const b = baseName(k.name);
+    side.set(b, { ...side.get(b), [kind]: k });
+  }
+  return sortEpisodes(
+    files.map((f) => {
+      const e = makeEpisode(f, folderPath);
+      const s = side.size ? side.get(baseName(f.name)) : null;
+      if (s && s.art) e.art = sideFile(s.art);
+      if (s && s.note) e.note = sideFile(s.note);
+      return e;
+    }),
+  );
+}
 const byName = (/** @type {string} */ a, /** @type {string} */ b) => a.localeCompare(b, 'es', { numeric: true });
 
 /**
@@ -105,7 +134,7 @@ function buildSeries(folder, rootPath) {
   /** @type {Season[]} */
   const seasons = [];
   const direct = kids.filter(isPlayable);
-  if (direct.length) seasons.push({ num: null, title: '', name: '', episodes: episodesOf(direct, path) });
+  if (direct.length) seasons.push({ num: null, title: '', name: '', episodes: episodesOf(direct, path, kids) });
   for (const sub of kids.filter((c) => c.directory)) {
     const inner = visibleChildren(sub);
     const videos = inner.filter(isPlayable);
@@ -113,7 +142,7 @@ function buildSeries(folder, rootPath) {
       seasons.push({
         ...seasonInfo(sub.name),
         name: sub.name,
-        episodes: episodesOf(videos, path + '/' + sub.name),
+        episodes: episodesOf(videos, path + '/' + sub.name, inner),
       });
   }
   if (!seasons.length) return null;
@@ -362,7 +391,8 @@ export function migrateProgressKeys(obj) {
  */
 export function librarySignature(lib) {
   if (!lib) return '';
-  const ep = (/** @type {Episode} */ e) => e.id + (e.fa ? '+' : '');
+  const ep = (/** @type {Episode} */ e) =>
+    e.id + (e.fa ? '+' : '') + (e.art ? '~' + e.art.id : '') + (e.note ? '#' + e.note.id : '');
   const season = (/** @type {Season} */ se) => se.name + '=' + (se.full || se.episodes).map(ep).join(',');
   const series = (/** @type {Series} */ s) => `${s.name}@${s.added || 0}:${s.seasons.map(season).join(';')}`;
   return lib.root + '|' + lib.series.map(series).join('|');

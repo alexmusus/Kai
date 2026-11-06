@@ -62,7 +62,14 @@ export function buildFixture() {
     name: 'Cine', folderId: 'f4', added: NOW - 86400e3 * 5,
     seasons: [season(null, 'El gigante de hierro (1999)', 'El gigante de hierro (1999)', [ep('Anime/Cine/El gigante de hierro (1999)', 'El gigante de hierro.mp4', null)])],
   };
-  const library = { root: 'Anime', rootId: 'root', v: 2, series: [dor, pel, cine, yahari].sort((a, b) => a.name.localeCompare(b.name, 'es', { numeric: true })), updated: NOW };
+  // Studio: música en vivo; el primero con su descripción (.txt con el mismo nombre)
+  const qd = ep('Anime/Studio', 'Juan Gabriel - Querida (Bellas Artes, 1990).mp4', null);
+  qd.note = { id: 'txt1', key: KEY, size: 40 };
+  const studio = {
+    name: 'Studio', folderId: 'f5', added: NOW - 86400e3 * 5,
+    seasons: [season(null, '', '', [qd, ep('Anime/Studio', 'Rocío Dúrcal - Amor eterno.mp4', null)])],
+  };
+  const library = { root: 'Anime', rootId: 'root', v: 2, series: [dor, pel, cine, studio, yahari].sort((a, b) => a.name.localeCompare(b.name, 'es', { numeric: true })), updated: NOW };
 
   const metaMap = {
     Dorohedoro: { ...meta(105228, 'Dorohedoro', 20, { year: 2020, genres: ['Acción', 'Comedia', 'Fantasía'], score: 82 }), sv: 6 },

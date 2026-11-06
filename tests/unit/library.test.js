@@ -30,7 +30,19 @@ beforeEach(() => {
 });
 
 describe('buildLibrary', () => {
-  it('series, temporadas en orden, capítulos y subtítulos', () => {
+  it('la imagen y el .txt con el mismo nombre que un video son su miniatura y su descripción (Studio)', () => {
+    const st = tree(dir('Anime', [
+      dir('Studio', [file('Juan Gabriel - Querida.mp4'), file('Juan Gabriel - Querida.jpg'), file('juan gabriel - querida.txt'), file('Otra.mp4'), file('portada.png')]),
+    ]));
+    const lib = buildLibrary(st);
+    const [q, otra] = lib.series[0].seasons[0].episodes.slice().sort((a, b) => a.name.localeCompare(b.name));
+    expect(q.name).toBe('Juan Gabriel - Querida.mp4');
+    expect(q.art && q.art.id).toBeTruthy();
+    expect(q.note && q.note.id).toBeTruthy();
+    expect(otra.art).toBeUndefined(); // "portada.png" no se llama como ningún video
+    expect(lib.series[0].seasons[0].episodes).toHaveLength(2); // las imágenes no son capítulos
+  });
+  it('series, temporadas en orden y capítulos', () => {
     const st = tree(dir('Anime', [
       dir('Fate', [
         dir('2. Fate Zero', [file('2_1_SUB.mp4'), file('2_0_SUB.mp4')]),

@@ -22,6 +22,8 @@
  * @property {string | null} fa atributo de miniatura de MEGA
  * @property {string} mime
  * @property {number} ts       cuándo llegó a MEGA (segundos)
+ * @property {SideFile} [art]  imagen con el mismo nombre (su miniatura)
+ * @property {SideFile} [note] .txt con el mismo nombre (su descripción)
  * @property {Lang | null} [lang] idioma (lo pone buildIndex)
  */
 
@@ -84,6 +86,7 @@
 
 /** @typedef {Record<string, Progress>} ProgressMap */
 
+/** @typedef {{ id: string, key: string, size: number }} SideFile un archivo de MEGA que acompaña a un video */
 /** @typedef {{ hold?: number, step?: number }} ProfilePrefs lo del reproductor que elige cada perfil */
 /** @typedef {{ id: string, name: string, deleted?: boolean, u?: number, prefs?: ProfilePrefs }} Profile */
 

@@ -1784,3 +1784,7 @@ section.empty .btn { margin-top: 10px; }
 .copy-list { list-style: none; margin: 8px 0 14px; padding: 0; display: grid; gap: 14px; }
 .copy-row p { margin: 0 0 6px; }
 .copy-row .segmented { flex-wrap: wrap; }
+
+/* Studio: los videos en mosaicos 16:9 (su imagen es un cuadro del video) y, en el reproductor, su descripción */
+.studio-grid .tile-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.watch-note { margin: 10px 0 0; color: var(--dim); font-size: 15px; line-height: 1.45; white-space: pre-line; max-width: 62ch; }

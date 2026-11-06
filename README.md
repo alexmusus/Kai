@@ -10,6 +10,7 @@ Reproductor de las series y películas de anime guardadas en una cuenta de MEGA.
 - Muestra un menú de temporadas en las series que tienen varias, y la lista de capítulos directa en las que tienen una.
 - Traduce las sinopsis al español y las comparte con todos los dispositivos.
 - Separa una sección de **Cine** para las películas que no son anime, con ficha en español.
+- **Studio:** música en vivo, con la imagen y la descripción que tú le pongas a cada video.
 - Avisa con una burbuja de "Nuevo" lo que se agregó a MEGA y lo lista en **Novedades**.
 
 **Inicio y búsqueda**
