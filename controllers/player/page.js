@@ -52,6 +52,7 @@ export function renderWatch(id) {
     </main>`;
     const slot = $('#stage-slot');
     slot.appendChild(stage);
+    watchStuck(slot);
     if (from) {
       flyFrom(slot, from, slot.getBoundingClientRect());
       // lo demás de la página aparece un poco después, cuando el video ya va llegando
@@ -135,6 +136,22 @@ function noteText(/** @type {import('../../models/types.js').Episode} */ ep) {
       })
       .catch(() => notes.delete(key)); // sin conexión: se intenta otra vez la próxima
   return '';
+}
+
+/** Teléfono: marca cuándo el video quedó fijo arriba (styles.css: .stage-slot.is-stuck): cuando los botones de
+ * arriba de la página ya se fueron. @param {HTMLElement} slot */
+let stuckObserver = /** @type {IntersectionObserver | null} */ (null);
+function watchStuck(slot) {
+  if (stuckObserver) stuckObserver.disconnect();
+  const bar = slot.closest('main')?.previousElementSibling;
+  if (!bar || !('IntersectionObserver' in window)) return;
+  // el video se fija cuando su borde de arriba llega a `top`; entre los botones y el video hay `gap`
+  const top = parseFloat(getComputedStyle(slot).top) || 0;
+  const gap = slot.getBoundingClientRect().top - bar.getBoundingClientRect().bottom;
+  stuckObserver = new IntersectionObserver(([e]) => slot.classList.toggle('is-stuck', !e.isIntersecting), {
+    rootMargin: `${Math.round(gap - top)}px 0px 0px 0px`,
+  });
+  stuckObserver.observe(bar);
 }
 
 export function parkStage() {
