@@ -1744,12 +1744,14 @@ section.empty p:first-child { font-weight: 600; font-size: 16px; }
 section.empty .btn { margin-top: 10px; }
 .tv-empty { background: none; box-shadow: none; }
 
-/* ── PC: Kai acostado sobre el nombre de la app, y Descubrir en horizontal con Kai sentado a la derecha ── */
+/* ── PC: Kai acostado al lado del nombre de la app (donde iba el saludo), y Descubrir en horizontal con Kai sentado
+ * a la derecha ── */
 .kcat-sit.is-top { display: none; }
 @media (min-width: 900px) {
-  .tv.is-home .tv-top { padding-top: calc(env(safe-area-inset-top) + 40px); }
+  .tv.is-home .tv-top { padding-top: calc(env(safe-area-inset-top) + 20px); }
+  .tv.is-home .tv-greet { display: none; }
   .tv-word .kcat-sit.is-top {
-    display: block; left: 50%; bottom: calc(100% - 7px); width: 92px; height: auto; aspect-ratio: 520 / 224; transform: translateX(-50%);
+    display: block; left: calc(100% + 12px); right: auto; bottom: -5px; width: 88px; height: auto; aspect-ratio: 520 / 224; transform: none;
   }
   .home-foot { max-width: none; }
   .home-shelf { display: flex; align-items: flex-end; gap: 18px; }
@@ -1788,3 +1790,13 @@ section.empty .btn { margin-top: 10px; }
 /* Studio: los videos en mosaicos 16:9 (su imagen es un cuadro del video) y, en el reproductor, su descripción */
 .studio-grid .tile-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .watch-note { margin: 10px 0 0; color: var(--dim); font-size: 15px; line-height: 1.45; white-space: pre-line; max-width: 62ch; }
+
+/* teléfono: el video se queda arriba mientras bajas a ver los capítulos (como en YouTube). La caja de la página que
+ * lo contiene abarca también la lista (si no, el video se iba con la información); al quedar fijo, la franja de la
+ * hora (iPhone) se pinta del color del fondo para que la lista no se vea pasar por detrás. */
+@media (max-width: 899px) {
+  .watch-main { display: contents; }
+  .stage-slot { position: sticky; top: env(safe-area-inset-top); }
+  .stage-slot.is-stuck::before { content: ''; position: absolute; left: 0; right: 0; bottom: 100%; height: env(safe-area-inset-top); background: var(--bg); }
+  .stage-slot.is-stuck .stage { box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28); }
+}
