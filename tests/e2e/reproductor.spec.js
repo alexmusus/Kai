@@ -52,6 +52,10 @@ test('reproduce un capítulo descargado: controles, intro, velocidad, progreso y
   await page.evaluate(() => { const v = document.querySelector('#video'); v.muted = true; return v.play(); });
   await expect.poll(() => time(page), { timeout: 10000 }).toBeGreaterThan(0.5);
   await expect(page.locator('#app')).toContainText('Dorohedoro');
+  // en la barra del video: la serie y el capítulo (sin el nombre del capítulo interno del MP4); en el teléfono, solo el capítulo
+  await expect(page.locator('#st-title')).toHaveText('Dorohedoro · Episodio 1');
+  await expect(page.locator('#st-title .st-series')).toBeVisible({ visible: test.info().project.name === 'pc' });
+  await expect(page.locator('.st-row')).not.toContainText('Opening');
 
   // las marcas de capítulos del MP4; al entrar al Opening (5 s → 1:35) lo salta solo y ofrece volver
   await expect.poll(() => page.locator('#st-marks *').count(), { timeout: 10000 }).toBeGreaterThan(0);

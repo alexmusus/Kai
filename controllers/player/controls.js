@@ -7,11 +7,11 @@ import { profilePrefs } from '../../models/profiles.js';
 import { video, ui, stage, holdEl } from './dom.js';
 import { ICON } from '../../views/icons.js';
 import { P } from './state.js';
-import { fmtTime, $ } from '../../lib/util.js';
+import { fmtTime, $, esc } from '../../lib/util.js';
 import { paintThemeColor } from '../../views/theme.js';
 import { toast } from '../../views/toast.js';
 import { neighbor } from './engine.js';
-import { paintSkip, chapterAt } from './chapters.js';
+import { paintSkip } from './chapters.js';
 import { episodeLabel } from '../../models/collections.js';
 
 // se llama varias veces por segundo: solo toca el DOM cuando algo cambió
@@ -45,12 +45,13 @@ export function paintControls() {
       if (n) n.textContent = String(v);
     }
   });
-  // en medio de la barra: qué se está viendo
+  // en medio de la barra: qué se está viendo (en el teléfono, solo el capítulo: la serie se esconde)
+  const series = (P.playing && P.playing.ctx && P.playing.ctx.title) || '';
   const what = P.playing
-    ? [P.playing.ctx && P.playing.ctx.title, episodeLabel(P.playing.ep)].filter(Boolean).join(' · ')
+    ? `${series ? `<span class="st-series">${esc(series)} · </span>` : ''}${esc(episodeLabel(P.playing.ep))}`
     : '';
   setOnce('title', what, (v) => {
-    ui.title.textContent = v;
+    ui.title.innerHTML = v;
   });
   const d = isFinite(video.duration) ? video.duration : 0;
   const t = P.seeking ? Number(ui.seek.value) : video.currentTime;
@@ -69,10 +70,6 @@ export function paintControls() {
     ui.next.hidden = v;
   });
   paintSkip(t, d);
-  const ch = chapterAt(P.seeking ? t : video.currentTime);
-  setOnce('chapter', ch && ch.title ? ch.title : '', (v) => {
-    ui.chapter.textContent = v;
-  });
   setOnce('mute', video.muted || video.volume === 0, (v) => {
     ui.mute.innerHTML = v
       ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></svg>'
