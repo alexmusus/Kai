@@ -240,6 +240,17 @@ test('Seleccionar capítulos de una temporada', async ({ page }, info) => {
   await eps.nth(4).click();
   await expect(page).toHaveURL(new RegExp(`#/serie/${k.si('Dorohedoro')}$`)); // no abrió el capítulo
   await expect(page.locator('#pick-count')).toHaveText('2 capítulos, 500 MB por descargar');
+  // todos de una vez, y otra vez para soltarlos
+  const total = await eps.count();
+  await expect(page.locator('#pick-all')).toHaveText('Todos');
+  await page.locator('#pick-all').click();
+  await expect(page.locator('#season-eps .ep.is-picked')).toHaveCount(total);
+  await expect(page.locator('#pick-all')).toHaveText('Ninguno');
+  await page.locator('#pick-all').click();
+  await expect(page.locator('#season-eps .ep.is-picked')).toHaveCount(0);
+  await expect(page.locator('#pick-count')).toHaveText('Toca los capítulos que quieras');
+  await eps.nth(0).click();
+  await eps.nth(4).click();
   await expect(page.locator('[data-act="pick-seen"]')).toBeEnabled();
   await expect(page.locator('[data-act="pick-unseen"]')).toBeDisabled(); // ninguno de los dos está visto
   await shot(page, 'seleccionar', info);
@@ -472,11 +483,14 @@ test('la barra flotante se achica al bajar en la casita, se queda así hasta toc
   await page.waitForTimeout(700);
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
   await expect(dock).toHaveClass(/is-compact/);
-  await expect(page.locator('#dock .dock-tab[data-tab="home"]')).toHaveCSS('width', '48px');
+  // la casita queda al centro de la pantalla (la barra se corre, no se reacomoda)
+  await page.waitForTimeout(400);
+  const home = await page.locator('#dock .dock-tab[data-tab="home"]').boundingBox();
+  const vw = page.viewportSize()?.width || 0;
+  expect(Math.abs((home?.x || 0) + (home?.width || 0) / 2 - vw / 2)).toBeLessThan(2);
   await expect(page.locator('#dock .dock-tab[data-tab="ajustes"]')).toHaveCSS('opacity', '0');
   // y lejos del principio, al lado, la burbuja de subir
   await expect(up).toHaveCSS('opacity', '1');
-  await page.screenshot({ path: '/tmp/claude-0/-home-user-Kai/2a50527b-117a-5251-8346-343e47b047cb/scratchpad/new/compact-ajustes.png', clip: { x: 0, y: 700, width: 390, height: 144 } });
   const y = await scrollY();
   await page.locator('#dock .dock-tab[data-tab="home"]').click();
   await expect(dock).not.toHaveClass(/is-compact/);

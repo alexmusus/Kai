@@ -58,12 +58,12 @@ decide. ESLint lo revisa (`no-restricted-imports`).
 | `home.js` | portada estilo TV: destacado al pasar o enfocar un mosaico, flechas como control remoto |
 | `lifecycle.js` | dirección, conexión, segundo plano y cierre: guardar y sincronizar a tiempo |
 | `updates.js` | registrar el service worker, aviso de versión nueva, "Buscar actualización" |
-| `dock.js` | barra flotante: pestañas, menú del perfil, se achica al bajar (hasta tocarla) con la burbuja para subir, tocar fuera solo cierra |
+| `dock.js` | barra flotante: pestañas, menú del perfil, se achica al bajar (hasta tocarla; solo con transform y opacidad) con la burbuja para subir, tocar fuera solo cierra |
 | `sync.js` | cuándo sincronizar y qué redibujar después |
 | `account.js` | entrar a MEGA, crear y elegir perfil |
 | `downloads.js` | elegir carpeta, copia aparte, poner en cola con el nombre de la serie |
 | `sheet.js` | hoja de opciones de un capítulo |
-| `picking.js` | "Seleccionar" varios capítulos |
+| `picking.js` | "Seleccionar" varios capítulos (o todos de una vez) |
 | `player/` | el reproductor: `state` (lo que suena), `dom` (sus elementos), `engine` (cargar, cambiar y guardar), `page` (la página de reproducción), `mini`, `controls`, `chapters` (marcas, saltar intro), `gestures` (toques y teclado), `events` (los del video) |
 
 Las vistas (`views/`) dibujan; si necesitan navegar avisan `navigate`, y los formularios avisan `login` y

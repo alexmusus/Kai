@@ -292,15 +292,13 @@ body.lights-off .bar { z-index: 1; }
 .st-btn svg { width: 22px; height: 22px; }
 .st-num { font: 700 7px var(--font); fill: currentColor; stroke: none; }
 .st-time { font-variant-numeric: tabular-nums; margin-left: 6px; white-space: nowrap; }
-.st-chapter { font-size: 13px; color: rgba(255, 255, 255, 0.6); margin-left: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 22ch; }
-.st-chapter:empty { display: none; }
 .st-speed { font-size: 13px; min-width: 42px; }
 #st-fs .ic-exit, .stage.is-fs #st-fs .ic-enter { display: none; }
 .stage.is-fs #st-fs .ic-exit { display: block; }
 @media (hover: none) { .st-desktop { display: none; } }
 @media (max-width: 600px) {
         .st-time { margin-left: 2px; }
-  .st-chapter, .st-desktop-ish { display: none; }
+  .st-desktop-ish { display: none; }
   .st-row [data-act='back10'], .st-row [data-act='fwd10'] { display: none; }
   .stage.is-fs .st-row [data-act='back10'], .stage.is-fs .st-row [data-act='fwd10'] { display: inline-grid; }
 }
@@ -834,6 +832,10 @@ body:not(.is-playing) .eq i { animation-play-state: paused; }
 .pick-bar[hidden] { display: none; }
 @keyframes pick-in { from { opacity: 0; transform: translate(-50%, 12px); } }
 .pick-count { font-size: 14px; font-weight: 600; white-space: nowrap; margin-right: 6px; font-variant-numeric: tabular-nums; }
+.pick-head { display: inline-flex; align-items: center; gap: 4px; margin-right: 4px; }
+.pick-head .pick-count { margin-right: 0; }
+.pick-all { height: 30px; padding: 0 10px; border-radius: 999px; font-size: 13px; font-weight: 650; color: var(--accent); white-space: nowrap; }
+@media (hover: hover) { .pick-all:hover { background: var(--btn); } }
 .pick-btn { display: inline-flex; align-items: center; gap: 6px; height: 38px; padding: 0 14px; border-radius: 999px; font-size: 14px; font-weight: 600; color: var(--text); white-space: nowrap; }
 .pick-btn:not(.is-primary) { background: var(--btn); }
 @media (hover: hover) { .pick-btn:not(.is-primary):not(:disabled):hover { background: var(--btn-hover); } }
@@ -845,7 +847,7 @@ html.is-picking .series-main { padding-bottom: calc(110px + env(safe-area-inset-
 @media (max-width: 520px) {
   .pick-bar { left: 12px; right: 12px; transform: none; max-width: none; flex-wrap: wrap; justify-content: space-between; border-radius: 22px; padding: 10px; }
   @keyframes pick-in { from { opacity: 0; transform: translateY(12px); } }
-  .pick-count { flex-basis: 100%; text-align: center; margin: 0 0 4px; }
+  .pick-head { flex-basis: 100%; justify-content: center; margin: 0 0 4px; }
   .pick-btn { flex: 1; justify-content: center; padding: 0 10px; }
 }
 
@@ -1295,8 +1297,10 @@ html:is(.kai-fs-on, .fs-leaving) :is(.ambient, .dock, .toast), html:has(.stage:f
 
 /* ── barra flotante: las páginas principales y tu perfil ── */
 .dock { left: 50%; right: auto; transform: translateX(-50%); bottom: max(8px, calc(env(safe-area-inset-bottom) - 12px)); display: block; }
-.dock-bar {
-  display: flex; align-items: center; gap: 2px; padding: 5px; border-radius: 30px;
+/* el fondo de vidrio va en su propia capa: al achicarse solo cambia ella (los botones no se reacomodan) */
+.dock-bar { position: relative; z-index: 0; display: flex; align-items: center; gap: 2px; padding: 6px; }
+.dock-bar::before {
+  content: ''; position: absolute; z-index: -1; left: 0; top: 0; bottom: 0; width: 100%; box-sizing: border-box; border-radius: 32px;
   background: color-mix(in srgb, var(--glass-solid) 70%, transparent); border: 1px solid var(--glass-edge);
   box-shadow: inset 0 1px 0 var(--glass-hi), 0 14px 34px rgba(0, 0, 0, 0.35);
   -webkit-backdrop-filter: blur(18px) saturate(180%); backdrop-filter: blur(18px) saturate(180%);
@@ -1319,7 +1323,7 @@ html:is(.kai-fs-on, .fs-leaving) :is(.ambient, .dock, .toast), html:has(.stage:f
 @media (hover: hover) { .dock-btn:hover { transform: none; } .dock-tab:hover { color: var(--text); } }
 body.is-playing:not(:has(.dock.is-open)) .dock-btn { opacity: 1; }
 .dock-panel { position: absolute; right: 0; bottom: calc(100% + 10px); transform-origin: bottom right; }
-html.lite .dock-bar { background: var(--glass-solid); }
+html.lite .dock-bar::before { background: var(--glass-solid); -webkit-backdrop-filter: none; backdrop-filter: none; }
 /* en el teléfono, la página del reproductor es solo el video: sin barra */
 @media (max-width: 899px) { body:has(main.watch) .dock { display: none; } }
 /* lo que flota abajo se acomoda sobre la barra (teléfono) */
@@ -1345,29 +1349,33 @@ html.lite .dock-bar { background: var(--glass-solid); }
   .dock-btn .dock-avatar { width: 30px; height: 30px; font-size: 13px; }
 }
 
-/* la barra se achica al bajar (teléfono): queda la pestaña actual y tu perfil; al subir o tocarla vuelve */
+/* la barra se achica al bajar (teléfono): queda la casita sola. Todo es con transform y opacidad (lo barato de
+   animar): la barra se corre para que la casita quede al centro, lo demás se desvanece y el fondo se encoge a su
+   alrededor. Medidas: pestañas de 66 px, perfil de 52, márgenes de 6 → la casita queda centrada en x = 39. */
 .dock-up { display: none; }
 @media (max-width: 899px) {
-  .dock-bar { transition: padding 0.28s cubic-bezier(0.2, 0.8, 0.2, 1); }
-  .dock-tab, .dock-btn { transition: width 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), height 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.18s, background-color 0.15s, color 0.15s; }
+  .dock-bar { transition: transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1); }
+  .dock-bar::before { transition: left 0.32s cubic-bezier(0.2, 0.8, 0.2, 1), width 0.32s cubic-bezier(0.2, 0.8, 0.2, 1), top 0.32s cubic-bezier(0.2, 0.8, 0.2, 1), bottom 0.32s cubic-bezier(0.2, 0.8, 0.2, 1), border-radius 0.32s; }
+  .dock-tab, .dock-btn { transition: opacity 0.18s, background-color 0.15s, color 0.15s; }
   .dock-tab span { transition: opacity 0.15s; }
-  .dock.is-compact .dock-bar { padding: 4px; }
-  .dock.is-compact .dock-tab { height: 40px; }
-  /* achicada queda siempre la casita (estés en la pestaña que estés) */
-  .dock.is-compact .dock-tab:not([data-tab='home']) { width: 0; opacity: 0; overflow: hidden; pointer-events: none; }
-  .dock.is-compact .dock-tab[data-tab='home'] { width: 48px; color: var(--text); }
-  .dock.is-compact .dock-tab span { opacity: 0; height: 0; overflow: hidden; }
-  .dock.is-compact .dock-tabs { gap: 0; }
-  /* achicada: solo la casita, con el punto de sincronización de tu perfil en su esquina */
-  .dock-bar { position: relative; }
-  .dock.is-compact .dock-btn { width: 0; height: 40px; opacity: 0; overflow: hidden; pointer-events: none; }
-  .dock-bar::after { content: ''; position: absolute; right: 3px; bottom: 3px; width: 11px; height: 11px; border-radius: 50%; background: var(--ok); border: 2px solid var(--bg); opacity: 0; transform: scale(0.5); transition: opacity 0.18s, transform 0.18s; pointer-events: none; }
+  .dock-tab svg { transition: transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1); }
+  /* achicada, lo invisible no se puede tocar (ni tapa lo que está debajo) */
+  .dock.is-compact { pointer-events: none; }
+  .dock.is-compact .dock-bar { transform: translateX(calc(50% - 39px)); }
+  .dock.is-compact .dock-bar::before { left: 11px; width: 56px; top: 7px; bottom: 7px; border-radius: 25px; }
+  .dock.is-compact .dock-tab:not([data-tab='home']), .dock.is-compact .dock-btn { opacity: 0; }
+  .dock.is-compact .dock-tab span { opacity: 0; }
+  .dock.is-compact .dock-tab[data-tab='home'] { pointer-events: auto; color: var(--text); background-color: transparent; }
+  .dock.is-compact .dock-tab[data-tab='home'] svg { transform: translateY(6.5px); }
+  /* achicada: el punto de sincronización de tu perfil, en la esquina de la casita */
+  .dock-bar::after { content: ''; position: absolute; left: 49px; top: 39px; width: 11px; height: 11px; border-radius: 50%; background: var(--ok); border: 2px solid var(--bg); opacity: 0; transform: scale(0.5); transition: opacity 0.18s, transform 0.18s; pointer-events: none; }
   .dock.is-compact .dock-bar::after { opacity: 1; transform: none; }
   .dock[data-sync='syncing'] .dock-bar::after, .dock[data-sync='pending'] .dock-bar::after { background: var(--accent); }
   .dock[data-sync='offline'] .dock-bar::after { background: var(--faint); }
+  @media (prefers-reduced-motion: reduce) { .dock-bar, .dock-bar::before, .dock-tab svg { transition: none; } }
   /* la burbuja de subir, al lado de la barra achicada (solo en el teléfono) */
   .dock-up {
-    position: absolute; left: calc(100% + 8px); bottom: 6px; width: 36px; height: 36px; border-radius: 50%;
+    position: absolute; left: calc(50% + 36px); bottom: 14px; width: 36px; height: 36px; border-radius: 50%;
     display: grid; place-items: center; color: var(--text);
     background: var(--glass-solid); box-shadow: inset 0 0 0 1px var(--glass-edge), 0 10px 30px var(--shadow);
     -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur);
@@ -1681,6 +1689,8 @@ body:has(.tv.is-series) .ambient { display: none; }
 .st-gap { display: flex; justify-content: center; min-width: 8px; overflow: hidden; }
 .st-title { max-width: 100%; padding: 0 12px; font-size: 14px; font-weight: 600; color: rgba(255, 255, 255, 0.92); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 @media (max-width: 600px) { .stage:not(.kai-fs):not(.is-fs) .st-title { display: none; } }
+/* en el teléfono (también acostado), solo el capítulo */
+@media (max-width: 899px), (max-height: 500px) { .st-series { display: none; } }
 .stage:not(.is-idle):not(.is-loading):not(.is-ended) .st-big { opacity: 1; pointer-events: auto; transform: none; }
 .stage.is-mini .st-big { display: none; }
 .st-big.is-pause svg { margin-left: 0; }

@@ -34,7 +34,7 @@ import {
 } from '../views/settings.js';
 import { setProfilePref } from '../models/profiles.js';
 import { openDiscoverSheet } from '../views/discover.js';
-import { startPicking, endPicking, pickAction } from './picking.js';
+import { startPicking, endPicking, pickAction, pickAll } from './picking.js';
 import { go, goHome, goBack, render, softRender } from './router.js';
 import { paintDock, toggleDock, dockUp } from './dock.js';
 import { sync, syncing, refreshLibrary, setLater } from './sync.js';
@@ -346,6 +346,7 @@ const ACTIONS = {
   'movie-dl': (el) => movieAction(el, false),
   'series-dl': downloadNextOfSeries,
   'pick-mode': () => (viewState.picking ? endPicking() : startPicking(Number(route().arg.split('/')[1]) || 0)),
+  'pick-all': () => pickAll(),
   'pick-seen': () => pickAction('pick-seen'),
   'pick-unseen': () => pickAction('pick-unseen'),
   'pick-dl': () => pickAction('pick-dl'),

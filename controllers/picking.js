@@ -22,7 +22,11 @@ export function startPicking(ki) {
   const si = viewState.heroSi;
   const s = state.library && si != null ? state.library.series[si] : null;
   if (!s || si == null) return;
-  viewState.picking = { si, ki: Math.min(ki, s.seasons.length - 1), ids: new Set() };
+  viewState.picking = {
+    si,
+    ki: Math.min(ki, s.seasons.length - 1),
+    ids: new Set(),
+  };
   paintPick();
 }
 
@@ -31,6 +35,16 @@ export function endPicking(repaint = true) {
   viewState.picking = null;
   document.documentElement.classList.remove('is-picking');
   if (repaint) paintPick();
+}
+
+/** Elegir todos los capítulos de la temporada de una vez (o soltarlos todos, si ya estaban). */
+export function pickAll() {
+  const picking = viewState.picking;
+  const season = pickSeason();
+  if (!picking || !season) return;
+  const all = season.episodes.every((e) => picking.ids.has(e.id));
+  picking.ids = all ? new Set() : new Set(season.episodes.map((e) => e.id));
+  paintPick();
 }
 
 /** Botones de la barra: marcar los elegidos como vistos o no vistos, y descargarlos. @param {string} act */
