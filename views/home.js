@@ -4,7 +4,7 @@
  */
 
 import { resumeOffer } from '../models/progress.js';
-import { app } from './components.js';
+import { app, rowHTML } from './components.js';
 import { movieHref } from '../lib/route.js';
 import { state } from '../models/store.js';
 import { esc, $, fmtLeft, plural, fmtTime } from '../lib/util.js';
@@ -179,9 +179,11 @@ export function renderHome() {
       <section class="tv-row">
         <div class="tv-row-head"><h3 class="tv-row-title">Series</h3>
           <a class="tv-more" href="#/catalogo?t=series">${ICON.grid}<span>Ver catálogo${lib.series.filter((x) => !isCollection(x)).length > HOME_RECENT ? ` (${lib.series.filter((x) => !isCollection(x)).length})` : ''}</span></a></div>
-        <ul class="shelf is-row" role="list">${homeSeries(lib)
-          .map(({ s, si }) => seriesPosterHTML(s, si))
-          .join('')}</ul>
+        ${rowHTML(
+          homeSeries(lib)
+            .map(({ s, si }) => seriesPosterHTML(s, si))
+            .join(''),
+        )}
 </section>
       ${homeMoviesHTML(lib)}
       ${homeFootHTML(lib)}
@@ -219,10 +221,12 @@ export function homeMoviesHTML(lib) {
   return `<section class="tv-row">
     <div class="tv-row-head"><h3 class="tv-row-title">Películas</h3>
       <a class="tv-more" href="#/catalogo?t=peliculas">${ICON.grid}<span>Ver catálogo${items.length > HOME_MOVIES ? ` (${items.length})` : ''}</span></a></div>
-    <ul class="shelf is-row" role="list">${items
-      .slice(0, HOME_MOVIES)
-      .map((x) => moviePosterHTML(s, si, x, fresh))
-      .join('')}</ul>
+    ${rowHTML(
+      items
+        .slice(0, HOME_MOVIES)
+        .map((x) => moviePosterHTML(s, si, x, fresh))
+        .join(''),
+    )}
   </section>`;
 }
 

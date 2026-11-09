@@ -7,7 +7,16 @@
 import { emit } from '../lib/events.js';
 import { langPref, langsOf, epById } from '../models/library.js';
 import { state, index } from '../models/store.js';
-import { isCollection, isStudio, studioTitle, collectionItems, itemMeta, movieTitle } from '../models/collections.js';
+import {
+  isCollection,
+  isStudio,
+  studioTitle,
+  studioSorted,
+  setStudioShuffle,
+  collectionItems,
+  itemMeta,
+  movieTitle,
+} from '../models/collections.js';
 import { viewState } from './view-state.js';
 import { seasonPlan, heroPlan, shelfItems, moviePlan } from '../models/plans.js';
 import {
@@ -163,7 +172,7 @@ export function renderSeries(arg) {
       </section>
     </main>
     <div class="pick-bar" id="pick-bar" role="toolbar" aria-label="Capítulos seleccionados" hidden>
-      <span class="pick-count" id="pick-count" aria-live="polite"></span>
+      <span class="pick-head"><span class="pick-count" id="pick-count" aria-live="polite"></span><button class="pick-all" id="pick-all" data-act="pick-all"></button></span>
       <button class="pick-btn" data-act="pick-seen" disabled>${ICON.check}<span>Visto</span></button>
       <button class="pick-btn" data-act="pick-unseen" disabled>${ICON.close}<span>No visto</span></button>
       <button class="pick-btn is-primary" data-act="pick-dl" disabled>${ICON.down}<span>Descargar</span></button>
@@ -283,11 +292,7 @@ export function renderSeasonMenu(s, si) {
 /** Studio: todos los videos, cada uno con su imagen (la que pusiste con el mismo nombre) y quién canta. */
 export function renderStudio(s, si) {
   setTint(seriesColor(s));
-  const eps = [...s.all].sort((a, b) => {
-    const x = studioTitle(a.name);
-    const y = studioTitle(b.name);
-    return (x.artist || x.song).localeCompare(y.artist || y.song, 'es') || x.song.localeCompare(y.song, 'es');
-  });
+  const eps = studioSorted(s.all);
   const tile = (/** @type {import('../models/types.js').Episode} */ e) => {
     const { artist, song, detail } = studioTitle(e.name);
     const p = prog(e) || {};
@@ -301,9 +306,16 @@ export function renderStudio(s, si) {
   app.innerHTML =
     header(esc(s.name)) +
     `<main class="shelf-main studio">
-    <p class="dim shelf-count">${plural(eps.length, 'canción', 'canciones')} en vivo</p>
+    <div class="studio-head">
+      <p class="dim shelf-count">${plural(eps.length, 'canción', 'canciones')} en vivo</p>
+      ${eps.length > 1 ? `<div class="studio-actions"><button class="btn btn-lamp" data-act="studio-play" data-si="${si}">${ICON.play}<span>Reproducir todo</span></button><button class="btn" data-act="studio-shuffle" data-si="${si}">${ICON.shuffle}<span>Aleatorio</span></button></div>` : ''}
+    </div>
     <div class="tiles is-grid studio-grid" role="list">${eps.map(tile).join('')}</div>
   </main>`;
+  // tocar una canción suelta: suena en el orden de la página (se deja el aleatorio)
+  app.querySelector('.studio-grid')?.addEventListener('click', (e) => {
+    if (/** @type {HTMLElement} */ (e.target).closest('.studio-tile')) setStudioShuffle(null);
+  });
   if (newEpisodes(s).length) {
     markSeriesSeen(s);
     announceNew();
@@ -433,7 +445,13 @@ export function paintPick() {
   const size = toGet.reduce((a, e) => a + (e.size || 0), 0);
   $('#pick-count').textContent = eps.length
     ? `${plural(eps.length, 'capítulo', 'capítulos')}${toGet.length ? `, ${fmtSize(size)} por descargar` : ''}`
-    : 'Toca los capítulos que quieras';
+    : matchMedia('(hover: hover) and (pointer: fine)').matches
+      ? 'Elige capítulos (Shift + clic: varios seguidos)'
+      : 'Toca los capítulos que quieras';
+  // todos de una vez (o, si ya están todos, ninguno)
+  const season = pickSeason();
+  const all = !!season && season.episodes.length > 0 && season.episodes.every((e) => viewState.picking.ids.has(e.id));
+  $('#pick-all').textContent = all ? 'Ninguno' : 'Todos';
   bar.querySelector('[data-act="pick-dl"]').disabled = !toGet.length;
   // cada botón se apaga si no cambiaría nada (todos ya vistos, o ninguno visto)
   const seen = eps.filter((e) => (prog(e) || {}).w).length;

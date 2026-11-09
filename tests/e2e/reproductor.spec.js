@@ -52,6 +52,10 @@ test('reproduce un capítulo descargado: controles, intro, velocidad, progreso y
   await page.evaluate(() => { const v = document.querySelector('#video'); v.muted = true; return v.play(); });
   await expect.poll(() => time(page), { timeout: 10000 }).toBeGreaterThan(0.5);
   await expect(page.locator('#app')).toContainText('Dorohedoro');
+  // en la barra del video: la serie y el capítulo (sin el nombre del capítulo interno del MP4); en el teléfono, solo el capítulo
+  await expect(page.locator('#st-title')).toHaveText('Dorohedoro · Episodio 1');
+  await expect(page.locator('#st-title .st-series')).toBeVisible({ visible: test.info().project.name === 'pc' });
+  await expect(page.locator('.st-row')).not.toContainText('Opening');
 
   // las marcas de capítulos del MP4; al entrar al Opening (5 s → 1:35) lo salta solo y ofrece volver
   await expect.poll(() => page.locator('#st-marks *').count(), { timeout: 10000 }).toBeGreaterThan(0);
@@ -261,5 +265,24 @@ test('cada perfil elige la velocidad al mantener presionado y cuánto saltan los
   // un toque: pausa
   await page.keyboard.press(' ');
   await expect.poll(() => page.evaluate(() => document.querySelector('#video').paused)).toBe(true);
+  expect(k.errors).toEqual([]);
+});
+
+test('Descargados: quitar de una vez lo que ya viste', async ({ page }) => {
+  const k = await openWithDownloads(page, '#/descargas');
+  await expect(page.locator('main.downloads .ep')).toHaveCount(2);
+  await expect(page.locator('[data-act="clear-seen-dl"]')).toHaveCount(0); // nada visto todavía
+  await page.evaluate(async (id) => {
+    const { setProgress } = await import('/models/progress.js');
+    const { epById } = await import('/models/library.js');
+    setProgress(epById(id), 1400, 1400, true);
+    location.hash = '#/descargas?' + Date.now();
+  }, k.eps[0].id);
+  const btn = page.locator('[data-act="clear-seen-dl"]');
+  await expect(btn).toContainText('Quitar lo ya visto (1 capítulo');
+  await btn.click();
+  await page.locator('.sheet-panel button', { hasText: /^Quitar$/ }).click();
+  await expect(page.locator('main.downloads .ep')).toHaveCount(1);
+  await expect(btn).toHaveCount(0);
   expect(k.errors).toEqual([]);
 });

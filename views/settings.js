@@ -1,5 +1,5 @@
 /*
- * views/settings.js — Ajustes: novedades, perfil, tema, descargas y carpeta, Cine (clave de TMDB), sincronización,
+ * views/settings.js — Ajustes: novedades, perfil, tu resumen, tema, descargas y carpeta, Cine (clave de TMDB), sincronización,
  * espacio, lo que vieron todos los perfiles y la versión de Kai.
  */
 
@@ -8,7 +8,8 @@ import { profilePrefs, HOLD_RATES, SEEK_STEPS } from '../models/profiles.js';
 import { newsList, newEpisodes, hasUnreadNews, markNewsRead } from '../models/news.js';
 import { esc, $, fmtSize, LS, plural } from '../lib/util.js';
 import { filesNamed, readJson, megaMessage } from '../models/mega.js';
-import { mergeProgress } from '../models/progress.js';
+import { mergeProgress, prog } from '../models/progress.js';
+import { profileStats, fmtWatched } from '../models/stats.js';
 import { isCollection, episodeLabel, isCine } from '../models/collections.js';
 import { app, header } from './components.js';
 import { ICON } from './icons.js';
@@ -18,6 +19,31 @@ import { tmdbKey } from '../models/fichas.js';
 import { tmdbCheckKey } from '../models/meta-api.js';
 import { setTmdbKey } from '../models/fichas-sync.js';
 import { canFolder, currentDir, getDir, dirPermission, refreshSaved } from '../models/downloads.js';
+
+/** Tu resumen: cuánto viste con este perfil, las series que terminaste y lo más visto del mes. */
+export function statsHTML() {
+  const lib = state.library;
+  if (!lib || !state.profile) return '';
+  const st = profileStats(lib.series, prog);
+  if (!st.eps && !st.seconds) return '';
+  const fig = (/** @type {string} */ n, /** @type {string} */ label) =>
+    `<div class="stat"><b>${n}</b><span>${label}</span></div>`;
+  const month = st.monthTop.length
+    ? `<p class="dim stats-month">Este mes, ${fmtWatched(st.monthSeconds)}: ${st.monthTop
+        .map((m) => `<strong>${esc(m.name)}</strong> (${plural(m.eps, 'capítulo', 'capítulos')})`)
+        .join(', ')}.</p>`
+    : '';
+  const done = st.done.length
+    ? `<details class="stats-done"><summary>${plural(st.done.length, 'serie terminada', 'series terminadas')}</summary><p class="dim">${st.done
+        .slice()
+        .sort((a, b) => a.localeCompare(b, 'es'))
+        .map(esc)
+        .join(' · ')}</p></details>`
+    : '';
+  return `<p class="settings-label">Tu resumen · ${esc(state.profile.name)}</p>
+    <div class="stats">${fig(fmtWatched(st.seconds, true), 'vistos')}${fig(String(st.eps), st.eps === 1 ? 'capítulo' : 'capítulos')}${fig(String(st.done.length), st.done.length === 1 ? 'serie terminada' : 'series terminadas')}</div>
+    ${month}${done}`;
+}
 
 /** Lo del reproductor que elige cada perfil: la velocidad al mantener presionado y cuánto saltan los ±. */
 export function playerPrefsHTML() {
@@ -177,6 +203,10 @@ export function renderSettings() {
         .join('')}</div>
       <p class="dim settings-hint">El tono claro se usa con el tema Claro y el oscuro con el tema Oscuro; en Automático, cada uno según la hora del sistema.</p>
     </section>
+    ${(() => {
+      const h = statsHTML();
+      return h ? `<section class="settings-group" id="profile-stats">${h}</section>` : '';
+    })()}
     <section class="settings-group" id="player-prefs">${playerPrefsHTML()}</section>
     <section class="settings-group" id="cine-key">${cineKeyHTML()}</section>
     <section class="settings-group">

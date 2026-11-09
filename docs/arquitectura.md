@@ -25,7 +25,7 @@ decide. ESLint lo revisa (`no-restricted-imports`).
 | `mega.js` | sesión, árbol, leer y escribir archivos (avisa `tree-changed`) |
 | `library.js` | biblioteca desde el árbol, índice, Sub/Doblado, carpetas renombradas; la imagen y el .txt con el nombre de un video |
 | `profile-copies.js` | encontrar y separar lo que se copió entre perfiles |
-| `collections.js` | Peliculas, Cine y Studio (música en vivo: artista y canción salen del nombre del archivo) |
+| `collections.js` | Peliculas, Cine y Studio (música en vivo: artista y canción salen del nombre del archivo; su orden o el aleatorio) |
 | `progress.js` | lo visto, Más tarde, Continuar viendo, seguir en otro dispositivo |
 | `profiles.js` | perfiles y lo compartido, duplicados, respaldo |
 | `sync.js` | juntar con MEGA y dejar una sola copia |
@@ -41,7 +41,8 @@ decide. ESLint lo revisa (`no-restricted-imports`).
 | `media.js` | leer videos por rangos, códec de cada archivo, si este navegador lo reproduce, capítulos guardados |
 | `plans.js` | qué capítulo toca después y qué ofrece la portada, una temporada o una película |
 | `context.js` | de qué serie, temporada o película es un capítulo, y su título |
-| `updates.js` | si hay una versión nueva de Kai lista |
+| `updates.js` | si hay una versión nueva de Kai lista, y qué cambió (lo cuenta `sw.js`, en `CAMBIOS`) |
+| `stats.js` | el resumen de un perfil: tiempo visto, series terminadas, lo más visto del mes |
 | `discover.js` | Descubrir: recomendaciones y lo que está en emisión (AniList) |
 
 | Utilidad (`lib/`) | De qué se encarga |
@@ -57,13 +58,14 @@ decide. ESLint lo revisa (`no-restricted-imports`).
 | `actions.js` | los botones (`data-act`): una tabla nombre → función; las del reproductor las atiende `player/` |
 | `home.js` | portada estilo TV: destacado al pasar o enfocar un mosaico, flechas como control remoto |
 | `lifecycle.js` | dirección, conexión, segundo plano y cierre: guardar y sincronizar a tiempo |
-| `updates.js` | registrar el service worker, aviso de versión nueva, "Buscar actualización" |
-| `dock.js` | barra flotante: pestañas, menú del perfil, se achica al bajar (hasta tocarla) con la burbuja para subir, tocar fuera solo cierra |
+| `updates.js` | registrar el service worker, aviso de versión nueva (al tocarlo, qué cambió), "Buscar actualización" |
+| `dock.js` | barra flotante: pestañas, menú del perfil, se achica al bajar (hasta tocarla; solo con transform y opacidad) con la burbuja para subir, tocar fuera solo cierra |
 | `sync.js` | cuándo sincronizar y qué redibujar después |
 | `account.js` | entrar a MEGA, crear y elegir perfil |
 | `downloads.js` | elegir carpeta, copia aparte, poner en cola con el nombre de la serie |
 | `sheet.js` | hoja de opciones de un capítulo |
-| `picking.js` | "Seleccionar" varios capítulos |
+| `picking.js` | "Seleccionar" varios capítulos (o todos de una vez) |
+| `posters.js` | pósters de serie: menú al mantener presionado, tarjeta al pasar el ratón; flechas de las filas |
 | `player/` | el reproductor: `state` (lo que suena), `dom` (sus elementos), `engine` (cargar, cambiar y guardar), `page` (la página de reproducción), `mini`, `controls`, `chapters` (marcas, saltar intro), `gestures` (toques y teclado), `events` (los del video) |
 
 Las vistas (`views/`) dibujan; si necesitan navegar avisan `navigate`, y los formularios avisan `login` y

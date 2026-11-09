@@ -192,7 +192,6 @@ main { padding: 6px var(--gutter) calc(48px + env(safe-area-inset-bottom)); max-
   color: var(--text);
   transition: background-color 0.15s, transform 0.1s;
 }
-@media (hover: hover) {  }
 .btn:active { transform: scale(0.98); }
 .btn:disabled { opacity: 0.6; cursor: default; }
 .btn svg { width: 18px; height: 18px; }
@@ -292,15 +291,13 @@ body.lights-off .bar { z-index: 1; }
 .st-btn svg { width: 22px; height: 22px; }
 .st-num { font: 700 7px var(--font); fill: currentColor; stroke: none; }
 .st-time { font-variant-numeric: tabular-nums; margin-left: 6px; white-space: nowrap; }
-.st-chapter { font-size: 13px; color: rgba(255, 255, 255, 0.6); margin-left: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 22ch; }
-.st-chapter:empty { display: none; }
 .st-speed { font-size: 13px; min-width: 42px; }
 #st-fs .ic-exit, .stage.is-fs #st-fs .ic-enter { display: none; }
 .stage.is-fs #st-fs .ic-exit { display: block; }
 @media (hover: none) { .st-desktop { display: none; } }
 @media (max-width: 600px) {
         .st-time { margin-left: 2px; }
-  .st-chapter, .st-desktop-ish { display: none; }
+  .st-desktop-ish { display: none; }
   .st-row [data-act='back10'], .st-row [data-act='fwd10'] { display: none; }
   .stage.is-fs .st-row [data-act='back10'], .stage.is-fs .st-row [data-act='fwd10'] { display: inline-grid; }
 }
@@ -570,7 +567,6 @@ html.kai-fs-on .dock { display: none; }
 @media (min-width: 601px) { .resume-card { width: min(420px, 100%); margin-left: auto; } }
 /* en la PC flota arriba a la derecha, en el espacio libre sobre la portada, sin empujarla */
 @media (min-width: 900px) { .resume-card { position: absolute; top: 0; right: clamp(16px, 4vw, 56px); z-index: 4; margin: 0; } }
-@media (hover: hover) {  }
 .tv-btn:focus-visible { outline: none; }
 .tv-done { color: var(--dim); font-weight: 600; }
 .link-btn { margin-top: 8px; font-size: 14px; color: var(--accent); font-weight: 600; }
@@ -599,7 +595,6 @@ html.kai-fs-on .dock { display: none; }
 }
 .tile-bar { position: absolute; z-index: 1; left: 0; right: 0; bottom: 0; height: 4px; background: rgba(255, 255, 255, 0.25); }
 .tile-bar span { display: block; height: 100%; background: #fff; }
-@media (hover: hover) {  }
 .tile:focus-visible { outline: none; z-index: 2; }
 [data-theme='light'] .tile:focus-visible { box-shadow: 0 0 0 3px var(--text), 0 18px 50px var(--shadow); }
 .tv-empty { padding: 12vh 0; }
@@ -804,6 +799,7 @@ body:not(.is-playing) .eq i { animation-play-state: paused; }
 .pick-toggle.is-on { background: var(--accent); color: var(--accent-ink); box-shadow: none; }
 .episodes.is-picking .ep-tools, .episodes.is-picking .ep-play { display: none; }
 .episodes.is-picking .ep-main { cursor: pointer; }
+.episodes.is-picking { -webkit-user-select: none; user-select: none; }
 .episodes.is-picking .ep-thumb::before {
   content: '';
   position: absolute;
@@ -834,6 +830,10 @@ body:not(.is-playing) .eq i { animation-play-state: paused; }
 .pick-bar[hidden] { display: none; }
 @keyframes pick-in { from { opacity: 0; transform: translate(-50%, 12px); } }
 .pick-count { font-size: 14px; font-weight: 600; white-space: nowrap; margin-right: 6px; font-variant-numeric: tabular-nums; }
+.pick-head { display: inline-flex; align-items: center; gap: 4px; margin-right: 4px; }
+.pick-head .pick-count { margin-right: 0; }
+.pick-all { height: 30px; padding: 0 10px; border-radius: 999px; font-size: 13px; font-weight: 650; color: var(--accent); white-space: nowrap; }
+@media (hover: hover) { .pick-all:hover { background: var(--btn); } }
 .pick-btn { display: inline-flex; align-items: center; gap: 6px; height: 38px; padding: 0 14px; border-radius: 999px; font-size: 14px; font-weight: 600; color: var(--text); white-space: nowrap; }
 .pick-btn:not(.is-primary) { background: var(--btn); }
 @media (hover: hover) { .pick-btn:not(.is-primary):not(:disabled):hover { background: var(--btn-hover); } }
@@ -845,7 +845,7 @@ html.is-picking .series-main { padding-bottom: calc(110px + env(safe-area-inset-
 @media (max-width: 520px) {
   .pick-bar { left: 12px; right: 12px; transform: none; max-width: none; flex-wrap: wrap; justify-content: space-between; border-radius: 22px; padding: 10px; }
   @keyframes pick-in { from { opacity: 0; transform: translateY(12px); } }
-  .pick-count { flex-basis: 100%; text-align: center; margin: 0 0 4px; }
+  .pick-head { flex-basis: 100%; justify-content: center; margin: 0 0 4px; }
   .pick-btn { flex: 1; justify-content: center; padding: 0 10px; }
 }
 
@@ -854,7 +854,6 @@ html.is-picking .series-main { padding-bottom: calc(110px + env(safe-area-inset-
 .wl-title { margin: 0; font: 700 18px/1.2 var(--font-display); letter-spacing: -0.02em; }
 .wl-count { font-size: 12.5px; color: var(--dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .episodes.is-compact .ep { border: 0; margin-bottom: 2px; transition: background-color 0.15s; }
-@media (hover: hover) {  }
 .episodes.is-compact .ep-main { gap: 12px; padding: 4px 0; }
 .episodes.is-compact .ep-num { font-size: 24px; }
 .episodes.is-compact .ep-flags { top: 5px; right: 5px; }
@@ -939,18 +938,30 @@ html.has-mini body { padding-bottom: var(--mini-space); }
 /* aviso de versión nueva */
 .update-notice {
   position: fixed; z-index: 45; left: 50%; top: calc(env(safe-area-inset-top) + 14px); transform: translateX(-50%);
-  display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 16px; max-width: calc(100vw - 24px);
+  display: flex; align-items: center; gap: 8px; padding: 6px 18px; width: max-content; max-width: calc(100vw - 24px); white-space: nowrap;
   border-radius: 999px; font-size: 14px; font-weight: 600;
   background: var(--glass-solid); box-shadow: inset 0 0 0 1px var(--glass-edge), 0 14px 40px var(--shadow);
   -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur); animation: pick-in 0.25s ease-out;
 }
 .update-btn { height: 34px; padding: 0 14px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font-weight: 650; }
-.update-x { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; color: var(--dim); }
-.update-x svg { width: 16px; height: 16px; }
+.update-what { display: grid; justify-items: start; gap: 1px; padding: 4px 6px 4px 0; text-align: left; color: var(--text); line-height: 1.2; }
+.update-what b { font-weight: 650; }
+.update-see { font-size: 12px; font-weight: 600; color: var(--accent); }
+.update-notice:not(.is-open) .update-see::after { content: ' ›'; }
+/* al tocarla se abre hacia abajo con lo que cambió y el botón de actualizar */
+.update-notice.is-open { flex-wrap: wrap; width: min(440px, calc(100vw - 24px)); white-space: normal; border-radius: 22px; padding: 12px 18px 14px; }
+.update-notice.is-open .update-what { flex: 1; }
+.update-more { flex-basis: 100%; display: grid; gap: 12px; padding-right: 10px; animation: pick-in-y 0.22s ease-out; }
+@keyframes pick-in-y { from { opacity: 0; transform: translateY(-6px); } }
+.update-more[hidden] { display: none; }
+.update-list { margin: 0; padding-left: 18px; display: grid; gap: 7px; font-size: 14px; font-weight: 500; line-height: 1.4; color: var(--text); }
+p.update-list { padding-left: 0; }
+.update-more .update-btn { justify-self: stretch; height: 40px; }
+/* en la PC va debajo de la barra de arriba (no encima) */
+@media (min-width: 900px) { .update-notice { top: calc(env(safe-area-inset-top) + 70px); } }
 
 /* etiquetas que filtran el catálogo */
 .tv-facts .fact { color: var(--text); transition: background-color 0.15s, transform 0.15s; }
-@media (hover: hover) {  }
 .tv-facts .fact:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* cuadrícula de mosaicos (inicio y catálogo): hacia abajo, sin deslizar de lado */
@@ -1295,8 +1306,10 @@ html:is(.kai-fs-on, .fs-leaving) :is(.ambient, .dock, .toast), html:has(.stage:f
 
 /* ── barra flotante: las páginas principales y tu perfil ── */
 .dock { left: 50%; right: auto; transform: translateX(-50%); bottom: max(8px, calc(env(safe-area-inset-bottom) - 12px)); display: block; }
-.dock-bar {
-  display: flex; align-items: center; gap: 2px; padding: 5px; border-radius: 30px;
+/* el fondo de vidrio va en su propia capa: al achicarse solo cambia ella (los botones no se reacomodan) */
+.dock-bar { position: relative; z-index: 0; display: flex; align-items: center; gap: 2px; padding: 6px; }
+.dock-bar::before {
+  content: ''; position: absolute; z-index: -1; left: 0; top: 0; bottom: 0; width: 100%; box-sizing: border-box; border-radius: 32px;
   background: color-mix(in srgb, var(--glass-solid) 70%, transparent); border: 1px solid var(--glass-edge);
   box-shadow: inset 0 1px 0 var(--glass-hi), 0 14px 34px rgba(0, 0, 0, 0.35);
   -webkit-backdrop-filter: blur(18px) saturate(180%); backdrop-filter: blur(18px) saturate(180%);
@@ -1319,7 +1332,7 @@ html:is(.kai-fs-on, .fs-leaving) :is(.ambient, .dock, .toast), html:has(.stage:f
 @media (hover: hover) { .dock-btn:hover { transform: none; } .dock-tab:hover { color: var(--text); } }
 body.is-playing:not(:has(.dock.is-open)) .dock-btn { opacity: 1; }
 .dock-panel { position: absolute; right: 0; bottom: calc(100% + 10px); transform-origin: bottom right; }
-html.lite .dock-bar { background: var(--glass-solid); }
+html.lite .dock-bar::before { background: var(--glass-solid); -webkit-backdrop-filter: none; backdrop-filter: none; }
 /* en el teléfono, la página del reproductor es solo el video: sin barra */
 @media (max-width: 899px) { body:has(main.watch) .dock { display: none; } }
 /* lo que flota abajo se acomoda sobre la barra (teléfono) */
@@ -1345,29 +1358,33 @@ html.lite .dock-bar { background: var(--glass-solid); }
   .dock-btn .dock-avatar { width: 30px; height: 30px; font-size: 13px; }
 }
 
-/* la barra se achica al bajar (teléfono): queda la pestaña actual y tu perfil; al subir o tocarla vuelve */
+/* la barra se achica al bajar (teléfono): queda la casita sola. Todo es con transform y opacidad (lo barato de
+   animar): la barra se corre para que la casita quede al centro, lo demás se desvanece y el fondo se encoge a su
+   alrededor. Medidas: pestañas de 66 px, perfil de 52, márgenes de 6 → la casita queda centrada en x = 39. */
 .dock-up { display: none; }
 @media (max-width: 899px) {
-  .dock-bar { transition: padding 0.28s cubic-bezier(0.2, 0.8, 0.2, 1); }
-  .dock-tab, .dock-btn { transition: width 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), height 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.18s, background-color 0.15s, color 0.15s; }
+  .dock-bar { transition: transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1); }
+  .dock-bar::before { transition: left 0.32s cubic-bezier(0.2, 0.8, 0.2, 1), width 0.32s cubic-bezier(0.2, 0.8, 0.2, 1), top 0.32s cubic-bezier(0.2, 0.8, 0.2, 1), bottom 0.32s cubic-bezier(0.2, 0.8, 0.2, 1), border-radius 0.32s; }
+  .dock-tab, .dock-btn { transition: opacity 0.18s, background-color 0.15s, color 0.15s; }
   .dock-tab span { transition: opacity 0.15s; }
-  .dock.is-compact .dock-bar { padding: 4px; }
-  .dock.is-compact .dock-tab { height: 40px; }
-  /* achicada queda siempre la casita (estés en la pestaña que estés) */
-  .dock.is-compact .dock-tab:not([data-tab='home']) { width: 0; opacity: 0; overflow: hidden; pointer-events: none; }
-  .dock.is-compact .dock-tab[data-tab='home'] { width: 48px; color: var(--text); }
-  .dock.is-compact .dock-tab span { opacity: 0; height: 0; overflow: hidden; }
-  .dock.is-compact .dock-tabs { gap: 0; }
-  /* achicada: solo la casita, con el punto de sincronización de tu perfil en su esquina */
-  .dock-bar { position: relative; }
-  .dock.is-compact .dock-btn { width: 0; height: 40px; opacity: 0; overflow: hidden; pointer-events: none; }
-  .dock-bar::after { content: ''; position: absolute; right: 3px; bottom: 3px; width: 11px; height: 11px; border-radius: 50%; background: var(--ok); border: 2px solid var(--bg); opacity: 0; transform: scale(0.5); transition: opacity 0.18s, transform 0.18s; pointer-events: none; }
+  .dock-tab svg { transition: transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1); }
+  /* achicada, lo invisible no se puede tocar (ni tapa lo que está debajo) */
+  .dock.is-compact { pointer-events: none; }
+  .dock.is-compact .dock-bar { transform: translateX(calc(50% - 39px)); }
+  .dock.is-compact .dock-bar::before { left: 11px; width: 56px; top: 7px; bottom: 7px; border-radius: 25px; }
+  .dock.is-compact .dock-tab:not([data-tab='home']), .dock.is-compact .dock-btn { opacity: 0; }
+  .dock.is-compact .dock-tab span { opacity: 0; }
+  .dock.is-compact .dock-tab[data-tab='home'] { pointer-events: auto; color: var(--text); background-color: transparent; }
+  .dock.is-compact .dock-tab[data-tab='home'] svg { transform: translateY(6.5px); }
+  /* achicada: el punto de sincronización de tu perfil, en la esquina de la casita */
+  .dock-bar::after { content: ''; position: absolute; left: 49px; top: 39px; width: 11px; height: 11px; border-radius: 50%; background: var(--ok); border: 2px solid var(--bg); opacity: 0; transform: scale(0.5); transition: opacity 0.18s, transform 0.18s; pointer-events: none; }
   .dock.is-compact .dock-bar::after { opacity: 1; transform: none; }
   .dock[data-sync='syncing'] .dock-bar::after, .dock[data-sync='pending'] .dock-bar::after { background: var(--accent); }
   .dock[data-sync='offline'] .dock-bar::after { background: var(--faint); }
+  @media (prefers-reduced-motion: reduce) { .dock-bar, .dock-bar::before, .dock-tab svg { transition: none; } }
   /* la burbuja de subir, al lado de la barra achicada (solo en el teléfono) */
   .dock-up {
-    position: absolute; left: calc(100% + 8px); bottom: 6px; width: 36px; height: 36px; border-radius: 50%;
+    position: absolute; left: calc(50% + 36px); bottom: 14px; width: 36px; height: 36px; border-radius: 50%;
     display: grid; place-items: center; color: var(--text);
     background: var(--glass-solid); box-shadow: inset 0 0 0 1px var(--glass-edge), 0 10px 30px var(--shadow);
     -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur);
@@ -1681,6 +1698,8 @@ body:has(.tv.is-series) .ambient { display: none; }
 .st-gap { display: flex; justify-content: center; min-width: 8px; overflow: hidden; }
 .st-title { max-width: 100%; padding: 0 12px; font-size: 14px; font-weight: 600; color: rgba(255, 255, 255, 0.92); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 @media (max-width: 600px) { .stage:not(.kai-fs):not(.is-fs) .st-title { display: none; } }
+/* en el teléfono (también acostado), solo el capítulo */
+@media (max-width: 899px), (max-height: 500px) { .st-series { display: none; } }
 .stage:not(.is-idle):not(.is-loading):not(.is-ended) .st-big { opacity: 1; pointer-events: auto; transform: none; }
 .stage.is-mini .st-big { display: none; }
 .st-big.is-pause svg { margin-left: 0; }
@@ -1744,18 +1763,24 @@ section.empty p:first-child { font-weight: 600; font-size: 16px; }
 section.empty .btn { margin-top: 10px; }
 .tv-empty { background: none; box-shadow: none; }
 
-/* ── PC: Kai acostado sobre el nombre de la app, y Descubrir en horizontal con Kai sentado a la derecha ── */
+/* ── PC: Kai acostado al lado del nombre de la app (donde iba el saludo), y Descubrir en horizontal con Kai sentado
+ * a la derecha ── */
 .kcat-sit.is-top { display: none; }
 @media (min-width: 900px) {
-  .tv.is-home .tv-top { padding-top: calc(env(safe-area-inset-top) + 40px); }
+  .tv.is-home .tv-top { padding-top: calc(env(safe-area-inset-top) + 20px); }
+  .tv.is-home .tv-greet { display: none; }
   .tv-word .kcat-sit.is-top {
-    display: block; left: 50%; bottom: calc(100% - 7px); width: 92px; height: auto; aspect-ratio: 520 / 224; transform: translateX(-50%);
+    display: block; left: calc(100% + 12px); right: auto; bottom: -5px; width: 88px; height: auto; aspect-ratio: 520 / 224; transform: none;
   }
   .home-foot { max-width: none; }
   .home-shelf { display: flex; align-items: flex-end; gap: 18px; }
   .home-links { flex: 1; grid-template-columns: repeat(3, minmax(0, 1fr)); max-width: 1080px; }
   .home-link + .home-link::before { top: 14px; bottom: 14px; left: 0; right: auto; width: 1px; height: auto; }
   .home-shelf .kcat-sit.is-foot { position: relative; right: auto; bottom: auto; order: 2; --kh: 112px; margin-bottom: -4px; }
+}
+/* pantallas anchas: Descubrir en una sola fila (las que haya: Cine, Studio, Porque viste…, En emisión) */
+@media (min-width: 1100px) {
+  .home-links { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); max-width: 1500px; }
 }
 
 /* ── PC: la tarjeta de la portada a la altura del banner de AniList (~1900 × 400 px como máximo): más alta, el
@@ -1788,3 +1813,85 @@ section.empty .btn { margin-top: 10px; }
 /* Studio: los videos en mosaicos 16:9 (su imagen es un cuadro del video) y, en el reproductor, su descripción */
 .studio-grid .tile-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .watch-note { margin: 10px 0 0; color: var(--dim); font-size: 15px; line-height: 1.45; white-space: pre-line; max-width: 62ch; }
+
+/* teléfono: el video se queda arriba mientras bajas a ver los capítulos (como en YouTube). La caja de la página que
+ * lo contiene abarca también la lista (si no, el video se iba con la información); al quedar fijo, la franja de la
+ * hora (iPhone) se pinta del color del fondo para que la lista no se vea pasar por detrás. */
+@media (max-width: 899px) {
+  .watch-main { display: contents; }
+  .stage-slot { position: sticky; top: env(safe-area-inset-top); }
+  .stage-slot.is-stuck::before { content: ''; position: absolute; left: 0; right: 0; bottom: 100%; height: env(safe-area-inset-top); background: var(--bg); }
+  .stage-slot.is-stuck .stage { box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28); }
+}
+
+/* ── pantallas muy anchas (monitores de 27–32" en 1440p o más; una laptop no llega a 1900 px) ──
+ * las filas del inicio con pósters y mosaicos más grandes, para llenar el ancho sin dejar media pantalla vacía */
+@media (min-width: 1900px) {
+  .shelf.is-row { grid-auto-columns: clamp(180px, 9vw, 240px); gap: 20px; }
+  .tiles:not(.is-grid) { grid-auto-columns: clamp(360px, 18vw, 480px); gap: 22px; }
+  .tiles.is-grid { grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 22px; }
+  .tv-row-title { font-size: 26px; }
+  .shelf-title, .tile-title { font-size: 16px; }
+  .home-links { max-width: none; }
+  .catalog { max-width: 2200px; }
+  .catalog .shelf { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 26px 20px; }
+}
+
+/* Ajustes → tu resumen */
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 4px 0 10px; }
+.stat { display: grid; gap: 2px; padding: 12px 14px; border-radius: 14px; background: var(--btn); }
+.stat b { font: 700 22px/1.1 var(--font-display); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.stat span { font-size: 13px; color: var(--dim); }
+.stats-month { margin: 0 0 8px; }
+.stats-month strong { color: var(--text); font-weight: 600; }
+.stats-done summary { cursor: pointer; color: var(--accent); font-size: 14px; font-weight: 600; }
+.stats-done p { margin: 6px 0 0; line-height: 1.5; }
+@media (max-width: 400px) { .stat { padding: 10px; } .stat b { font-size: 19px; } }
+
+/* Studio: reproducir todo o en aleatorio */
+.studio-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; margin-bottom: 4px; }
+.studio-head .shelf-count { margin: 0; }
+.studio-actions { display: flex; gap: 8px; }
+.studio-actions .btn svg { width: 18px; height: 18px; }
+
+/* mantener presionado un póster en el teléfono abre el menú rápido, no el del navegador */
+@media (pointer: coarse) { .shelf-item { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; } }
+
+/* ── PC: la tarjeta de una serie al dejar el ratón sobre su póster ── */
+.poster-card {
+  position: absolute; z-index: 30; width: 320px; padding: 16px 16px 14px; border-radius: 18px;
+  background: var(--glass-solid); box-shadow: inset 0 0 0 1px var(--glass-edge), 0 24px 60px var(--shadow);
+  -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur);
+  opacity: 0; transform: translateX(-6px) scale(0.98); transform-origin: left top; transition: opacity 0.16s, transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.poster-card[data-side='left'] { transform: translateX(6px) scale(0.98); transform-origin: right top; }
+.poster-card.is-in { opacity: 1; transform: none; }
+.pc-title { margin: 0; font: 700 18px/1.25 var(--font-display); letter-spacing: -0.01em; }
+.pc-facts { display: flex; flex-wrap: wrap; gap: 2px 8px; margin: 4px 0 0; font-size: 13px; color: var(--dim); }
+.pc-facts span + span::before { content: '·'; margin-right: 8px; color: var(--faint); }
+.pc-syn { margin: 10px 0 0; font-size: 14px; line-height: 1.45; color: var(--text); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden; }
+.pc-actions { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
+.pc-actions .tv-btn { flex: 1; min-width: 0; height: 40px; font-size: 14px; }
+.pc-actions .tv-btn span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pc-btn { display: grid; place-items: center; width: 40px; height: 40px; flex: none; border-radius: 50%; background: var(--btn); color: var(--text); }
+.pc-btn svg { width: 18px; height: 18px; }
+@media (hover: hover) { .pc-btn:hover { background: var(--btn-hover); } }
+html.lite .poster-card { background: var(--glass-solid); -webkit-backdrop-filter: none; backdrop-filter: none; }
+
+/* ── filas que se deslizan: flechas a los lados al pasar el ratón (solo en la computadora) ── */
+.row-scroll { position: relative; }
+.row-arrow { display: none; }
+@media (hover: hover) and (pointer: fine) {
+  .row-arrow {
+    position: absolute; z-index: 2; top: calc(4px + (100% - 18px - 44px) / 2 - 22px); width: 44px; height: 44px; border-radius: 50%;
+    display: grid; place-items: center; color: var(--text);
+    background: var(--glass-solid); box-shadow: inset 0 0 0 1px var(--glass-edge), 0 8px 24px var(--shadow);
+    opacity: 0; transition: opacity 0.18s, transform 0.18s; pointer-events: none;
+  }
+  .row-arrow svg { width: 20px; height: 20px; }
+  .row-arrow.is-prev { left: -14px; transform: scaleX(-1); }
+  .row-arrow.is-next { right: -14px; }
+  .row-scroll:hover .row-arrow { opacity: 1; pointer-events: auto; }
+  .row-scroll.is-start .row-arrow.is-prev, .row-scroll.is-end .row-arrow.is-next { opacity: 0; pointer-events: none; }
+  .row-arrow:hover { background: var(--btn-hover); }
+}

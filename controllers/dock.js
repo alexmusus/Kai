@@ -32,6 +32,7 @@ export function paintDock() {
   }
   btn.dataset.name = p.name;
   paintTabs(v);
+  dockView = v;
   // al cambiar de página la barra vuelve a su tamaño (y el scroll de volver a donde estabas no la achica)
   setCompact(false);
   setDeep(false);
@@ -49,6 +50,7 @@ const COMPACT_ON = matchMedia('(max-width: 899px)');
 let compactY = window.scrollY;
 let compactFrame = 0;
 let compactHold = 0;
+let dockView = ''; // la página actual (se guarda al pintar: así el scroll no relee la dirección)
 /** @param {boolean} on */
 function setCompact(on) {
   if (dock.classList.contains('is-compact') !== on) dock.classList.toggle('is-compact', on);
@@ -60,12 +62,12 @@ function setDeep(on) {
 function checkCompact() {
   compactFrame = 0;
   const y = window.scrollY;
-  setDeep(y > 600 && route().view !== 'home'); // en el inicio sube la casita: no hace falta la burbuja
+  setDeep(y > 600 && dockView !== 'home'); // en el inicio sube la casita: no hace falta la burbuja
   const dy = y - compactY;
   if (Math.abs(dy) < 8) return; // movimientos mínimos no cuentan
   compactY = y;
   if (performance.now() < compactHold) return;
-  if (!COMPACT_ON.matches || dock.classList.contains('is-open')) return setCompact(false);
+  if (dock.classList.contains('is-open')) return setCompact(false);
   // solo se achica: volver a agrandarse es al tocarla (el rebote al llegar al final ya no la agranda)
   if (dy > 0 && y > 140) setCompact(true);
 }
@@ -74,15 +76,24 @@ export function dockUp() {
   setCompact(false);
   setDeep(false);
   compactHold = performance.now() + 1500; // mientras sube sola, no se achica ni vuelve la burbuja
-  window.scrollTo({ top: 0, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  window.scrollTo({
+    top: 0,
+    behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+  });
 }
+// solo en el teléfono, y solo con la barra a la vista (en el reproductor o en la PC el scroll no hace nada aquí)
 addEventListener(
   'scroll',
   () => {
-    if (!compactFrame) compactFrame = requestAnimationFrame(checkCompact);
+    if (compactFrame || dock.hidden || !COMPACT_ON.matches || dockView === 'play') return;
+    compactFrame = requestAnimationFrame(checkCompact);
   },
   { passive: true },
 );
+COMPACT_ON.addEventListener('change', () => {
+  setCompact(false);
+  setDeep(false);
+});
 dock.addEventListener(
   'click',
   (e) => {
@@ -91,7 +102,7 @@ dock.addEventListener(
     e.preventDefault();
     e.stopPropagation();
     // en el inicio, la casita achicada sube de una vez (ahí no está la burbuja); en otra página solo la agranda
-    if (route().view === 'home') return dockUp();
+    if (dockView === 'home') return dockUp();
     setCompact(false);
     compactHold = performance.now() + 1200; // que el siguiente movimiento no la vuelva a achicar enseguida
   },
