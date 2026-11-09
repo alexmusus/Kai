@@ -95,20 +95,6 @@ export function setHero(si) {
   }, 120);
 }
 
-/** La forma del inicio mientras carga: la portada, una fila de mosaicos y una de pósters, en gris. */
-export function skeletonHTML() {
-  const n = (/** @type {number} */ k, /** @type {string} */ cls) =>
-    Array.from({ length: k }, () => `<span class="${cls}"></span>`).join('');
-  return `<div class="skel" role="status" aria-label="Conectando con MEGA…">
-    <span class="skel-hero"></span>
-    <span class="skel-line"></span>
-    <div class="skel-row is-tiles">${n(4, 'skel-tile')}</div>
-    <span class="skel-line"></span>
-    <div class="skel-row">${n(8, 'skel-poster')}</div>
-    <p class="skel-note dim">Conectando con MEGA…</p>
-  </div>`;
-}
-
 export function renderHome() {
   const lib = state.library && state.library.v === 2 ? state.library : null;
   const err = state.error;
@@ -120,11 +106,8 @@ export function renderHome() {
       <a class="tv-btn is-primary" href="#/explorar">Elegir carpeta</a>
     </section>`;
   } else if (!lib) {
-    // mientras llega la biblioteca: la forma del inicio en gris (con conexión), o qué hacer sin ella
-    body = navigator.onLine
-      ? skeletonHTML()
-      : `<section class="empty tv-empty"><p class="dim">Sin conexión. Lo que descargaste está en Descargados.</p>
-      <a class="tv-btn" href="#/descargas">Ver descargados</a></section>`;
+    body = `<section class="empty tv-empty"><p class="dim">${navigator.onLine ? 'Conectando con MEGA…' : 'Sin conexión. Lo que descargaste está en Descargados.'}</p>
+      ${navigator.onLine ? '' : '<a class="tv-btn" href="#/descargas">Ver descargados</a>'}</section>`;
   } else if (!lib.series.length) {
     body = `<section class="empty tv-empty"><p>La carpeta <strong>${esc(lib.root)}</strong> está vacía.</p>
       <p class="dim">Crea una carpeta por serie y pon los capítulos adentro, o una subcarpeta por temporada.</p></section>`;

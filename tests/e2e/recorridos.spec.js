@@ -596,7 +596,7 @@ test('Ajustes: tu resumen; y la burbuja de versión nueva se abre con lo que cam
   expect(k.errors).toEqual([]);
 });
 
-test('pósters: tarjeta al pasar el ratón (PC), menú al mantener presionado (teléfono) y vuelo a la portada', async ({ page }, info) => {
+test('pósters: tarjeta al pasar el ratón (PC) y menú al mantener presionado (teléfono)', async ({ page }, info) => {
   const k = await openKai(page, '#/');
   const poster = page.locator(`.home-shelf, .tv-main`).locator(`a.shelf-item[href="#/serie/${k.si('Dorohedoro')}"]`).first();
   await poster.scrollIntoViewIfNeeded();
@@ -623,15 +623,8 @@ test('pósters: tarjeta al pasar el ratón (PC), menú al mantener presionado (t
     await page.locator('.sheet-panel [data-act="later"]').click();
     await expect(page.locator('.sheet-panel')).toHaveCount(0, { timeout: 2000 }).catch(() => {});
   }
-  // tocar el póster entra a la serie, con el vuelo a la portada (sin "reducir movimiento", que lo omite)
-  await page.emulateMedia({ reducedMotion: 'no-preference' });
-  await page.evaluate(() => {
-    window.__vt = 0;
-    const orig = document.startViewTransition.bind(document);
-    document.startViewTransition = (cb) => (window.__vt++, orig(cb));
-  });
+  // tocar el póster entra a la serie
   await poster.click();
-  await expect.poll(() => page.evaluate(() => window.__vt)).toBe(1);
   await expect(page).toHaveURL(new RegExp(`#/serie/${k.si('Dorohedoro')}$`));
   await expect(page.locator('.series-hero .tv-title')).toHaveText('Dorohedoro');
   expect(k.errors).toEqual([]);

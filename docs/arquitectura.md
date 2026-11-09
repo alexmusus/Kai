@@ -65,7 +65,7 @@ decide. ESLint lo revisa (`no-restricted-imports`).
 | `downloads.js` | elegir carpeta, copia aparte, poner en cola con el nombre de la serie |
 | `sheet.js` | hoja de opciones de un capítulo |
 | `picking.js` | "Seleccionar" varios capítulos (o todos de una vez) |
-| `posters.js` | pósters de serie: menú al mantener presionado, tarjeta al pasar el ratón, el vuelo a la portada |
+| `posters.js` | pósters de serie: menú al mantener presionado, tarjeta al pasar el ratón; flechas de las filas |
 | `player/` | el reproductor: `state` (lo que suena), `dom` (sus elementos), `engine` (cargar, cambiar y guardar), `page` (la página de reproducción), `mini`, `controls`, `chapters` (marcas, saltar intro), `gestures` (toques y teclado), `events` (los del video) |
 
 Las vistas (`views/`) dibujan; si necesitan navegar avisan `navigate`, y los formularios avisan `login` y

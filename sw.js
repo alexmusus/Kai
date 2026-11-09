@@ -10,7 +10,7 @@ importScripts('core.js');
  * subidas a prueba dentro de esa versión: sube en cada una (el navegador solo instala de nuevo si este archivo
  * cambia) y vuelve a 1 cuando sube VERSION. */
 const VERSION = 42;
-const ENTREGA = 3;
+const ENTREGA = 4;
 const CACHE = `kai-${VERSION}.${ENTREGA}`;
 /* Lo que cambió en esta versión, corto y en palabras de todos los días: lo muestran la burbuja de "Versión nueva"
  * (al tocarla) y Ajustes → Versión. Se escribe de nuevo al empezar cada versión. */
@@ -22,9 +22,7 @@ const CAMBIOS = [
   'En pantallas grandes, el inicio y el catálogo aprovechan mejor el espacio, y Descubrir va en una sola fila.',
   'En la computadora, Kai (el gatito) ocupa el lugar del saludo.',
   'La barra flotante del teléfono se achica más suave.',
-  'Al tocar un póster, vuela hasta la portada de la serie.',
   'En el teléfono, mantener presionado un póster abre un menú rápido; en la computadora, pasar el ratón muestra la sinopsis.',
-  'Mientras carga, se ve la forma de la página en vez de un hueco.',
   'En la computadora, las filas de pósters tienen flechas para avanzar.',
   'Ajustes → Tu resumen: cuánto has visto, las series terminadas y lo más visto del mes.',
   'Studio: reproducir todo seguido o en aleatorio.',

@@ -1854,32 +1854,6 @@ section.empty .btn { margin-top: 10px; }
 .studio-actions { display: flex; gap: 8px; }
 .studio-actions .btn svg { width: 18px; height: 18px; }
 
-/* ── esqueletos: la forma de la página mientras carga. Las formas son quietas; un solo brillo pasa por encima de
- * todo (una capa, con transform: no cuesta), y en el modo liviano ni eso ── */
-.skel { position: relative; overflow: hidden; display: grid; gap: 14px; padding-top: 8px; }
-.skel span { display: block; border-radius: 14px; background: var(--btn); }
-.skel-hero { height: clamp(260px, 42vh, 400px); border-radius: 24px !important; }
-.skel-line { width: 160px; height: 20px; margin-top: 10px; border-radius: 8px !important; }
-.skel-row { display: grid; grid-auto-flow: column; grid-auto-columns: clamp(130px, 13vw, 170px); gap: 16px; overflow: hidden; }
-.skel-row.is-tiles { grid-auto-columns: clamp(230px, 26vw, 360px); }
-.skel-row.is-grid { grid-auto-flow: row; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
-.skel-poster { aspect-ratio: 2 / 3; border-radius: 10px !important; }
-.skel-tile { aspect-ratio: 16 / 9; }
-.skel-note { margin: 4px 0 0; font-size: 14px; }
-.skel::after {
-  content: ''; position: absolute; inset: 0; pointer-events: none;
-  background: linear-gradient(100deg, transparent 30%, color-mix(in srgb, var(--text) 7%, transparent) 50%, transparent 70%);
-  transform: translateX(-100%); animation: skel-shine 1.6s ease-in-out infinite;
-}
-@keyframes skel-shine { to { transform: translateX(100%); } }
-html.lite .skel::after { display: none; }
-@media (prefers-reduced-motion: reduce) { .skel::after { display: none; } }
-@media (max-width: 600px) { .skel-row { grid-auto-columns: 30%; gap: 10px; } .skel-row.is-tiles { grid-auto-columns: 70%; } .skel-row.is-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-
-/* ── el póster vuela a la portada de la serie (donde el navegador sabe) ── */
-::view-transition-group(kai-art) { animation-duration: 0.42s; animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1); border-radius: 20px; overflow: clip; }
-::view-transition-old(kai-art), ::view-transition-new(kai-art) { height: 100%; object-fit: cover; overflow: clip; border-radius: inherit; }
-::view-transition-old(root), ::view-transition-new(root) { animation-duration: 0.28s; }
 /* mantener presionado un póster en el teléfono abre el menú rápido, no el del navegador */
 @media (pointer: coarse) { .shelf-item { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; } }
 

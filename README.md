@@ -45,7 +45,6 @@ Reproductor de las series y películas de anime guardadas en una cuenta de MEGA.
 - Fluida en teléfonos modestos: se aligera sola cuando el teléfono tiene poca memoria y respeta la opción de reducir movimiento.
 - Kai, el gatito, en la portada (se puede apagar).
 - En monitores grandes, el inicio y el catálogo aprovechan el ancho.
-- Al tocar un póster, vuela a la portada de la serie; mientras carga se ve la forma de la página.
 - Pósters: en el teléfono, mantener presionado abre un menú rápido (ver, Más tarde, descargar, marcar como vista); en la computadora, al pasar el ratón sale una tarjeta con la sinopsis, y las filas tienen flechas para avanzar.
 
 **Cuota de MEGA**
