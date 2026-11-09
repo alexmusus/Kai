@@ -197,11 +197,9 @@ export function paintCatalog() {
     list.map((e) => e.img || '').join('').length;
   if (box.dataset.sig !== sig) {
     resetPosterCache();
-    box.innerHTML = !state.library
-      ? `<div class="skel is-catalog" aria-hidden="true"><div class="skel-row is-grid">${'<span class="skel-poster"></span>'.repeat(12)}</div></div>`
-      : posters
-        ? `<ul class="shelf" role="list">${list.map(posterAny).join('')}</ul>`
-        : `<div class="tiles is-grid" role="list">${list.map(entryTile).join('')}</div>`;
+    box.innerHTML = posters
+      ? `<ul class="shelf" role="list">${list.map(posterAny).join('')}</ul>`
+      : `<div class="tiles is-grid" role="list">${list.map(entryTile).join('')}</div>`;
     box.dataset.sig = sig;
     if (posters) hydrateThumbs(box);
   }

@@ -1,9 +1,8 @@
 /*
- * controllers/posters.js — lo que se puede hacer con el póster de una serie sin entrar a ella:
+ * controllers/posters.js — lo que se puede hacer con el póster de una serie sin entrar a ella (y las flechas de las
+ * filas que se deslizan, en la computadora):
  *  - en el teléfono, mantenerlo presionado abre un menú rápido (ver, Más tarde, descargar, marcar como vista);
  *  - en la computadora, dejar el ratón encima un momento muestra una tarjeta con la sinopsis y el botón para ver.
- * También: al tocar un póster, el póster "vuela" a la portada de la serie (View Transitions, donde el navegador
- * lo tiene; si no, se entra como siempre).
  */
 import { esc, plural } from '../lib/util.js';
 import { state } from '../models/store.js';
@@ -243,43 +242,3 @@ app.addEventListener(
   },
   { capture: true, passive: true },
 );
-
-/* ── el póster vuela a la portada ── */
-
-let morph = /** @type {HTMLElement | null} */ (null);
-app.addEventListener(
-  'click',
-  (e) => {
-    const p = seriesPoster(e.target);
-    morph = p && !e.defaultPrevented ? /** @type {HTMLElement} */ (p.a.querySelector('.shelf-poster')) : null;
-  },
-  true,
-);
-
-/**
- * Dibuja la página nueva; si se llegó tocando un póster y el navegador sabe, con el póster volando a la portada.
- * @param {() => void} draw
- */
-export function drawWithMorph(draw) {
-  const from = morph;
-  morph = null;
-  const doc = /** @type {any} */ (document);
-  if (
-    !from ||
-    !from.isConnected ||
-    !doc.startViewTransition ||
-    document.documentElement.classList.contains('lite') ||
-    matchMedia('(prefers-reduced-motion: reduce)').matches
-  )
-    return draw();
-  from.style.viewTransitionName = 'kai-art';
-  /** @type {HTMLElement | null} */
-  let to = null;
-  const t = doc.startViewTransition(() => {
-    from.style.viewTransitionName = '';
-    draw();
-    to = app.querySelector('.series-hero .hero-art') || app.querySelector('.series-hero');
-    if (to) to.style.viewTransitionName = 'kai-art';
-  });
-  t.finished.finally(() => to && (to.style.viewTransitionName = ''));
-}
