@@ -10,6 +10,7 @@ import { paintSync } from '../views/dock.js';
 import { render, onHashChange, alreadyArrived } from './router.js';
 import { sync, refreshLibrary } from './sync.js';
 import { savePosition } from './player/engine.js';
+import { drawWithMorph } from './posters.js';
 
 async function onOnline() {
   paintSync();
@@ -43,7 +44,7 @@ function onVisibility() {
 function onRouteChange() {
   if (alreadyArrived()) return;
   onHashChange();
-  render();
+  drawWithMorph(render); // si se tocó un póster, vuela a la portada
 }
 
 export function initLifecycle() {

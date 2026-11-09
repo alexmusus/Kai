@@ -11,7 +11,9 @@ import { fmtSize, plural, esc } from '../lib/util.js';
 import { sortEpisodes } from '../models/naming.js';
 import { episodeRow } from './episodes.js';
 import { paintSync } from './dock.js';
+import { ICON } from './icons.js';
 import { hydrateThumbs } from './thumbs.js';
+import { prog } from '../models/progress.js';
 
 export async function renderDownloads() {
   if (!app.querySelector('main.downloads')) app.innerHTML = header('Descargados') + '<main class="downloads"></main>';
@@ -28,6 +30,9 @@ export async function renderDownloads() {
     groups.get(t).push(m.ep);
   }
   const total = metas.filter((m) => m.done).reduce((a, m) => a + (m.size || 0), 0);
+  // lo que este perfil ya terminó de ver: se puede quitar de una vez para liberar espacio
+  const seen = metas.filter((m) => m.done && (prog(m.ep) || {}).w);
+  const seenSize = seen.reduce((a, m) => a + (m.size || 0), 0);
   const folderN = metas.filter((m) => m.done && m.where === 'folder').length;
   const dir = await getDir();
   const perm = dir ? await dirPermission(dir) : '';
@@ -43,6 +48,7 @@ export async function renderDownloads() {
     header('Descargados') +
     `<main class="downloads">
     ${metas.length ? `<p class="dim downloads-sum">${plural(state.saved.size, 'capítulo', 'capítulos')} en este dispositivo, ${fmtSize(total)}${folderN ? ` (${folderN === state.saved.size ? 'todos' : folderN} en tu carpeta${dir ? ` «${esc(dir.name)}»` : ''})` : ''}${free}.</p>` : ''}
+    ${seen.length ? `<p class="downloads-sum"><button class="btn" data-act="clear-seen-dl">${ICON.check}<span>Quitar lo ya visto (${plural(seen.length, 'capítulo', 'capítulos')}, ${fmtSize(seenSize)})</span></button></p>` : ''}
     ${dir && perm === 'prompt' ? '<p class="downloads-sum"><button class="btn btn-lamp" data-act="dir-grant">Permitir acceso a tu carpeta de descargas</button></p>' : ''}
     ${
       !metas.length

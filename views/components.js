@@ -222,3 +222,8 @@ export function moviePosterHTML(s, si, { it, m, plan }, fresh) {
 }
 
 export { seasonHref };
+
+/** Una fila de pósters que se desliza de lado, con flechas para avanzar con el ratón (solo en la computadora). */
+export function rowHTML(/** @type {string} */ items) {
+  return `<div class="row-scroll is-start"><ul class="shelf is-row" role="list">${items}</ul><button class="row-arrow is-prev" data-act="row-prev" aria-label="Anteriores" tabindex="-1">${ICON.chev}</button><button class="row-arrow is-next" data-act="row-next" aria-label="Siguientes" tabindex="-1">${ICON.chev}</button></div>`;
+}

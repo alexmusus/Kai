@@ -21,24 +21,35 @@ export function setRegistration(r) {
   swReg = r;
 }
 
-/** La versión instalada ("Kai 38", y "· entrega 3" si es una prueba posterior a la primera), o '' si no hay service
- * worker o no responde en 2 s. @returns {Promise<string>} */
-export function swVersion() {
+/** @typedef {{ label: string, version: number, cambios: string[] }} SwInfo */
+
+/** La versión instalada ("Kai 38", y "· entrega 3" si es una prueba posterior a la primera) y lo que cambió en ella;
+ * label vacío si no hay service worker o no responde en 2 s. @returns {Promise<SwInfo>} */
+export function swInfo() {
   const sw = navigator.serviceWorker && navigator.serviceWorker.controller;
-  if (!sw) return Promise.resolve('');
+  /** @type {SwInfo} */
+  const none = { label: '', version: 0, cambios: [] };
+  if (!sw) return Promise.resolve(none);
   return new Promise((res) => {
     const done = (/** @type {MessageEvent} */ e) => {
       if (e.data && e.data.type === 'version') {
         navigator.serviceWorker.removeEventListener('message', done);
-        const { version: v, entrega: n } = e.data;
-        res(typeof v === 'number' ? `Kai ${v}${n > 1 ? ` · entrega ${n}` : ''}` : '');
+        const { version: v, entrega: n, cambios } = e.data;
+        if (typeof v !== 'number') return res(none);
+        res({
+          label: `Kai ${v}${n > 1 ? ` · entrega ${n}` : ''}`,
+          version: v,
+          cambios: Array.isArray(cambios) ? cambios : [],
+        });
       }
     };
     navigator.serviceWorker.addEventListener('message', done);
     sw.postMessage({ type: 'version' });
-    setTimeout(() => res(''), 2000);
+    setTimeout(() => res(none), 2000);
   });
 }
+/** Solo el nombre de la versión. @returns {Promise<string>} */
+export const swVersion = () => swInfo().then((i) => i.label);
 
 /**
  * Pregunta si hay una versión nueva. Si la hay, espera hasta 10 s a que se instale y tome el control.

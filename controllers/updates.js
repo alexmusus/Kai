@@ -2,12 +2,10 @@
  * Actualizaciones de Kai. El service worker se instala solo cuando cambia; al activarse toma el control de la página
  * (controllerchange). Ahí Kai avisa que hay versión nueva y basta con recargar.
  */
-import { $ } from '../lib/util.js';
-import { isUpdateReady, markUpdateReady, setRegistration, findUpdate } from '../models/updates.js';
+import { $, esc } from '../lib/util.js';
+import { isUpdateReady, markUpdateReady, setRegistration, findUpdate, swInfo } from '../models/updates.js';
 import { toast } from '../views/toast.js';
 import { savePosition } from './player/engine.js';
-
-const CLOSE_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
 
 function setCheckButton(text, disabled = false) {
   const btn = $('#check-update');
@@ -16,7 +14,7 @@ function setCheckButton(text, disabled = false) {
   btn.querySelector('span').textContent = text;
 }
 
-function showUpdateNotice() {
+export function showUpdateNotice() {
   markUpdateReady();
   setCheckButton('Actualizar ahora');
   if ($('#update-notice')) return;
@@ -24,8 +22,34 @@ function showUpdateNotice() {
   el.id = 'update-notice';
   el.className = 'update-notice';
   el.setAttribute('role', 'status');
-  el.innerHTML = `<span>Hay una versión nueva de Kai.</span><button class="update-btn" data-act="apply-update">Actualizar</button><button class="update-x" data-act="dismiss-update" aria-label="Más tarde">${CLOSE_ICON}</button>`;
+  // solo avisa, y se queda hasta actualizar (no se puede cerrar: actualizar no cuesta nada, Kai vuelve al mismo
+  // segundo del capítulo y la versión nueva ya está bajada). Al tocarla se abre con lo que cambió y el botón.
+  el.innerHTML = `<button class="update-what" data-act="update-news" aria-expanded="false"><b>Versión nueva de Kai</b><span class="update-see">Toca para ver qué cambió</span></button><div class="update-more" hidden></div>`;
   document.body.appendChild(el);
+}
+
+/** Abre (o cierra) la burbuja con lo que cambió en la versión nueva y el botón para actualizar. */
+export async function showUpdateNews() {
+  const el = $('#update-notice');
+  if (!el) return;
+  const more = /** @type {HTMLElement} */ (el.querySelector('.update-more'));
+  const btn = /** @type {HTMLElement} */ (el.querySelector('.update-what'));
+  if (el.classList.contains('is-open')) {
+    el.classList.remove('is-open');
+    more.hidden = true;
+    btn.setAttribute('aria-expanded', 'false');
+    return;
+  }
+  const info = await swInfo();
+  more.innerHTML = `${
+    info.cambios.length
+      ? `<ul class="update-list">${info.cambios.map((c) => `<li>${esc(c)}</li>`).join('')}</ul>`
+      : '<p class="update-list">Arreglos y mejoras pequeñas.</p>'
+  }<button class="update-btn" data-act="apply-update">Actualizar${info.label ? ` a ${esc(info.label)}` : ''}</button>`;
+  more.hidden = false;
+  el.classList.add('is-open');
+  btn.setAttribute('aria-expanded', 'true');
+  btn.querySelector('.update-see').textContent = 'Lo nuevo:';
 }
 
 /** Recarga con la versión nueva, guardando antes dónde va el capítulo. */
