@@ -9,7 +9,7 @@ import { movieHref, route } from '../lib/route.js';
 import { langsOf } from '../models/library.js';
 import { metaFor } from '../models/fichas.js';
 import { esc, $, debounce, plural } from '../lib/util.js';
-import { app, header, resetPosterCache, posterAny, entryTile } from './components.js';
+import { app, header, resetPosterCache, posterAny, entryTile, rowHTML } from './components.js';
 import { ICON } from './icons.js';
 import { hydrateThumbs } from './thumbs.js';
 import { emit } from '../lib/events.js';
@@ -197,9 +197,11 @@ export function paintCatalog() {
     list.map((e) => e.img || '').join('').length;
   if (box.dataset.sig !== sig) {
     resetPosterCache();
-    box.innerHTML = posters
-      ? `<ul class="shelf" role="list">${list.map(posterAny).join('')}</ul>`
-      : `<div class="tiles is-grid" role="list">${list.map(entryTile).join('')}</div>`;
+    box.innerHTML = !state.library
+      ? `<div class="skel is-catalog" aria-hidden="true"><div class="skel-row is-grid">${'<span class="skel-poster"></span>'.repeat(12)}</div></div>`
+      : posters
+        ? `<ul class="shelf" role="list">${list.map(posterAny).join('')}</ul>`
+        : `<div class="tiles is-grid" role="list">${list.map(entryTile).join('')}</div>`;
     box.dataset.sig = sig;
     if (posters) hydrateThumbs(box);
   }
@@ -258,6 +260,6 @@ export function paintHomeSearch() {
   const list = sortEntries(filterEntries(catalogEntries(), { q: qv }), 'az');
   box.innerHTML = `<div class="tv-row-head"><h3 class="tv-row-title">${list.length ? plural(list.length, 'resultado', 'resultados') : 'Sin resultados'}</h3>
       <a class="tv-more" href="#/catalogo?${new URLSearchParams({ q: qv })}">${ICON.grid}<span>Buscar en el catálogo</span></a></div>
-    <ul class="shelf is-row" role="list">${list.slice(0, 24).map(posterAny).join('')}</ul>`;
+    ${rowHTML(list.slice(0, 24).map(posterAny).join(''))}`;
   resetPosterCache();
 }

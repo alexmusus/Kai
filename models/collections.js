@@ -77,6 +77,31 @@ export function studioTitle(name) {
   };
 }
 
+/** Studio, en el orden de su página: por quién canta y después por canción. @template {{ name: string }} T @param {T[]} eps @returns {T[]} */
+export function studioSorted(eps) {
+  return [...eps].sort((a, b) => {
+    const x = studioTitle(a.name);
+    const y = studioTitle(b.name);
+    return (x.artist || x.song).localeCompare(y.artist || y.song, 'es') || x.song.localeCompare(y.song, 'es');
+  });
+}
+
+/** El orden aleatorio de Studio mientras dura ("Aleatorio"): ids en el orden en que van a sonar; null = en orden. */
+let studioShuffle = /** @type {string[] | null} */ (null);
+/** @param {string[] | null} ids */
+export function setStudioShuffle(ids) {
+  studioShuffle = ids;
+}
+/** La lista de Studio en el orden en que suenan (la aleatoria si está puesta y tiene ese video). @template {{ id: string, name: string }} T @param {T[]} eps @param {string} id @returns {T[]} */
+export function studioQueue(eps, id) {
+  if (studioShuffle && studioShuffle.includes(id)) {
+    const by = new Map(eps.map((e) => [e.id, e]));
+    const out = /** @type {T[]} */ (studioShuffle.map((x) => by.get(x)).filter(Boolean));
+    if (out.length) return out;
+  }
+  return studioSorted(eps);
+}
+
 const JUNK_WORDS =
   /\b(1080p|720p|480p|2160p|4k|x26[45]|hevc|aac|sub|subs|subtitulado|vose|dub|dob|doblado|lat|latino|castellano|esp|spa|bd|bdrip|web|webrip)\b/gi;
 

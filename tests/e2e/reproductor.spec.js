@@ -267,3 +267,22 @@ test('cada perfil elige la velocidad al mantener presionado y cuánto saltan los
   await expect.poll(() => page.evaluate(() => document.querySelector('#video').paused)).toBe(true);
   expect(k.errors).toEqual([]);
 });
+
+test('Descargados: quitar de una vez lo que ya viste', async ({ page }) => {
+  const k = await openWithDownloads(page, '#/descargas');
+  await expect(page.locator('main.downloads .ep')).toHaveCount(2);
+  await expect(page.locator('[data-act="clear-seen-dl"]')).toHaveCount(0); // nada visto todavía
+  await page.evaluate(async (id) => {
+    const { setProgress } = await import('/models/progress.js');
+    const { epById } = await import('/models/library.js');
+    setProgress(epById(id), 1400, 1400, true);
+    location.hash = '#/descargas?' + Date.now();
+  }, k.eps[0].id);
+  const btn = page.locator('[data-act="clear-seen-dl"]');
+  await expect(btn).toContainText('Quitar lo ya visto (1 capítulo');
+  await btn.click();
+  await page.locator('.sheet-panel button', { hasText: /^Quitar$/ }).click();
+  await expect(page.locator('main.downloads .ep')).toHaveCount(1);
+  await expect(btn).toHaveCount(0);
+  expect(k.errors).toEqual([]);
+});

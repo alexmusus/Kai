@@ -10,14 +10,31 @@ importScripts('core.js');
  * subidas a prueba dentro de esa versión: sube en cada una (el navegador solo instala de nuevo si este archivo
  * cambia) y vuelve a 1 cuando sube VERSION. */
 const VERSION = 42;
-const ENTREGA = 2;
+const ENTREGA = 3;
 const CACHE = `kai-${VERSION}.${ENTREGA}`;
+/* Lo que cambió en esta versión, corto y en palabras de todos los días: lo muestran la burbuja de "Versión nueva"
+ * (al tocarla) y Ajustes → Versión. Se escribe de nuevo al empezar cada versión. */
+const CAMBIOS = [
+  'En el teléfono, el video se queda arriba mientras bajas a ver los capítulos.',
+  'En la barra del video, el teléfono muestra solo el capítulo; la computadora, la serie y el capítulo.',
+  'Seleccionar capítulos: «Todos» de una vez y, en la computadora, Shift + clic para elegir varios seguidos.',
+  'Descargados: un botón para quitar de una vez lo que ya viste.',
+  'En pantallas grandes, el inicio y el catálogo aprovechan mejor el espacio, y Descubrir va en una sola fila.',
+  'En la computadora, Kai (el gatito) ocupa el lugar del saludo.',
+  'La barra flotante del teléfono se achica más suave.',
+  'Al tocar un póster, vuela hasta la portada de la serie.',
+  'En el teléfono, mantener presionado un póster abre un menú rápido; en la computadora, pasar el ratón muestra la sinopsis.',
+  'Mientras carga, se ve la forma de la página en vez de un hueco.',
+  'En la computadora, las filas de pósters tienen flechas para avanzar.',
+  'Ajustes → Tu resumen: cuánto has visto, las series terminadas y lo más visto del mes.',
+  'Studio: reproducir todo seguido o en aleatorio.',
+];
 const SHELL = [
   './', 'styles.css', 'app.js', 'core.js', 'models/mp4.js', 'models/meta-api.js',
   'lib/util.js', 'lib/events.js', 'lib/route.js', 'lib/nav-history.js', 'models/naming.js', 'models/store.js', 'models/mega.js', 'models/library.js',
-  'models/quota.js', 'models/collections.js', 'models/progress.js', 'models/profiles.js', 'models/sync.js', 'models/profile-copies.js', 'models/fichas.js', 'models/fichas-sync.js', 'models/idb.js', 'models/news.js', 'models/thumbs.js', 'models/downloads.js', 'models/media.js', 'models/plans.js', 'models/context.js', 'models/updates.js', 'models/discover.js', 'views/icons.js', 'views/quota.js', 'views/thumbs.js', 'views/view-state.js', 'views/components.js', 'views/home.js', 'views/episodes.js', 'views/series.js', 'views/dock.js', 'views/catalog.js', 'views/explorer.js', 'views/downloads.js',
+  'models/quota.js', 'models/collections.js', 'models/progress.js', 'models/profiles.js', 'models/sync.js', 'models/profile-copies.js', 'models/fichas.js', 'models/fichas-sync.js', 'models/idb.js', 'models/news.js', 'models/thumbs.js', 'models/downloads.js', 'models/media.js', 'models/plans.js', 'models/context.js', 'models/updates.js', 'models/discover.js', 'models/stats.js', 'views/icons.js', 'views/quota.js', 'views/thumbs.js', 'views/view-state.js', 'views/components.js', 'views/home.js', 'views/episodes.js', 'views/series.js', 'views/dock.js', 'views/catalog.js', 'views/explorer.js', 'views/downloads.js',
   'views/settings.js', 'views/discover.js', 'views/account.js', 'views/sheet.js', 'views/toast.js', 'views/theme.js', 'views/images.js',
-  'controllers/picking.js', 'controllers/router.js', 'controllers/dock.js', 'controllers/sync.js',
+  'controllers/picking.js', 'controllers/posters.js', 'controllers/router.js', 'controllers/dock.js', 'controllers/sync.js',
   'controllers/actions.js', 'controllers/home.js', 'controllers/lifecycle.js', 'controllers/updates.js',
   'controllers/account.js', 'controllers/downloads.js', 'controllers/sheet.js', 'controllers/player/state.js', 'controllers/player/dom.js',
   'controllers/player/mini.js', 'controllers/player/controls.js', 'controllers/player/chapters.js',
@@ -74,7 +91,7 @@ self.addEventListener('install', (e) => {
 
 // la app pregunta qué versión está instalada (Ajustes)
 self.addEventListener('message', (e) => {
-  if ((e.data || {}).type === 'version' && e.source) e.source.postMessage({ type: 'version', version: VERSION, entrega: ENTREGA });
+  if ((e.data || {}).type === 'version' && e.source) e.source.postMessage({ type: 'version', version: VERSION, entrega: ENTREGA, cambios: CAMBIOS });
 });
 
 self.addEventListener('activate', (e) => {

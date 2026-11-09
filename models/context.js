@@ -4,7 +4,7 @@
  * serie), cómo se llama esa lista y a qué página se vuelve desde el reproductor.
  */
 
-import { isCollection, isStudio, itemFor } from './collections.js';
+import { isCollection, isStudio, itemFor, studioQueue } from './collections.js';
 import { movieHref } from '../lib/route.js';
 import { index, state, knownEps } from './store.js';
 import { seasonLabel } from './fichas.js';
@@ -26,8 +26,9 @@ export function resolveContext(id) {
     const s = state.library.series[e.si];
     const season = s.seasons[e.ki];
     // un capítulo en el idioma que no está elegido (desde Descargados, por ejemplo): la lista sigue en su idioma
-    const list =
-      e.ei >= 0 || !season.full
+    const list = isStudio(s)
+      ? studioQueue(season.episodes, id) // Studio suena en el orden de su página (o en el aleatorio)
+      : e.ei >= 0 || !season.full
         ? season.episodes
         : season.full.filter((x) => !index.twins.has(x.path) || x.lang === e.ep.lang);
     return {

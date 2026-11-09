@@ -9,7 +9,14 @@ import { state, index, setIndex, saveSettings, pkey, saveShared, visibleProfiles
 import { megaMessage, connect } from '../models/mega.js';
 import { nodePath, buildIndex, setLangPref, epById } from '../models/library.js';
 import { removeAllDownloads, removeDownload, dirAccess, flushFolder } from '../models/downloads.js';
-import { episodeLabel, collectionItems, itemMetaKey, movieTitle } from '../models/collections.js';
+import {
+  episodeLabel,
+  collectionItems,
+  itemMetaKey,
+  movieTitle,
+  studioSorted,
+  setStudioShuffle,
+} from '../models/collections.js';
 import { nextUnseen, resumeOffer, prog, setProgress, isLater } from '../models/progress.js';
 import { saveMeta } from '../models/fichas.js';
 import { setTmdbKey, saveSyn, translateMissing, resetFichas } from '../models/fichas-sync.js';
@@ -41,7 +48,8 @@ import { sync, syncing, refreshLibrary, setLater } from './sync.js';
 import { selectProfile, checkCopies, pickCopy, applyCopies } from './account.js';
 import { queueDownload, pickFolder, dropFolder } from './downloads.js';
 import { openSheet } from './sheet.js';
-import { checkUpdate, applyUpdate } from './updates.js';
+import { checkUpdate, applyUpdate, showUpdateNews } from './updates.js';
+import { scrollRow } from './posters.js';
 import { P } from './player/state.js';
 import { stage } from './player/dom.js';
 import { togglePlay, setLights, paintControls } from './player/controls.js';
@@ -274,6 +282,35 @@ async function clearDownloads() {
   render();
 }
 
+/** Studio → todas las canciones seguidas, en orden o en aleatorio. @param {HTMLElement} el @param {boolean} shuffle */
+function studioPlay(el, shuffle) {
+  const s = state.library && state.library.series[Number(el.dataset.si)];
+  if (!s) return;
+  const ids = studioSorted(s.all).map((e) => e.id);
+  if (shuffle)
+    for (let i = ids.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [ids[i], ids[j]] = [ids[j], ids[i]];
+    }
+  setStudioShuffle(shuffle ? ids : null);
+  if (ids.length) go('#/play/' + encodeURIComponent(ids[0]));
+}
+
+/** Descargados → quitar de una vez los capítulos que este perfil ya terminó de ver. */
+async function clearSeenDownloads() {
+  const epOf = (/** @type {any} */ m) => m.ep || (index.byId.get(m.id) || {}).ep;
+  const seen = [...state.dlMeta.values()].filter((m) => m.done && epOf(m) && (prog(epOf(m)) || {}).w);
+  if (!seen.length) return;
+  const ok = await askConfirm(`¿Quitar ${plural(seen.length, 'capítulo visto', 'capítulos vistos')}?`, {
+    detail: 'Se quitan de este dispositivo los capítulos descargados que este perfil ya terminó de ver.',
+    ok: 'Quitar',
+  });
+  if (!ok) return;
+  for (const m of seen) await removeDownload(m.id, true);
+  toast(`${plural(seen.length, 'capítulo quitado', 'capítulos quitados')} del dispositivo.`);
+  render();
+}
+
 /**
  * Cada acción recibe el elemento tocado y, si está dentro de una fila de capítulo, ese capítulo.
  * @type {Record<string, (el: HTMLElement, ep: any) => unknown>}
@@ -291,7 +328,7 @@ const ACTIONS = {
   // actualizaciones
   'check-update': () => checkUpdate(),
   'apply-update': () => applyUpdate(),
-  'dismiss-update': () => $('#update-notice')?.remove(),
+  'update-news': () => showUpdateNews(),
 
   // navegación
   dock: () => toggleDock(),
@@ -375,6 +412,11 @@ const ACTIONS = {
   'dir-off': () => dropFolder(),
   'dir-grant': grantFolder,
   'clear-dl': clearDownloads,
+  'clear-seen-dl': clearSeenDownloads,
+  'row-prev': (el) => scrollRow(el, -1),
+  'row-next': (el) => scrollRow(el, 1),
+  'studio-play': (el) => studioPlay(el, false),
+  'studio-shuffle': (el) => studioPlay(el, true),
 
   // tema y luz
   theme: () => setThemeSetting('theme', resolvedTheme() === 'dark' ? 'light' : 'dark', false),

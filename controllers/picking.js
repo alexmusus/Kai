@@ -17,6 +17,9 @@ import { viewState } from '../views/view-state.js';
 import { softRender } from './router.js';
 import { sync } from './sync.js';
 
+/** El último capítulo que se tocó al elegir (para Shift + clic) y si quedó elegido. @type {{ id: string, on: boolean } | null} */
+let lastPicked = null;
+
 /** Empieza a elegir en la temporada `ki` de la serie que se está mirando. @param {number} ki */
 export function startPicking(ki) {
   const si = viewState.heroSi;
@@ -106,8 +109,19 @@ app.addEventListener(
     e.stopPropagation();
     const ep = epById(li.dataset.id || '');
     if (!ep) return;
-    if (picking.ids.has(ep.id)) picking.ids.delete(ep.id);
+    // con Shift (en la PC), del último que tocaste hasta este: todos quedan como quedó el último
+    const season = pickSeason();
+    const list = season ? season.episodes.map((x) => x.id) : [];
+    const from = lastPicked ? list.indexOf(lastPicked.id) : -1;
+    const to = list.indexOf(ep.id);
+    if (e.shiftKey && from >= 0 && to >= 0) {
+      for (const id of list.slice(Math.min(from, to), Math.max(from, to) + 1))
+        if (lastPicked.on) picking.ids.add(id);
+        else picking.ids.delete(id);
+      getSelection()?.removeAllRanges(); // Shift + clic también selecciona texto
+    } else if (picking.ids.has(ep.id)) picking.ids.delete(ep.id);
     else picking.ids.add(ep.id);
+    lastPicked = { id: ep.id, on: picking.ids.has(ep.id) };
     paintPick();
   },
   true,

@@ -234,10 +234,19 @@ test('Seleccionar capítulos de una temporada', async ({ page }, info) => {
   await go(page, '#/serie/' + k.si('Dorohedoro'));
   await page.locator('[data-act="pick-mode"]').click();
   await expect(page.locator('#pick-bar')).toBeVisible();
-  await expect(page.locator('#pick-count')).toHaveText('Toca los capítulos que quieras');
+  const hint = info.project.name === 'pc' ? 'Elige capítulos (Shift + clic: varios seguidos)' : 'Toca los capítulos que quieras';
+  await expect(page.locator('#pick-count')).toHaveText(hint);
   const eps = page.locator('#season-eps .ep .ep-main');
   await eps.nth(0).click();
   await eps.nth(4).click();
+  if (info.project.name === 'pc') {
+    // Shift + clic elige del último tocado hasta ese (del 5 al 8), y se suelta igual
+    await eps.nth(7).click({ modifiers: ['Shift'] });
+    await expect(page.locator('#season-eps .ep.is-picked')).toHaveCount(5);
+    await eps.nth(5).click(); // suelta el 6
+    await eps.nth(7).click({ modifiers: ['Shift'] }); // y del 6 al 8 quedan sueltos
+    await expect(page.locator('#season-eps .ep.is-picked')).toHaveCount(2);
+  }
   await expect(page).toHaveURL(new RegExp(`#/serie/${k.si('Dorohedoro')}$`)); // no abrió el capítulo
   await expect(page.locator('#pick-count')).toHaveText('2 capítulos, 500 MB por descargar');
   // todos de una vez, y otra vez para soltarlos
@@ -248,7 +257,7 @@ test('Seleccionar capítulos de una temporada', async ({ page }, info) => {
   await expect(page.locator('#pick-all')).toHaveText('Ninguno');
   await page.locator('#pick-all').click();
   await expect(page.locator('#season-eps .ep.is-picked')).toHaveCount(0);
-  await expect(page.locator('#pick-count')).toHaveText('Toca los capítulos que quieras');
+  await expect(page.locator('#pick-count')).toHaveText(hint);
   await eps.nth(0).click();
   await eps.nth(4).click();
   await expect(page.locator('[data-act="pick-seen"]')).toBeEnabled();
@@ -531,6 +540,16 @@ test('Studio: su botón al final del inicio, sus videos con quién canta, y no s
   await expect(page.locator('.shelf-count')).toHaveText('2 canciones en vivo');
   await expect(page.locator('.studio-tile .tile-title')).toHaveText(['Querida', 'Amor eterno']);
   await expect(page.locator('.studio-tile .tile-sub').first()).toHaveText('Juan Gabriel · Bellas Artes, 1990');
+  // reproducir todo: empieza por la primera y la lista del reproductor va en el orden de la página
+  await page.locator('[data-act="studio-play"]').click();
+  await expect(page.locator('.watch-title')).toHaveText('Querida');
+  await expect(page.locator('#watch-list .ep')).toHaveCount(2);
+  // aleatorio: suenan todas, en algún orden
+  await go(page, '#/serie/' + k.si('Studio'));
+  await page.locator('[data-act="studio-shuffle"]').click();
+  await expect(page).toHaveURL(/#\/play\//);
+  await expect(page.locator('#watch-list .ep')).toHaveCount(2);
+  await go(page, '#/serie/' + k.si('Studio'));
   await page.locator('.studio-tile').first().click();
   await expect(page).toHaveURL(/#\/play\//);
   await expect(page.locator('.watch-title')).toHaveText('Querida');
@@ -550,5 +569,70 @@ test('Studio: su botón al final del inicio, sus videos con quién canta, y no s
   await go(page, '#/catalogo');
   await expect(page.locator('.catalog')).not.toContainText('Querida');
   await expect(page.locator('.catalog')).not.toContainText('Studio');
+  expect(k.errors).toEqual([]);
+});
+
+test('Ajustes: tu resumen; y la burbuja de versión nueva se abre con lo que cambió', async ({ page }, info) => {
+  const k = await openKai(page, '#/ajustes');
+  const stats = page.locator('#profile-stats');
+  await expect(stats).toContainText('Tu resumen');
+  await expect(stats.locator('.stat')).toHaveCount(3);
+  // la burbuja de versión nueva: cabe en el teléfono y al tocarla dice qué cambió
+  await page.evaluate(async () => (await import('/controllers/updates.js')).showUpdateNotice());
+  const notice = page.locator('#update-notice');
+  await expect(notice).toBeVisible();
+  const box = await notice.boundingBox();
+  expect((box?.x || 0) >= 0 && (box?.x || 0) + (box?.width || 0) <= (page.viewportSize()?.width || 0)).toBe(true);
+  expect(box?.height || 0).toBeLessThan(60); // en una sola línea
+  await expect(notice.locator('[data-act="apply-update"]')).toHaveCount(0); // para actualizar hay que abrirla
+  await notice.locator('[data-act="update-news"]').click();
+  await expect(notice).toHaveClass(/is-open/);
+  await expect(notice.locator('.update-list')).toBeVisible();
+  await expect(notice.locator('[data-act="apply-update"]')).toBeVisible();
+  const open = await notice.boundingBox();
+  expect((open?.x || 0) >= 0 && (open?.x || 0) + (open?.width || 0) <= (page.viewportSize()?.width || 0)).toBe(true);
+  await expect(page.locator('#app-changes')).toHaveCount(0); // en Ajustes no sale
+  await expect(notice.locator('.update-x')).toHaveCount(0); // no se puede cerrar: se queda hasta actualizar
+  expect(k.errors).toEqual([]);
+});
+
+test('pósters: tarjeta al pasar el ratón (PC), menú al mantener presionado (teléfono) y vuelo a la portada', async ({ page }, info) => {
+  const k = await openKai(page, '#/');
+  const poster = page.locator(`.home-shelf, .tv-main`).locator(`a.shelf-item[href="#/serie/${k.si('Dorohedoro')}"]`).first();
+  await poster.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(300); // que termine de desplazarse (desplazarse cancela el mantener presionado)
+  const card = page.locator('.poster-card');
+  if (info.project.name === 'pc') {
+    await poster.hover();
+    await expect(card).toBeVisible();
+    await expect(card.locator('.pc-title')).toHaveText('Dorohedoro');
+    await expect(card.locator('.tv-btn')).toContainText('Episodio 3');
+    await page.mouse.move(5, 5);
+    await expect(card).toBeHidden();
+  } else {
+    // mantener presionado: abre el menú rápido y no entra a la serie
+    const box = await poster.boundingBox();
+    const at = { x: (box?.x || 0) + 30, y: (box?.y || 0) + 30 };
+    await poster.dispatchEvent('pointerdown', { pointerType: 'touch', clientX: at.x, clientY: at.y, isPrimary: true });
+    await page.waitForTimeout(650);
+    await poster.dispatchEvent('pointerup', { pointerType: 'touch', clientX: at.x, clientY: at.y, isPrimary: true });
+    await poster.dispatchEvent('click');
+    await expect(page.locator('.sheet-title')).toHaveText('Dorohedoro');
+    await expect(page.locator('.sheet-panel')).toContainText('Ir a la serie');
+    await expect(page).toHaveURL(/#\/$/);
+    await page.locator('.sheet-panel [data-act="later"]').click();
+    await expect(page.locator('.sheet-panel')).toHaveCount(0, { timeout: 2000 }).catch(() => {});
+  }
+  // tocar el póster entra a la serie, con el vuelo a la portada (sin "reducir movimiento", que lo omite)
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.evaluate(() => {
+    window.__vt = 0;
+    const orig = document.startViewTransition.bind(document);
+    document.startViewTransition = (cb) => (window.__vt++, orig(cb));
+  });
+  await poster.click();
+  await expect.poll(() => page.evaluate(() => window.__vt)).toBe(1);
+  await expect(page).toHaveURL(new RegExp(`#/serie/${k.si('Dorohedoro')}$`));
+  await expect(page.locator('.series-hero .tv-title')).toHaveText('Dorohedoro');
   expect(k.errors).toEqual([]);
 });
