@@ -78,7 +78,11 @@ export function paintEpisode(id) {
   const ep = epById(id);
   if (!ep) return;
   document.querySelectorAll(`.ep[data-id="${CSS.escape(id)}"] [data-act="dl"]`).forEach((btn) => {
+    const wasBusy = btn.classList.contains('is-busy');
     btn.outerHTML = dlButton(ep);
+    // recién terminada: el estilo Bloques le da un pequeño salto (styles.css, .dl.is-done-now)
+    const now = document.querySelector(`.ep[data-id="${CSS.escape(id)}"] .dl.is-saved`);
+    if (wasBusy && now) now.classList.add('is-done-now');
   });
   const wd = document.querySelector(`[data-act="w-dl"][data-id="${CSS.escape(id)}"]`);
   if (wd) wd.outerHTML = watchDlButton(ep);

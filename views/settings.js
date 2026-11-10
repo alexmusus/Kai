@@ -189,7 +189,7 @@ function toneSeg(label, act, tones, current) {
 
 export function renderSettings() {
   const s = state.settings;
-  const blocks = s.style === 'bloques';
+  const blocks = !!s.lab && s.style === 'bloques';
   const unread = hasUnreadNews();
   markNewsRead();
   // lo plegable que estaba abierto sigue abierto al volver a dibujar (cada cambio de un ajuste redibuja la página)
@@ -211,15 +211,19 @@ export function renderSettings() {
             `<button class="seg ${s.theme === v ? 'is-on' : ''}" data-act="set-theme" data-v="${v}" aria-pressed="${s.theme === v}">${l}</button>`,
         )
         .join('')}</div>
-      <div class="segmented" role="group" aria-label="Estilo">${[
-        ['vidrio', 'Vidrio'],
-        ['bloques', 'Bloques'],
-      ]
-        .map(
-          ([v, l]) =>
-            `<button class="seg ${(s.style || 'vidrio') === v ? 'is-on' : ''}" data-act="set-style" data-v="${v}" aria-pressed="${(s.style || 'vidrio') === v}">${l}</button>`,
-        )
-        .join('')}</div>
+      ${
+        s.lab
+          ? `<div class="segmented" role="group" aria-label="Estilo">${[
+              ['vidrio', 'Vidrio'],
+              ['bloques', 'Bloques'],
+            ]
+              .map(
+                ([v, l]) =>
+                  `<button class="seg ${(blocks ? 'bloques' : 'vidrio') === v ? 'is-on' : ''}" data-act="set-style" data-v="${v}" aria-pressed="${(blocks ? 'bloques' : 'vidrio') === v}">${l}</button>`,
+              )
+              .join('')}</div>`
+          : ''
+      }
       <details class="settings-fold" id="fold-look" ${open.has('fold-look') ? 'open' : ''}>
         <summary>Tonos, animaciones y modo liviano</summary>
       <p class="settings-label">Tono del modo claro</p>
@@ -279,11 +283,24 @@ export function renderSettings() {
     </section>
     <details class="settings-group settings-fold" id="fold-adv" ${open.has('fold-adv') ? 'open' : ''}>
       <summary>Avanzado</summary>
-      <p class="dim settings-hint">Lo que casi nunca se toca: la carpeta de series, la clave de Cine, separar perfiles y el espacio.</p>
+      <p class="dim settings-hint">Lo que casi nunca se toca: la carpeta de series, el Laboratorio, la clave de Cine, separar perfiles y el espacio.</p>
     <section class="settings-group">
       <p class="settings-label">Carpeta de series</p>
       <p class="settings-value">${esc(s.root)}</p>
       <a class="btn" href="#/explorar${state.library && state.library.rootId ? '/' + encodeURIComponent(state.library.rootId) : ''}">Cambiar carpeta</a>
+    </section>
+    <section class="settings-group" id="lab">
+      <p class="settings-label">Laboratorio</p>
+      <p class="dim">Lo que está en prueba: el estilo Bloques, con animaciones al tocar. Al encenderlo aparece en Apariencia. Solo cambia este dispositivo.</p>
+      <div class="segmented" role="group" aria-label="Laboratorio">${[
+        ['off', 'Apagado'],
+        ['on', 'Encendido'],
+      ]
+        .map(
+          ([v, l]) =>
+            `<button class="seg ${!!s.lab === (v === 'on') ? 'is-on' : ''}" data-act="set-lab" data-v="${v}" aria-pressed="${!!s.lab === (v === 'on')}">${l}</button>`,
+        )
+        .join('')}</div>
     </section>
     <section class="settings-group" id="cine-key">${cineKeyHTML()}</section>
     ${

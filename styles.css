@@ -2012,3 +2012,58 @@ html.lite .poster-card { background: var(--glass-solid); -webkit-backdrop-filter
 [data-style='bloques'] .stat b { font-family: var(--font-display) !important; font-weight: 500 !important; font-size: 34px !important; letter-spacing: -0.04em !important; }
 [data-style='bloques'] .stat:first-child { background: var(--accent) !important; color: var(--accent-ink) !important; }
 [data-style='bloques'] .stat:first-child * { color: var(--accent-ink) !important; }
+
+/* ───────────── Bloques: animaciones al tocar (Laboratorio) ─────────────
+ * Solo con Bloques, con las animaciones encendidas (sin html.calm, que también pone el modo liviano en Automático) y
+ * si el sistema no pide reducir el movimiento.
+ * Todo es transform y opacidad. La píldora la coloca views/lively.js (--pill-x/-y/-w/-h). */
+@media (prefers-reduced-motion: no-preference) {
+html[data-style='bloques']:not(.calm) {
+  --kai-pop: cubic-bezier(0.34, 1.56, 0.64, 1);
+  interpolate-size: allow-keywords;
+}
+/* la píldora que se desliza entre las opciones (selectores, Sub/Doblado, la barra de abajo) */
+html[data-style='bloques']:not(.calm) .has-pill { position: relative; isolation: isolate; }
+html[data-style='bloques']:not(.calm) .has-pill::before {
+  content: ''; position: absolute; z-index: -1; left: 0; top: 0; width: var(--pill-w); height: var(--pill-h);
+  transform: translate(var(--pill-x), var(--pill-y)); border-radius: 12px; background: var(--accent);
+  transition: transform 0.32s var(--kai-pop), width 0.32s var(--kai-pop);
+}
+html[data-style='bloques']:not(.calm) .dock-tabs.has-pill::before { border-radius: 16px; }
+html[data-style='bloques']:not(.calm) .has-pill.pill-still::before { transition: none; }
+html[data-style='bloques']:not(.calm) .has-pill > :is(.seg, button, .dock-tab).is-on { background: transparent !important; }
+html[data-style='bloques']:not(.calm) .has-pill > * { transition: color 0.2s; }
+/* al tocar: los botones se hunden un poco */
+html[data-style='bloques']:not(.calm) :is(.btn, .tv-btn, .seg, .lang-switch button, .dock-tab, .dl, .icon-btn, .tv-icon, .pick-btn) { transition: transform 0.18s var(--kai-pop), background-color 0.2s, color 0.2s; }
+html[data-style='bloques']:not(.calm) :is(.btn, .tv-btn, .seg, .lang-switch button, .dock-tab, .dl, .icon-btn, .tv-icon, .pick-btn):active { transform: scale(0.94); }
+html[data-style='bloques']:not(.calm) :is(.shelf-item, .tile):active :is(.shelf-poster, .tile-img) { transform: scale(0.97); transition: transform 0.18s var(--kai-pop); }
+/* casilla al elegir capítulos: salta al marcarla */
+html[data-style='bloques']:not(.calm) .episodes.is-picking .ep.is-picked .ep-thumb::before { animation: kai-pop 0.36s var(--kai-pop); }
+/* el botón de descarga, al terminar: salta y se ve el ✓ */
+html[data-style='bloques']:not(.calm) .dl.is-done-now { animation: kai-pop 0.5s var(--kai-pop); }
+/* Sincronizar ahora: gira mientras trabaja y muestra ✓ al terminar */
+html[data-style='bloques']:not(.calm) .btn.is-working, html[data-style='bloques']:not(.calm) .btn.is-done { gap: 8px; display: inline-flex; align-items: center; }
+html[data-style='bloques']:not(.calm) .btn.is-working::before {
+  content: ''; width: 14px; height: 14px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent;
+  animation: kai-spin 0.8s linear infinite;
+}
+html[data-style='bloques']:not(.calm) .btn.is-done { background: var(--accent); color: var(--accent-ink); }
+html[data-style='bloques']:not(.calm) .btn.is-done::before { content: '✓'; font-weight: 700; animation: kai-pop 0.4s var(--kai-pop); }
+/* los plegables de Ajustes se abren suave (donde el navegador lo permite; donde no, se abren como siempre) */
+html[data-style='bloques']:not(.calm) details.settings-fold::details-content {
+  block-size: 0; overflow: clip; transition: block-size 0.3s var(--kai-fly-ease), content-visibility 0.3s allow-discrete;
+}
+html[data-style='bloques']:not(.calm) details.settings-fold[open]::details-content { block-size: auto; }
+}
+/* el anillo de avance de cada temporada ("5 de 13"); también sin animaciones, como dato */
+html[data-style='bloques'] .shelf-sub.has-ring { display: inline-flex; align-items: center; gap: 6px; }
+html[data-style='bloques'] .shelf-sub.has-ring::before {
+  content: ''; flex: none; width: 13px; height: 13px; border-radius: 50%;
+  background: radial-gradient(closest-side, var(--bg) 58%, transparent 60%), conic-gradient(var(--accent2) calc(var(--p) * 1%), var(--surface2) 0);
+}
+@media (prefers-reduced-motion: no-preference) {
+  html[data-style='bloques']:not(.calm) .shelf-sub.has-ring::before { animation: kai-pop 0.5s var(--kai-pop); }
+}
+html[data-style='bloques'] .stat b { font-variant-numeric: tabular-nums; }
+@keyframes kai-pop { 0% { transform: scale(0.6); } 60% { transform: scale(1.12); } 100% { transform: scale(1); } }
+@keyframes kai-spin { to { transform: rotate(360deg); } }

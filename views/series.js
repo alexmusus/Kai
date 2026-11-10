@@ -244,7 +244,7 @@ export function renderSeasonMenu(s, si) {
         ${done && !all ? `<span class="tile-bar"><span style="width:${(done / se.episodes.length) * 100}%"></span></span>` : ''}
       </span>
       <span class="shelf-title" title="${esc(seasonFullName(s, se))}">${esc(t)}</span>
-      <span class="shelf-sub">${esc(sub)}</span>
+      <span class="shelf-sub${done && !all ? ' has-ring' : ''}"${done && !all ? ` style="--p:${Math.round((done / se.episodes.length) * 100)}"` : ''}>${esc(sub)}</span>
     </a></li>`;
     })
     .join('');

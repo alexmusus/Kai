@@ -9,11 +9,47 @@ const inline = html.slice(html.indexOf('<script>', html.indexOf('theme-color')),
 
 describe('el tema antes del JS (index.html)', () => {
   it('conoce cada tono claro y oscuro con su color', () => {
-    for (const [name, t] of [...Object.entries(TONES), ...Object.entries(DARK_TONES), ...Object.entries(BLOCK_TONES), ...Object.entries(BLOCK_DARK)])
+    for (const [name, t] of [
+      ...Object.entries(TONES),
+      ...Object.entries(DARK_TONES),
+      ...Object.entries(BLOCK_TONES),
+      ...Object.entries(BLOCK_DARK),
+    ])
       expect(inline, `${name} ${t.bg}`).toContain(`${name}: '${t.bg}'`);
   });
   it('va antes de la hoja de estilos y después del color de la barra del sistema', () => {
-    expect(html.indexOf('name="theme-color"')).toBeLessThan(html.indexOf("dataset.theme = t"));
-    expect(html.indexOf("dataset.theme = t")).toBeLessThan(html.indexOf('href="styles.css"'));
+    expect(html.indexOf('name="theme-color"')).toBeLessThan(html.indexOf('dataset.theme = t'));
+    expect(html.indexOf('dataset.theme = t')).toBeLessThan(html.indexOf('href="styles.css"'));
+  });
+});
+
+describe('Bloques solo con el Laboratorio', () => {
+  const code = inline.slice(inline.indexOf('<script>') + 8, inline.indexOf('</script>'));
+  /** corre el arranque de index.html con estos ajustes (con un <html> de mentira) y devuelve lo que dejó */
+  const boot = (settings) => {
+    const html = { dataset: {} };
+    const meta = { content: '' };
+    const links = [];
+    const doc = {
+      documentElement: html,
+      head: { appendChild: (l) => links.push(l) },
+      createElement: () => ({ dataset: {} }),
+      querySelector: () => meta,
+    };
+    const ls = { getItem: () => JSON.stringify(settings) };
+    new Function('localStorage', 'matchMedia', 'document', code)(ls, () => ({ matches: true }), doc);
+    return { ...html.dataset, color: meta.content, fonts: links.length > 0 };
+  };
+  it('sin el Laboratorio, Bloques elegido antes no se aplica', () => {
+    expect(boot({ theme: 'dark', style: 'bloques' })).toEqual({ theme: 'dark', color: '#0d0e12', fonts: false });
+  });
+  it('con el Laboratorio, sí: su tono, su color de barra y sus letras', () => {
+    expect(boot({ theme: 'light', style: 'bloques', lab: true, blockTone: 'papel' })).toEqual({
+      theme: 'light',
+      style: 'bloques',
+      tone: 'papel',
+      color: '#eeede9',
+      fonts: true,
+    });
   });
 });

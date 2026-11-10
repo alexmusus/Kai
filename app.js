@@ -17,6 +17,7 @@ import { viewState } from './views/view-state.js';
 import { renderLogin } from './views/account.js';
 import { toast } from './views/toast.js';
 import { applyTheme } from './views/theme.js';
+import { startLively } from './views/lively.js';
 import { paintQuota } from './views/quota.js';
 import { paintDrawerCount, paintNewsDot } from './views/dock.js';
 import { paintEpisode } from './views/episodes.js';
@@ -103,6 +104,7 @@ function samsungHint() {
 
 async function boot() {
   applyTheme();
+  startLively();
   paintQuota();
   initUpdates();
   await refreshSaved().catch(() => {});

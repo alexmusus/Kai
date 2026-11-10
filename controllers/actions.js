@@ -367,8 +367,15 @@ const ACTIONS = {
 
   // biblioteca y sincronización
   refresh: refreshNow,
-  'sync-now': async () => {
+  'sync-now': async (el) => {
+    // el botón muestra que está trabajando y, al terminar, que quedó (en Bloques se ve con un giro y un ✓)
+    el.classList.add('is-working');
     await sync();
+    el.classList.remove('is-working');
+    if (state.syncState !== 'error') {
+      el.classList.add('is-done');
+      setTimeout(() => el.classList.remove('is-done'), 1800);
+    }
     refreshAccountInfo(true);
     toast(state.syncState === 'error' ? 'No se pudo sincronizar. Revisa la conexión.' : 'Progreso sincronizado.');
   },
@@ -440,6 +447,7 @@ const ACTIONS = {
   'set-dark-tone': (el) => setThemeSetting('darkTone', el.dataset.v),
   'set-tone': (el) => setThemeSetting('tone', el.dataset.v),
   'set-style': (el) => setThemeSetting('style', el.dataset.v),
+  'set-lab': (el) => setThemeSetting('lab', el.dataset.v === 'on'),
   'set-block-tone': (el) => setThemeSetting('blockTone', el.dataset.v),
   'set-block-dark': (el) => setThemeSetting('blockDark', el.dataset.v),
   'set-motion': (el) => setThemeSetting('motion', el.dataset.v),

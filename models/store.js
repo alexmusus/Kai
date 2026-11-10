@@ -19,7 +19,8 @@ import { LS } from '../lib/util.js';
  * @property {'auto' | 'light' | 'dark'} theme
  * @property {string} [tone]      tono del modo claro
  * @property {string} [darkTone]  tono del modo oscuro
- * @property {'vidrio' | 'bloques'} [style]  estilo de Kai (sin valor = vidrio)
+ * @property {boolean} [lab]     Laboratorio: deja elegir lo que está en prueba (el estilo Bloques); solo en este dispositivo
+ * @property {'vidrio' | 'bloques'} [style]  estilo de Kai (sin valor = vidrio; Bloques solo cuenta con el Laboratorio)
  * @property {string} [blockTone] tono claro del estilo Bloques
  * @property {string} [blockDark] tono oscuro del estilo Bloques
  * @property {boolean} [cat]      el gatito (false = apagado)

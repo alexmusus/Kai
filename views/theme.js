@@ -49,7 +49,7 @@ export function paintThemeColor() {
 /** El tono que se ve: el del estilo elegido (Vidrio o Bloques) para el tema claro u oscuro. */
 function toneOf(t) {
   const s = state.settings;
-  if (s.style === 'bloques')
+  if (s.lab && s.style === 'bloques')
     return t === 'dark'
       ? { id: BLOCK_DARK[s.blockDark] ? s.blockDark : 'grafito', ...(BLOCK_DARK[s.blockDark] || BLOCK_DARK.grafito) }
       : { id: BLOCK_TONES[s.blockTone] ? s.blockTone : 'piedra', ...(BLOCK_TONES[s.blockTone] || BLOCK_TONES.piedra) };
@@ -71,7 +71,7 @@ function loadBlockFonts() {
 export function applyTheme() {
   const t = resolvedTheme();
   const d = document.documentElement;
-  const blocks = state.settings.style === 'bloques';
+  const blocks = !!state.settings.lab && state.settings.style === 'bloques';
   const tone = toneOf(t).id;
   d.dataset.theme = t;
   if (blocks) d.dataset.style = 'bloques';

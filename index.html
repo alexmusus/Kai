@@ -29,8 +29,8 @@
       var d = document.documentElement;
       d.dataset.theme = t;
       var bg;
-      if (s.style === 'bloques') {
-        // estilo Bloques: los colores son los de BLOCK_TONES y BLOCK_DARK
+      if (s.lab && s.style === 'bloques') {
+        // estilo Bloques (solo con el Laboratorio): los colores son los de BLOCK_TONES y BLOCK_DARK
         d.dataset.style = 'bloques';
         var bl = { piedra: '#d9d3c7', papel: '#eeede9' }, bd = { grafito: '#18181a', bosque: '#2c6337' };
         var k = t === 'dark' ? (bd[s.blockDark] ? s.blockDark : 'grafito') : (bl[s.blockTone] ? s.blockTone : 'piedra');
@@ -102,6 +102,7 @@
   <link rel="modulepreload" href="views/sheet.js">
   <link rel="modulepreload" href="views/toast.js">
   <link rel="modulepreload" href="views/theme.js">
+  <link rel="modulepreload" href="views/lively.js">
   <link rel="modulepreload" href="views/images.js">
   <link rel="modulepreload" href="controllers/picking.js">
   <link rel="modulepreload" href="controllers/posters.js">
