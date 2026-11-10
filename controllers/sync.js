@@ -8,7 +8,7 @@ import { paintSync } from '../views/dock.js';
 import { syncShared, syncAllProgress } from '../models/sync.js';
 import { syncSynopses, syncFichas, ensureMeta } from '../models/fichas-sync.js';
 import { softRender, render } from './router.js';
-import { megaMessage } from '../models/mega.js';
+import { megaMessage, connect } from '../models/mega.js';
 import { profilesFromBackup } from '../models/profiles.js';
 import { route } from '../lib/route.js';
 import { librarySignature, buildLibrary, setLibrary } from '../models/library.js';
@@ -35,6 +35,13 @@ export function sync() {
   return syncing;
 }
 
+/** ¿Falló porque el archivo que se iba a leer ya no está en MEGA? Pasa cuando otro dispositivo subió una copia nueva y
+ * borró la anterior, y este todavía no se enteró. */
+const fileGone = (/** @type {any} */ err) =>
+  /No se pudo leer/.test(String(err && err.message)) && /ENOENT/.test(String(err && err.cause && err.cause.message));
+/** ya se volvió a mirar MEGA por un archivo que no estaba (una vez; se permite de nuevo al sincronizar bien) */
+let reloaded = false;
+
 async function doSync() {
   if (!state.storage || !navigator.onLine) return;
   const home = state.storage.root;
@@ -58,11 +65,28 @@ async function doSync() {
     const changedHere = await syncAllProgress(home);
     state.syncState = 'idle';
     if (changedHere || sharedChanged) softRender();
+    reloaded = false;
   } catch (err) {
     state.syncState = 'error';
+    const gone = fileGone(err);
+    if (gone && !reloaded) {
+      // se vuelve a traer la lista de archivos de MEGA y se sincroniza otra vez (sin esto quedaba en error hasta
+      // que llegara el aviso de MEGA o se tocara Actualizar)
+      reloaded = true;
+      try {
+        await connect();
+        refreshLibrary();
+        again = true;
+      } catch (e) {
+        console.warn('sync: no se pudo volver a mirar MEGA', e);
+      }
+    }
     if (!state.sharedLoaded) {
       state.sharedError = true;
-      state.sharedErrorMsg = megaMessage((err && err.cause) || err); // el motivo real: cuota, sesión, red…
+      // el motivo real: cuota, sesión, red… (un archivo que ya no está no es "contraseña incorrecta")
+      state.sharedErrorMsg = gone
+        ? 'Los perfiles cambiaron en MEGA desde otro dispositivo. Vuelve a intentar.'
+        : megaMessage((err && err.cause) || err);
       // sin poder leer el archivo de perfiles (p. ej. sin cuota), se muestran los del respaldo para poder entrar;
       // no se escribe nada en MEGA hasta poder leer el archivo de verdad
       for (const p of profilesFromBackup())

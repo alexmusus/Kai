@@ -1,11 +1,14 @@
 /*
  * Actualizaciones de Kai. El service worker se instala solo cuando cambia; al activarse toma el control de la página
- * (controllerchange). Ahí Kai avisa que hay versión nueva y basta con recargar.
+ * (controllerchange). Ahí Kai avisa que hay versión nueva y basta con recargar; al volver a Kai sin nada en curso se
+ * recarga sola.
  */
 import { $, esc } from '../lib/util.js';
 import { isUpdateReady, markUpdateReady, setRegistration, findUpdate, swInfo } from '../models/updates.js';
 import { toast } from '../views/toast.js';
 import { savePosition } from './player/engine.js';
+import { P } from './player/state.js';
+import { state } from '../models/store.js';
 
 function setCheckButton(text, disabled = false) {
   const btn = $('#check-update');
@@ -79,6 +82,14 @@ export function initUpdates() {
       return;
     }
     showUpdateNotice();
+  });
+  /* La versión nueva ya está bajada pero la página sigue con el código viejo hasta recargar. Al volver a Kai (de otra
+   * app o pestaña) se recarga sola si no interrumpe nada: sin video y sin descargas en curso. Así ningún dispositivo
+   * se queda semanas con una versión vieja (una anterior a Kai 41 mezclaba lo visto entre perfiles). */
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible' || !isUpdateReady()) return;
+    if (P.playing || Object.keys(state.dls).length || state.queue.length) return;
+    applyUpdate();
   });
   navigator.serviceWorker
     .register('sw.js')

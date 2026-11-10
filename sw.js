@@ -10,11 +10,12 @@ importScripts('core.js');
  * subidas a prueba dentro de esa versión: sube en cada una (el navegador solo instala de nuevo si este archivo
  * cambia) y vuelve a 1 cuando sube VERSION. */
 const VERSION = 42;
-const ENTREGA = 2;
+const ENTREGA = 3;
 const CACHE = `kai-${VERSION}.${ENTREGA}`;
 /* Lo que cambió en esta versión, corto y en palabras de todos los días: lo muestran la burbuja de "Versión nueva"
  * (al tocarla) y Ajustes → Versión. Se escribe de nuevo al empezar cada versión. */
 const CAMBIOS = [
+  'Kai se actualiza sola al volver a abrirla, si no estás viendo ni descargando nada.',
   'Perfiles: lo último que viste se sube aunque cambies de perfil enseguida, y lo que marcas mientras se sincroniza ya no se queda sin subir.',
   'En el teléfono, el video se queda arriba mientras bajas a ver los capítulos.',
   'En la barra del video, el teléfono muestra solo el capítulo; la computadora, la serie y el capítulo.',
