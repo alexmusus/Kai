@@ -51,6 +51,8 @@ decide. ESLint lo revisa (`no-restricted-imports`).
 | `events.js` | avisos entre capas: `on` y `emit` |
 | `route.js` | leer la dirección actual (`#/serie/3` → vista y argumento) |
 | `nav-history.js` | la copia del historial del navegador: cada entrada lleva su posición, así "volver" e "Inicio" no se desfasan |
+| `motion.js` | las animaciones: si van (`calmMotion`) y cuánto duran (variables CSS `--kai-…`, leídas al animar) |
+| `diag.js` | registro de diagnóstico en pantalla; apagado no hace nada, se enciende abriendo Kai con `?diag=1` |
 
 | Controlador | De qué se encarga |
 |---|---|
@@ -93,7 +95,10 @@ se cambian sus campos, nunca se reemplazan (`setIndex` cambia el contenido del �
 - Después de dibujar una página, cada parte idéntica a la que ya había en esa dirección se cambia por la de antes
   (`reuseIfSame` en `router.js`): lo ya pintado no se vuelve a pintar.
 - Nada de desenfoque (`backdrop-filter`) en lo que se repite en listas (cada capítulo, cada póster).
-- `html.lite` (teléfonos con 4 GB o menos, `views/theme.js`): sin desenfoques ni fondo en movimiento.
+- `html.lite` (teléfonos con 4 GB o menos, o Ajustes → Modo liviano; `views/theme.js`): sin desenfoques.
+- `html.calm` (modo liviano, o Ajustes → Animaciones → Reducidas): sin vuelos ni fundidos. Las duraciones y curvas
+  son variables CSS de `:root` (`--kai-fly-dur`, `--kai-fly-ease`, `--kai-page-in-dur`, `--kai-snap-dur`).
+- El tema se pone en `index.html` antes de cargar el JS (un script en línea): sin destello del otro tema al abrir.
 - Ningún desenfoque sobre el video ni en listas: el único que queda es el de la barra flotante (y el modo liviano
   lo quita).
 
@@ -111,6 +116,10 @@ use los mismos tokens (`--btn`, `--card`, `--text`, `--dim`) para que se vea en 
 - **Nada se borra solo, y Kai nunca borra de MEGA.**
 - **Si un archivo de MEGA no se pudo leer, no es un archivo vacío:** no se sobrescribe (eso duplicó perfiles en la v4).
 - Las fusiones de progreso y fichas usan la marca de tiempo (`u` / `at`): gana la más reciente.
+- La sincronización del progreso va por perfil explícito (`syncProgress(home, io, pid)`): lo leído de un perfil solo
+  se junta con lo local de ese perfil, aunque se cambie de perfil en medio. Se sube lo pendiente de todos los
+  perfiles del dispositivo (`syncAllProgress`). Una marca posterior a la subida de su archivo (reloj adelantado)
+  se baja a esa hora.
 - MEGA permite archivos repetidos con el mismo nombre: se leen todos, se juntan y queda una copia.
 - El progreso se guarda por ruta del archivo; si una carpeta se renombra, se sigue por el id de MEGA.
 - Lo que no se puede guardar o leer de localStorage no rompe la app: `LS` nunca lanza.

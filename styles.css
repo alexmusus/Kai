@@ -9,7 +9,17 @@
   --r-md: 14px;
   --r-sm: 10px;
   --blur: blur(28px) saturate(170%);
+  /* Animaciones: duración y curva en un solo lugar (las lee lib/motion.js en el momento de animar, así se ajustan en
+   * vivo: document.documentElement.style.setProperty('--kai-fly-dur', '450ms')) */
+  --kai-fly-dur: 320ms;                            /* el video entre grande y mini */
+  --kai-fly-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --kai-page-in-dur: 160ms;                        /* la página que llega o se va */
+  --kai-snap-dur: 250ms;                           /* soltar el video sin llegar al mini */
+  --kai-snap-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
+/* sin animaciones: lo pide el sistema o Ajustes → Animaciones (html.calm, views/theme.js) */
+@media (prefers-reduced-motion: reduce) { :root { --kai-fly-dur: 0ms; --kai-page-in-dur: 0ms; --kai-snap-dur: 0ms; } }
+html.calm { --kai-fly-dur: 0ms; --kai-page-in-dur: 0ms; --kai-snap-dur: 0ms; }
 
 :root, [data-theme='dark'] {
   color-scheme: dark;
@@ -906,7 +916,7 @@ html.is-picking .series-main { padding-bottom: calc(110px + env(safe-area-inset-
   padding: 8px 8px 10px;
   overflow: hidden;
   background: var(--glass-solid);
-  animation: mini-in 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+  animation: mini-in var(--kai-fly-dur) var(--kai-fly-ease);
 }
 .mini[hidden] { display: none; }
 @keyframes mini-in { from { opacity: 0; transform: translateY(16px) scale(0.96); } }
@@ -1142,7 +1152,7 @@ img.no-fade { animation: none !important; }
  * cada cuadro de la animación de entrada (se veía con tirones). Las animaciones entre grande y mini están en
  * controllers/player/mini.js (flyFrom). */
 .mini { -webkit-backdrop-filter: none; backdrop-filter: none; }
-#app { transition: opacity 0.15s ease-out; }
+#app { transition: opacity var(--kai-page-in-dur) ease-out; }
 #app.is-leaving { opacity: 0; pointer-events: none; }
 
 /* Modo liviano (teléfonos de gama media, ver views/theme.js): sin desenfoque y sin fondo en movimiento. Las
@@ -1152,8 +1162,8 @@ html.lite .bar, html.lite .sheet-panel, html.lite .toast, html.lite .st-menu, ht
 html.lite .st-bar { background: rgba(22, 24, 30, 0.85); }
 /* pasar entre el reproductor grande y el mini: animar un video es lo que más le cuesta a un teléfono modesto (se veía
  * trabado); cambia al instante. */
-html.lite .mini { animation: none; }
-html.lite #app { transition: none; }
+html.calm .mini { animation: none; }
+html.calm #app { transition: none; }
 
 /* En pantalla completa lo de detrás del video no se ve: no se calcula ni se dibuja. Con solo ocultarlo (visibility)
  * el navegador igual lo acomodaba al girar el teléfono, y además en horizontal con el diseño de PC (la barra de

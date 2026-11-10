@@ -20,6 +20,8 @@ import { LS } from '../lib/util.js';
  * @property {string} [tone]      tono del modo claro
  * @property {string} [darkTone]  tono del modo oscuro
  * @property {boolean} [cat]      el gatito (false = apagado)
+ * @property {'auto' | 'full' | 'reduced'} [motion]  animaciones (sin valor = auto)
+ * @property {'auto' | 'on' | 'off'} [lite]          modo liviano, sin desenfoques (sin valor = auto)
  */
 
 /** Tonos del modo claro (el color de fondo sirve para la barra del sistema). */

@@ -16,7 +16,8 @@ function fakeMega(files = []) {
   let nid = 0;
   const home = { name: '', nodeId: 'root', directory: true, children: [] };
   const add = (name, content) => {
-    const n = { name, nodeId: 'f' + ++nid, size: 1, key: Array(32).fill(0), content };
+    // timestamp: la hora de subida que pone el servidor de MEGA (en segundos)
+    const n = { name, nodeId: 'f' + ++nid, size: 1, key: Array(32).fill(0), content, timestamp: Math.floor(Date.now() / 1000) };
     home.children.push(n);
     return n;
   };
@@ -301,7 +302,7 @@ describe('DOS DISPOSITIVOS · mismo perfil', () => {
     expect(m.items('pA')['A/cap1.mp4'].w, 'y en MEGA sigue visto').toBe(true);
   });
 
-  it.fails('8. RELOJ: un dispositivo con la hora adelantada pisa lo más nuevo de verdad', async () => {
+  it('8. RELOJ: un dispositivo con la hora adelantada no pisa lo más nuevo de verdad', async () => {
     const m = megaAB();
     const d1 = device();
     const d2 = device();

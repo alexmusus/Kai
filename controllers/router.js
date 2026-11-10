@@ -11,6 +11,8 @@ import { route } from '../lib/route.js';
 import { closeDock, paintDock } from './dock.js';
 import { LS } from '../lib/util.js';
 import { createNavHistory } from '../lib/nav-history.js';
+import { calmMotion, motionMs } from '../lib/motion.js';
+import { diag, diagPainted, flags } from '../lib/diag.js';
 import { renderLogin, renderProfiles } from '../views/account.js';
 import { viewState } from '../views/view-state.js';
 import { state, visibleProfiles } from '../models/store.js';
@@ -84,7 +86,7 @@ addEventListener(
 /* Volver la deja el navegador ('auto') y Kai repite lo mismo por si no llegó. Con 'manual' (hasta la entrega 14),
  * Safari quitaba la foto del deslizar antes de dibujar la página en su lugar, y al volver al inicio desde abajo se
  * veía la pantalla en blanco o negro un momento. */
-if ('scrollRestoration' in history) history.scrollRestoration = 'auto';
+if ('scrollRestoration' in history) history.scrollRestoration = flags.sr === 'manual' ? 'manual' : 'auto';
 export function onHashChange() {
   const r = nav.arrive(location.hash || '#/', markedPos(), navReplacing);
   navReplacing = false;
@@ -212,11 +214,13 @@ export function softRender() {
 /** La página que llega después de leavePage aparece suave (si llegaba de golpe, su portada "saltaba" a la vista
  * mientras el video todavía volaba al mini). */
 function arrive() {
-  if (document.documentElement.classList.contains('lite') || matchMedia('(prefers-reduced-motion: reduce)').matches)
-    return;
-  if (!app.animate) return;
-  // aparece y se acomoda desde un poco más chica (medida desde el centro de la pantalla, no desde arriba de la página)
-  app.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 380, delay: 40, easing: 'ease-out', fill: 'backwards' });
+  if (calmMotion() || flags.nofade || !app.animate) return;
+  const dur = motionMs('--kai-page-in-dur', 160);
+  if (!dur) return;
+  /* aparece y se acomoda desde un poco más chica (medida desde el centro de la pantalla, no desde arriba de la página).
+   * El fundido es corto y sin espera: mientras dura se ve el fondo liso (blanco o negro según el tema), y con los
+   * 420 ms de antes eso parecía un pantallazo. */
+  app.animate([{ opacity: 0 }, { opacity: 1 }], { duration: dur, easing: 'ease-out' });
   for (const el of app.children) {
     const origin = `50% ${Math.round(innerHeight / 2 - el.getBoundingClientRect().top)}px`;
     el.animate(
@@ -224,7 +228,7 @@ function arrive() {
         { transform: 'scale(0.965)', transformOrigin: origin },
         { transform: 'none', transformOrigin: origin },
       ],
-      { duration: 520, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
+      { duration: dur * 2, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
     );
   }
 }
@@ -239,6 +243,13 @@ export function leavePage() {
 }
 
 export function render() {
+  diag('render', { hash: location.hash || '#/', saliendo: app.classList.contains('is-leaving') });
+  draw();
+  diag('render-fin', { y: Math.round(scrollY) });
+  diagPainted('pintado');
+}
+
+function draw() {
   const arriving = app.classList.contains('is-leaving');
   app.classList.remove('is-leaving', 'is-pulling');
   app.style.removeProperty('--pull');

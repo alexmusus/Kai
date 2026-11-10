@@ -437,6 +437,8 @@ const ACTIONS = {
   'set-step': (el) => setPlayerPref('step', Number(el.dataset.v)),
   'set-dark-tone': (el) => setThemeSetting('darkTone', el.dataset.v),
   'set-tone': (el) => setThemeSetting('tone', el.dataset.v),
+  'set-motion': (el) => setThemeSetting('motion', el.dataset.v),
+  'set-lite': (el) => setThemeSetting('lite', el.dataset.v),
   lights: () => setLights(false),
 };
 

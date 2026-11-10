@@ -6,6 +6,7 @@
 import { P } from './state.js';
 import { stage, mini, video } from './dom.js';
 import { $ } from '../../lib/util.js';
+import { calmMotion, motionMs, motionEase } from '../../lib/motion.js';
 import { episodeLabel } from '../../models/collections.js';
 import { ICON } from '../../views/icons.js';
 import { route } from '../../lib/route.js';
@@ -53,9 +54,7 @@ video.addEventListener('webkitpresentationmodechanged', () => {
   if (video.webkitPresentationMode === 'inline') backFromSystemPip();
 });
 
-/** ¿Sin animaciones? (modo liviano o "reducir movimiento" del sistema) */
-export const calmMotion = () =>
-  document.documentElement.classList.contains('lite') || matchMedia('(prefers-reduced-motion: reduce)').matches;
+export { calmMotion };
 
 /**
  * Hace que `el` parezca salir de `from` y llegar a donde ya está (la técnica FLIP: se mueve primero y se anima
@@ -64,11 +63,11 @@ export const calmMotion = () =>
  * @param {DOMRect} from dónde se veía antes
  * @param {DOMRect} to dónde se ve ahora la parte de `el` que tiene que coincidir con `from`
  * @param {number} [opacity] con qué opacidad empieza
- * @param {number} [duration] ms
+ * @param {number} [duration] ms (si no se dice, --kai-fly-dur)
  * @returns {Animation | null}
  */
-export function flyFrom(el, from, to, opacity = 1, duration = 300) {
-  if (calmMotion() || !from.width || !to.width || !el.animate) return null;
+export function flyFrom(el, from, to, opacity = 1, duration = motionMs('--kai-fly-dur', 320)) {
+  if (calmMotion() || !duration || !from.width || !to.width || !el.animate) return null;
   const box = el.getBoundingClientRect();
   const s = from.width / to.width;
   return el.animate(
@@ -80,7 +79,7 @@ export function flyFrom(el, from, to, opacity = 1, duration = 300) {
       },
       { transformOrigin: `${to.left - box.left}px ${to.top - box.top}px`, transform: 'none', opacity: 1 },
     ],
-    { duration, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
+    { duration, easing: motionEase('--kai-fly-ease', 'cubic-bezier(0.22, 1, 0.36, 1)') },
   );
 }
 
@@ -111,7 +110,7 @@ export function enterMini({ from, opacity } = {}) {
   paintMini();
   if (from && wasHidden && !calmMotion()) {
     mini.style.animation = 'none'; // la entrada de siempre (CSS) no se suma al vuelo
-    const fly = flyFrom(mini, from, /** @type {HTMLElement} */ ($('#mini-slot')).getBoundingClientRect(), opacity, 380);
+    const fly = flyFrom(mini, from, /** @type {HTMLElement} */ ($('#mini-slot')).getBoundingClientRect(), opacity);
     if (fly) {
       mini.classList.add('is-flying');
       const land = () => mini.classList.remove('is-flying');

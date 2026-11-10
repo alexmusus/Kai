@@ -202,6 +202,29 @@ export function renderSettings() {
         )
         .join('')}</div>
       <p class="dim settings-hint">El tono claro se usa con el tema Claro y el oscuro con el tema Oscuro; en Automático, cada uno según la hora del sistema.</p>
+      <p class="settings-label">Animaciones</p>
+      <div class="segmented" role="group" aria-label="Animaciones">${[
+        ['auto', 'Automático'],
+        ['full', 'Completas'],
+        ['reduced', 'Reducidas'],
+      ]
+        .map(
+          ([v, l]) =>
+            `<button class="seg ${(s.motion || 'auto') === v ? 'is-on' : ''}" data-act="set-motion" data-v="${v}" aria-pressed="${(s.motion || 'auto') === v}">${l}</button>`,
+        )
+        .join('')}</div>
+      <p class="settings-label">Modo liviano</p>
+      <div class="segmented" role="group" aria-label="Modo liviano">${[
+        ['auto', 'Automático'],
+        ['on', 'Sí'],
+        ['off', 'No'],
+      ]
+        .map(
+          ([v, l]) =>
+            `<button class="seg ${(s.lite || 'auto') === v ? 'is-on' : ''}" data-act="set-lite" data-v="${v}" aria-pressed="${(s.lite || 'auto') === v}">${l}</button>`,
+        )
+        .join('')}</div>
+      <p class="dim settings-hint">Si Kai se traba al abrir o cerrar el video, elige Reducidas. El modo liviano quita los desenfoques. Se guarda en este dispositivo.</p>
     </section>
     ${(() => {
       const h = statsHTML();

@@ -10,11 +10,13 @@ importScripts('core.js');
  * subidas a prueba dentro de esa versión: sube en cada una (el navegador solo instala de nuevo si este archivo
  * cambia) y vuelve a 1 cuando sube VERSION. */
 const VERSION = 42;
-const ENTREGA = 3;
+const ENTREGA = 4;
 const CACHE = `kai-${VERSION}.${ENTREGA}`;
 /* Lo que cambió en esta versión, corto y en palabras de todos los días: lo muestran la burbuja de "Versión nueva"
  * (al tocarla) y Ajustes → Versión. Se escribe de nuevo al empezar cada versión. */
 const CAMBIOS = [
+  'Ajustes → Apariencia: Animaciones (completas o reducidas) y Modo liviano, para teléfonos donde Kai se traba.',
+  'Con tema claro, Kai ya no abre con un destello oscuro.',
   'Kai se actualiza sola al volver a abrirla, si no estás viendo ni descargando nada.',
   'Perfiles: lo último que viste se sube aunque cambies de perfil enseguida, y lo que marcas mientras se sincroniza ya no se queda sin subir.',
   'En el teléfono, el video se queda arriba mientras bajas a ver los capítulos.',
@@ -31,7 +33,7 @@ const CAMBIOS = [
 ];
 const SHELL = [
   './', 'styles.css', 'app.js', 'core.js', 'models/mp4.js', 'models/meta-api.js',
-  'lib/util.js', 'lib/events.js', 'lib/route.js', 'lib/nav-history.js', 'models/naming.js', 'models/store.js', 'models/mega.js', 'models/library.js',
+  'lib/util.js', 'lib/events.js', 'lib/route.js', 'lib/nav-history.js', 'lib/motion.js', 'lib/diag.js', 'models/naming.js', 'models/store.js', 'models/mega.js', 'models/library.js',
   'models/quota.js', 'models/collections.js', 'models/progress.js', 'models/profiles.js', 'models/sync.js', 'models/profile-copies.js', 'models/fichas.js', 'models/fichas-sync.js', 'models/idb.js', 'models/news.js', 'models/thumbs.js', 'models/downloads.js', 'models/media.js', 'models/plans.js', 'models/context.js', 'models/updates.js', 'models/discover.js', 'models/stats.js', 'views/icons.js', 'views/quota.js', 'views/thumbs.js', 'views/view-state.js', 'views/components.js', 'views/home.js', 'views/episodes.js', 'views/series.js', 'views/dock.js', 'views/catalog.js', 'views/explorer.js', 'views/downloads.js',
   'views/settings.js', 'views/discover.js', 'views/account.js', 'views/sheet.js', 'views/toast.js', 'views/theme.js', 'views/images.js',
   'controllers/picking.js', 'controllers/posters.js', 'controllers/router.js', 'controllers/dock.js', 'controllers/sync.js',

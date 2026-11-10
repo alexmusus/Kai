@@ -12,6 +12,7 @@ import { go } from '../router.js';
 import { P } from './state.js';
 import { stage, parking, mini } from './dom.js';
 import { leaveMini, flyFrom, calmMotion } from './mini.js';
+import { motionMs } from '../../lib/motion.js';
 import { startPlayback } from './engine.js';
 import { route } from '../../lib/route.js';
 import { nextUnseen, prog } from '../../models/progress.js';
@@ -59,7 +60,7 @@ export function renderWatch(id) {
       if (!calmMotion())
         for (const el of app.querySelectorAll('.watch-info, .watch-list'))
           /** @type {HTMLElement} */ (el).animate([{ opacity: 0 }, { opacity: 1 }], {
-            duration: 220,
+            duration: motionMs('--kai-page-in-dur', 160) + 60,
             delay: 90,
             easing: 'ease-out',
             fill: 'backwards',

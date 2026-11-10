@@ -8,6 +8,7 @@ import { stage, video, ui } from './dom.js';
 import { P } from './state.js';
 import { goBack, leavePage } from '../router.js';
 import { enterMini } from './mini.js';
+import { motionMs } from '../../lib/motion.js';
 import {
   isFullscreen,
   togglePlay,
@@ -214,13 +215,16 @@ export function touchEnd(e, cancelled) {
       if (P.playing) goBack(P.playing.ctx.back);
     } else {
       releasePull();
-      stage.style.transition = 'transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.2s';
+      stage.style.transition = 'transform var(--kai-snap-dur) var(--kai-snap-ease), opacity var(--kai-snap-dur)';
       stage.style.transform = '';
       stage.style.opacity = '';
-      setTimeout(() => {
-        stage.style.transition = '';
-        stage.style.transformOrigin = '';
-      }, 260);
+      setTimeout(
+        () => {
+          stage.style.transition = '';
+          stage.style.transformOrigin = '';
+        },
+        motionMs('--kai-snap-dur', 250) + 10,
+      );
       if (far) exitFullscreen(); // vuelve al reproductor normal
     }
   } else if (t.mode === 'up') {

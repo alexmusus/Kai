@@ -91,6 +91,43 @@ function followMergedProfile() {
   saveProgressLocal();
 }
 
+/* ── marcas con la hora adelantada ──
+ * Al juntar gana la marca `u` más reciente, y `u` es la hora del dispositivo que guardó. Un teléfono con el reloj
+ * adelantado deja marcas "del futuro" que le ganan a todo lo que se vea después de verdad (un capítulo terminado
+ * volvía a salir a medias). Pero ninguna marca puede ser posterior a la subida del archivo que la trae, y esa hora la
+ * pone el servidor de MEGA: las que se pasan (por más de unos minutos, lo que puede desfasarse un reloj normal) se
+ * bajan a la hora de la subida. Solo cambia la marca; lo visto y el minuto quedan igual. */
+const CLOCK_SLACK_MS = 5 * 60 * 1000;
+/** @typedef {Map<string, { from: number, to: number }>} FixedMarks entrada → la marca que traía y la corregida */
+
+/**
+ * Baja las marcas de `items` que son posteriores a la subida de su archivo. Cambia `items` y anota en `fixed`.
+ * @param {ProgressMap} items @param {MegaNode} node @param {FixedMarks} fixed
+ */
+function capFuture(items, node, fixed) {
+  const cap = Number(/** @type {any} */ (node).timestamp) * 1000; // megajs: segundos, del servidor
+  if (!cap) return;
+  for (const k of Object.keys(items)) {
+    const v = items[k];
+    if (!v || typeof v.u !== 'number' || v.u <= cap + CLOCK_SLACK_MS) continue;
+    fixed.set(k, { from: v.u, to: cap });
+    items[k] = { ...v, u: cap };
+  }
+}
+
+/**
+ * Lo de este dispositivo con esas mismas marcas corregidas (si no, la copia de aquí seguiría "en el futuro" y volvería
+ * a subirse igual). No cambia `local`.
+ * @param {ProgressMap} local @param {FixedMarks} fixed
+ * @returns {ProgressMap}
+ */
+function adoptFixed(local, fixed) {
+  if (!fixed.size) return local;
+  const out = { ...local };
+  for (const [k, f] of fixed) if (out[k] && out[k].u === f.from) out[k] = { ...out[k], u: f.to };
+  return out;
+}
+
 /** ¿Ese perfil es el que está en pantalla? @param {string} pid */
 const isActive = (pid) => !!state.profile && state.profile.id === pid;
 
@@ -136,17 +173,20 @@ export async function syncProgress(home, io = REAL_IO, pid = state.profile ? sta
   const extra = olderProgressFiles(home, pid);
   /** @type {ProgressMap} */
   let remote = {};
+  /** @type {FixedMarks} */
+  const fixed = new Map();
   for (const n of [...nodes, ...extra]) {
     const data = await io.readJson(n);
     if (!data) continue;
     const items = data.items || {};
     migrateProgressKeys(items);
+    capFuture(items, n, fixed);
     remote = mergeProgress(remote, items);
     if (data.intros) state.shared.intros = mergeShared(state.shared, { intros: data.intros }).intros;
   }
   // lo de aquí se lee DESPUÉS de esperar a MEGA, y por perfil
   const before = JSON.stringify(localOf(pid));
-  const merged = mergeProgress(localOf(pid), remote);
+  const merged = mergeProgress(adoptFixed(localOf(pid), fixed), remote);
   const hasData = Object.keys(merged).length > 0;
   const remoteIsBehind = Object.keys(merged).some((k) => !remote[k] || merged[k].u > remote[k].u);
   let uploaded = remote; // lo que MEGA tiene al terminar
@@ -156,7 +196,7 @@ export async function syncProgress(home, io = REAL_IO, pid = state.profile ? sta
   }
   /* Lo que se marcó mientras se subía (el reproductor guarda cada pocos segundos) se conserva y sigue pendiente:
    * antes quedaba como "ya sincronizado" sin haber subido. */
-  const final = mergeProgress(localOf(pid), merged);
+  const final = mergeProgress(adoptFixed(localOf(pid), fixed), merged);
   const dirty = Object.keys(final).some((k) => !uploaded[k] || final[k].u > uploaded[k].u);
   const active = isActive(pid);
   storeLocal(pid, final, dirty);
