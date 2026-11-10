@@ -3,7 +3,16 @@
  * espacio, lo que vieron todos los perfiles y la versión de Kai.
  */
 
-import { state, visibleProfiles, profileFile, TONES, DARK_TONES, saveSettings } from '../models/store.js';
+import {
+  state,
+  visibleProfiles,
+  profileFile,
+  TONES,
+  DARK_TONES,
+  BLOCK_TONES,
+  BLOCK_DARK,
+  saveSettings,
+} from '../models/store.js';
 import { profilePrefs, HOLD_RATES, SEEK_STEPS } from '../models/profiles.js';
 import { newsList, newEpisodes, hasUnreadNews, markNewsRead } from '../models/news.js';
 import { esc, $, fmtSize, LS, plural } from '../lib/util.js';
@@ -168,8 +177,19 @@ export async function paintSeenByAll(btn) {
   }
 }
 
+/** Los tonos de un tema (claro u oscuro) como botones; cada estilo tiene los suyos. */
+function toneSeg(label, act, tones, current) {
+  return `<div class="segmented" role="group" aria-label="${label}">${Object.entries(tones)
+    .map(
+      ([v, o]) =>
+        `<button class="seg ${current === v ? 'is-on' : ''}" data-act="${act}" data-v="${v}" aria-pressed="${current === v}">${o.label}</button>`,
+    )
+    .join('')}</div>`;
+}
+
 export function renderSettings() {
   const s = state.settings;
+  const blocks = s.style === 'bloques';
   const unread = hasUnreadNews();
   markNewsRead();
   // lo plegable que estaba abierto sigue abierto al volver a dibujar (cada cambio de un ajuste redibuja la página)
@@ -191,22 +211,21 @@ export function renderSettings() {
             `<button class="seg ${s.theme === v ? 'is-on' : ''}" data-act="set-theme" data-v="${v}" aria-pressed="${s.theme === v}">${l}</button>`,
         )
         .join('')}</div>
+      <div class="segmented" role="group" aria-label="Estilo">${[
+        ['vidrio', 'Vidrio'],
+        ['bloques', 'Bloques'],
+      ]
+        .map(
+          ([v, l]) =>
+            `<button class="seg ${(s.style || 'vidrio') === v ? 'is-on' : ''}" data-act="set-style" data-v="${v}" aria-pressed="${(s.style || 'vidrio') === v}">${l}</button>`,
+        )
+        .join('')}</div>
       <details class="settings-fold" id="fold-look" ${open.has('fold-look') ? 'open' : ''}>
         <summary>Tonos, animaciones y modo liviano</summary>
       <p class="settings-label">Tono del modo claro</p>
-      <div class="segmented" role="group" aria-label="Tono del modo claro">${Object.entries(TONES)
-        .map(
-          ([v, o]) =>
-            `<button class="seg ${(s.tone || 'blanco') === v ? 'is-on' : ''}" data-act="set-tone" data-v="${v}" aria-pressed="${(s.tone || 'blanco') === v}">${o.label}</button>`,
-        )
-        .join('')}</div>
+      ${toneSeg('Tono del modo claro', blocks ? 'set-block-tone' : 'set-tone', blocks ? BLOCK_TONES : TONES, blocks ? s.blockTone || 'piedra' : s.tone || 'blanco')}
       <p class="settings-label">Tono del modo oscuro</p>
-      <div class="segmented" role="group" aria-label="Tono del modo oscuro">${Object.entries(DARK_TONES)
-        .map(
-          ([v, o]) =>
-            `<button class="seg ${(s.darkTone || 'negro') === v ? 'is-on' : ''}" data-act="set-dark-tone" data-v="${v}" aria-pressed="${(s.darkTone || 'negro') === v}">${o.label}</button>`,
-        )
-        .join('')}</div>
+      ${toneSeg('Tono del modo oscuro', blocks ? 'set-block-dark' : 'set-dark-tone', blocks ? BLOCK_DARK : DARK_TONES, blocks ? s.blockDark || 'grafito' : s.darkTone || 'negro')}
       <p class="dim settings-hint">El tono claro se usa con el tema Claro y el oscuro con el tema Oscuro; en Automático, cada uno según la hora del sistema.</p>
       <p class="settings-label">Animaciones</p>
       <div class="segmented" role="group" aria-label="Animaciones">${[

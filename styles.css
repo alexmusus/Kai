@@ -1922,3 +1922,93 @@ html.lite .poster-card { background: var(--glass-solid); -webkit-backdrop-filter
   .row-scroll.is-start .row-arrow.is-prev, .row-scroll.is-end .row-arrow.is-next { opacity: 0; pointer-events: none; }
   .row-arrow:hover { background: var(--btn-hover); }
 }
+
+/* ───────────── Color de cada tono (Kai 44): el botón principal, la pestaña abierta, lo elegido y el avance ─────────────
+ * Antes el botón principal era siempre blanco (oscuro) o negro (claro) y el tono solo cambiaba el fondo. Ahora cada
+ * tono trae un color que combina con su fondo, sin saltar a algo muy distinto: en Negro, un azul casi blanco; en
+ * Blanco, un azul profundo; en Arena, terracota. Solo variables de color: no pesa más. */
+[data-theme='dark'] { --accent: #b3c9f2; --accent-ink: #0b1322; --primary: #c3d4f4; --primary-ink: #0b1322; }
+[data-theme='dark'][data-dark='gris'] { --accent: #e6c38f; --accent-ink: #2a1d08; --primary: #e9c995; --primary-ink: #2a1d08; }
+[data-theme='light'] { --accent: #2d62cf; --accent-ink: #ffffff; --primary: #2a5bc0; --primary-ink: #ffffff; }
+[data-theme='light'][data-tone='gris'] { --accent: #34558a; --primary: #3a5679; --primary-ink: #ffffff; }
+[data-theme='light'][data-tone='celeste'] { --accent: #2a5fbd; --primary: #2a5ab0; --primary-ink: #ffffff; }
+[data-theme='light'][data-tone='arena'] { --accent: #a75d2b; --primary: #9b5a2e; --primary-ink: #fff8f0; }
+.dock-tab.is-on { color: var(--accent); background: color-mix(in srgb, var(--accent) 15%, var(--btn)); }
+.tile-bar span, .shelf-poster .tile-bar span { background: var(--accent); }
+/* la portada y las tarjetas de inicio tenían el botón fijo en blanco, y los selectores la ficha blanca de iPhone */
+.tv.is-home .tv-hero .tv-btn.is-primary, .hero-card .tv-btn.is-primary { background: var(--primary); color: var(--primary-ink); }
+.seg.is-on, .lang-switch button.is-on { background: var(--primary); color: var(--primary-ink); box-shadow: none; }
+
+/* ───────────── Estilo Bloques (Ajustes → Apariencia → Estilo) ─────────────
+ * Superficies lisas y opacas en lugar del vidrio, datos y etiquetas en letra monoespaciada, títulos en una grotesca,
+ * un color fuerte por tono y una cuadrícula de puntos en el fondo. Sin desenfoques: más liviano que el vidrio.
+ * Las letras (Space Grotesk y Space Mono) se piden solo con este estilo (views/theme.js e index.html). */
+[data-style='bloques'] {
+  --font-display: 'Space Grotesk', ui-sans-serif, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --mono: 'Space Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --blur: none;
+  --glass: var(--surface); --glass-strong: var(--surface); --glass-solid: var(--surface); --glass-edge: var(--edge); --glass-hi: transparent;
+  --btn: var(--surface2); --btn-hover: var(--surface2); --line: var(--edge);
+  --primary: var(--accent); --primary-ink: var(--accent-ink);
+}
+/* Grafito: gris carbón y azul cobalto */
+[data-style='bloques'][data-theme='dark'] {
+  --bg: #18181a; --surface: #242426; --surface2: #313134; --edge: rgba(255, 255, 255, 0.07); --dots: rgba(255, 255, 255, 0.07);
+  --text: #f2f0ea; --dim: #9d9a92; --faint: #6e6b65; --thumb-bg: #2a2a2d;
+  --accent: #4655ef; --accent-ink: #ffffff; --accent2: #a9b1fa; --chip-bg: #a9b1fa; --chip-ink: #14163a;
+}
+/* Bosque: todo verde, botones crema y detalles naranja */
+[data-style='bloques'][data-theme='dark'][data-dark='bosque'] {
+  --bg: #2c6337; --surface: #3d7a48; --surface2: #4f8b59; --edge: rgba(255, 255, 255, 0.1); --dots: rgba(255, 255, 255, 0.1);
+  --text: #f3f1e6; --dim: #c7dcc6; --faint: #9fbf9f; --thumb-bg: #3d7a48;
+  --accent: #f3f1e6; --accent-ink: #1f4a28; --accent2: #ff8a4c; --chip-bg: #f3f1e6; --chip-ink: #1f4a28;
+}
+/* Piedra: beige cálido y verde bosque */
+[data-style='bloques'][data-theme='light'] {
+  --bg: #d9d3c7; --surface: #ebe6dc; --surface2: #cfc8ba; --edge: rgba(0, 0, 0, 0.06); --dots: rgba(0, 0, 0, 0.09);
+  --text: #1b1a17; --dim: #655f54; --faint: #8d8679; --thumb-bg: #c9c2b4; --shadow: rgba(40, 30, 10, 0.12);
+  --accent: #2f6b3b; --accent-ink: #f4f1ea; --accent2: #3447d8; --chip-bg: #2f6b3b; --chip-ink: #f4f1ea;
+}
+/* Papel: blanco roto y naranja */
+[data-style='bloques'][data-theme='light'][data-tone='papel'] {
+  --bg: #eeede9; --surface: #ffffff; --surface2: #e2e0da; --edge: rgba(0, 0, 0, 0.06); --dots: rgba(0, 0, 0, 0.1);
+  --text: #1c1c1c; --dim: #6a6964; --faint: #9a9893; --thumb-bg: #e2e0da;
+  --accent: #ee7438; --accent-ink: #ffffff; --accent2: #e0652a; --chip-bg: #1c1c1c; --chip-ink: #ffffff;
+}
+[data-style='bloques'] body { background: radial-gradient(circle at 1px 1px, var(--dots) 1.1px, transparent 1.4px) 0 0 / 18px 18px, var(--bg); }
+[data-style='bloques'] *, [data-style='bloques'] *::before { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+[data-style='bloques'] .ambient::before { display: none; }
+/* títulos */
+[data-style='bloques'] :is(.tv-title, .tv-row-title, .ep-heading, .bar-title, .tv-word, .settings-value) { font-family: var(--font-display) !important; font-weight: 500 !important; letter-spacing: -0.035em !important; }
+[data-style='bloques'] :is(.tv-row-title, .ep-heading) { font-size: 26px !important; }
+/* datos y etiquetas en monoespaciada */
+[data-style='bloques'] :is(.tv-facts, .tv-facts *, .shelf-sub, .tile-sub, .tv-greet, .settings-label, .dock-tab, .lang-chip, .tile-badge, .tv-more, .stat span, .stat small, .fact-score, .ep-meta, .watch-series) { font-family: var(--mono) !important; letter-spacing: 0 !important; }
+[data-style='bloques'] .settings-label { text-transform: none; font-size: 12px; color: var(--dim); }
+[data-style='bloques'] .settings-label::before { content: '● '; color: var(--accent); }
+[data-style='bloques'] .tv-facts { font-size: 12px; }
+[data-style='bloques'] .dock-tab { font-size: 9.5px; }
+/* superficies lisas */
+[data-style='bloques'] :is(.settings-group, .stat, .home-link) { background: var(--surface) !important; border: 0 !important; box-shadow: none !important; border-radius: 18px !important; }
+[data-style='bloques'] :is(.tv.is-home .tv-hero, .series-hero, .hero-card) { border-radius: 22px !important; box-shadow: none !important; }
+[data-style='bloques'] :is(.shelf-poster, .tile-img) { border-radius: 12px !important; box-shadow: none !important; }
+[data-style='bloques'] .dock-bar::before { background: var(--surface) !important; border: 1px solid var(--edge) !important; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25) !important; border-radius: 22px !important; }
+[data-style='bloques'] .dock-tab { border-radius: 16px; }
+[data-style='bloques'] .dock-tab.is-on { background: var(--accent); color: var(--accent-ink); }
+[data-style='bloques'] :is(.tv-icon, .icon-btn) { background: var(--surface) !important; border: 0 !important; box-shadow: none !important; }
+[data-style='bloques'] .bar { background: color-mix(in srgb, var(--bg) 94%, transparent); }
+/* botones: bloques del color fuerte, menos redondos */
+[data-style='bloques'] :is(.tv-btn, .btn, .segmented, .seg, .lang-switch, .lang-switch button) { border-radius: 12px !important; }
+[data-style='bloques'] :is(.tv-btn.is-primary, .btn-lamp, .seg.is-on, .lang-switch button.is-on, .dock-badge, .pick-btn.is-primary) { background: var(--accent) !important; color: var(--accent-ink) !important; box-shadow: none !important; }
+[data-style='bloques'] .tv-btn.is-primary svg { color: var(--accent-ink); }
+[data-style='bloques'] .tv-btn:not(.is-primary) { background: var(--surface2) !important; }
+[data-style='bloques'] :is(.segmented, .lang-switch) { background: var(--surface2) !important; border: 0 !important; padding: 4px !important; }
+[data-style='bloques'] .tile-bar span { background: var(--accent2); }
+[data-style='bloques'] .lang-chip { border-radius: 6px !important; background: var(--chip-bg) !important; color: var(--chip-ink) !important; }
+[data-style='bloques'] :is(.link-btn, .tv-more) { color: var(--accent2) !important; }
+[data-style='bloques'] .switch input:checked { background: var(--accent); }
+[data-style='bloques'] .switch input:checked::after { background: var(--accent-ink); }
+/* Tu resumen: el primer número en un bloque de color, como un marcador */
+[data-style='bloques'] .stat { padding: 14px !important; }
+[data-style='bloques'] .stat b { font-family: var(--font-display) !important; font-weight: 500 !important; font-size: 34px !important; letter-spacing: -0.04em !important; }
+[data-style='bloques'] .stat:first-child { background: var(--accent) !important; color: var(--accent-ink) !important; }
+[data-style='bloques'] .stat:first-child * { color: var(--accent-ink) !important; }

@@ -28,11 +28,26 @@
       var t = s.theme === 'light' || s.theme === 'dark' ? s.theme : matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
       var d = document.documentElement;
       d.dataset.theme = t;
-      if (t === 'light' && s.tone && s.tone !== 'blanco') d.dataset.tone = s.tone;
-      if (t === 'dark' && s.darkTone === 'gris') d.dataset.dark = 'gris';
-      var bg = t === 'dark'
-        ? { negro: '#0d0e12', gris: '#4d4d4d' }[s.darkTone] || '#0d0e12'
-        : { blanco: '#eef0f4', gris: '#c6c8cb', celeste: '#d9e5f0', arena: '#e6e0d5' }[s.tone] || '#eef0f4';
+      var bg;
+      if (s.style === 'bloques') {
+        // estilo Bloques: los colores son los de BLOCK_TONES y BLOCK_DARK
+        d.dataset.style = 'bloques';
+        var bl = { piedra: '#d9d3c7', papel: '#eeede9' }, bd = { grafito: '#18181a', bosque: '#2c6337' };
+        var k = t === 'dark' ? (bd[s.blockDark] ? s.blockDark : 'grafito') : (bl[s.blockTone] ? s.blockTone : 'piedra');
+        if (t === 'dark') d.dataset.dark = k; else d.dataset.tone = k;
+        bg = t === 'dark' ? bd[k] : bl[k];
+        // sus letras, pedidas desde ya para que los títulos no cambien de forma al cargar (views/theme.js usa la misma)
+        var f = document.createElement('link');
+        f.rel = 'stylesheet'; f.dataset.kaiFonts = '';
+        f.href = 'https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Space+Mono:wght@400;700&display=swap';
+        document.head.appendChild(f);
+      } else {
+        if (t === 'light' && s.tone && s.tone !== 'blanco') d.dataset.tone = s.tone;
+        if (t === 'dark' && s.darkTone === 'gris') d.dataset.dark = 'gris';
+        bg = t === 'dark'
+          ? { negro: '#0d0e12', gris: '#4d4d4d' }[s.darkTone] || '#0d0e12'
+          : { blanco: '#eef0f4', gris: '#c6c8cb', celeste: '#d9e5f0', arena: '#e6e0d5' }[s.tone] || '#eef0f4';
+      }
       document.querySelector('meta[name="theme-color"]').content = bg;
     } catch (e) {}
   </script>

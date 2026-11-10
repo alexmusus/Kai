@@ -19,11 +19,17 @@ import { LS } from '../lib/util.js';
  * @property {'auto' | 'light' | 'dark'} theme
  * @property {string} [tone]      tono del modo claro
  * @property {string} [darkTone]  tono del modo oscuro
+ * @property {'vidrio' | 'bloques'} [style]  estilo de Kai (sin valor = vidrio)
+ * @property {string} [blockTone] tono claro del estilo Bloques
+ * @property {string} [blockDark] tono oscuro del estilo Bloques
  * @property {boolean} [cat]      el gatito (false = apagado)
  * @property {'auto' | 'full' | 'reduced'} [motion]  animaciones (sin valor = auto)
  * @property {'auto' | 'on' | 'off'} [lite]          modo liviano, sin desenfoques (sin valor = auto)
  */
 
+/* Estilo Bloques: superficies lisas, letra monoespaciada en los datos y un color fuerte por tono. */
+export const BLOCK_TONES = { piedra: { label: 'Piedra', bg: '#d9d3c7' }, papel: { label: 'Papel', bg: '#eeede9' } };
+export const BLOCK_DARK = { grafito: { label: 'Grafito', bg: '#18181a' }, bosque: { label: 'Bosque', bg: '#2c6337' } };
 /** Tonos del modo claro (el color de fondo sirve para la barra del sistema). */
 export const DARK_TONES = { negro: { label: 'Negro', bg: '#0d0e12' }, gris: { label: 'Gris Culero', bg: '#4d4d4d' } };
 export const TONES = {

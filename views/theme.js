@@ -5,7 +5,7 @@
 
 import { $ } from '../lib/util.js';
 import { emit } from '../lib/events.js';
-import { state, TONES, DARK_TONES } from '../models/store.js';
+import { state, TONES, DARK_TONES, BLOCK_TONES, BLOCK_DARK } from '../models/store.js';
 import { ICON } from './icons.js';
 
 /** ¿Hay un video en pantalla completa? (también la "pantalla completa" propia de Kai en iPhone) */
@@ -44,20 +44,44 @@ export function resolvedTheme() {
 export function paintThemeColor() {
   const meta = document.querySelector('meta[name="theme-color"]');
   if (!meta) return;
-  meta.content = isFullscreen()
-    ? '#000000'
-    : resolvedTheme() === 'dark'
-      ? (DARK_TONES[state.settings.darkTone] || DARK_TONES.negro).bg
-      : (TONES[state.settings.tone] || TONES.blanco).bg;
+  meta.content = isFullscreen() ? '#000000' : toneOf(resolvedTheme()).bg;
+}
+/** El tono que se ve: el del estilo elegido (Vidrio o Bloques) para el tema claro u oscuro. */
+function toneOf(t) {
+  const s = state.settings;
+  if (s.style === 'bloques')
+    return t === 'dark'
+      ? { id: BLOCK_DARK[s.blockDark] ? s.blockDark : 'grafito', ...(BLOCK_DARK[s.blockDark] || BLOCK_DARK.grafito) }
+      : { id: BLOCK_TONES[s.blockTone] ? s.blockTone : 'piedra', ...(BLOCK_TONES[s.blockTone] || BLOCK_TONES.piedra) };
+  return t === 'dark'
+    ? { id: DARK_TONES[s.darkTone] ? s.darkTone : 'negro', ...(DARK_TONES[s.darkTone] || DARK_TONES.negro) }
+    : { id: TONES[s.tone] ? s.tone : 'blanco', ...(TONES[s.tone] || TONES.blanco) };
+}
+/* Las letras del estilo Bloques se piden solo al elegirlo (el service worker las guarda para usarlas sin conexión). */
+const BLOCK_FONTS =
+  'https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Space+Mono:wght@400;700&display=swap';
+function loadBlockFonts() {
+  if (document.querySelector('link[data-kai-fonts]')) return;
+  const l = document.createElement('link');
+  l.rel = 'stylesheet';
+  l.href = BLOCK_FONTS;
+  l.dataset.kaiFonts = '';
+  document.head.append(l);
 }
 export function applyTheme() {
   const t = resolvedTheme();
-  document.documentElement.dataset.theme = t;
-  const tone = state.settings.tone;
-  if (t === 'light' && tone && tone !== 'blanco' && TONES[tone]) document.documentElement.dataset.tone = tone;
-  else delete document.documentElement.dataset.tone;
-  if (t === 'dark' && state.settings.darkTone === 'gris') document.documentElement.dataset.dark = 'gris';
-  else delete document.documentElement.dataset.dark;
+  const d = document.documentElement;
+  const blocks = state.settings.style === 'bloques';
+  const tone = toneOf(t).id;
+  d.dataset.theme = t;
+  if (blocks) d.dataset.style = 'bloques';
+  else delete d.dataset.style;
+  // el tono va en data-tone (claro) o data-dark (oscuro); los de siempre (Blanco y Negro) no llevan nada
+  if (t === 'light' && (blocks || tone !== 'blanco')) d.dataset.tone = tone;
+  else delete d.dataset.tone;
+  if (t === 'dark' && (blocks || tone !== 'negro')) d.dataset.dark = tone;
+  else delete d.dataset.dark;
+  if (blocks) loadBlockFonts();
   applyMotion();
   paintThemeColor();
   emit('theme');

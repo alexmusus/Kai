@@ -9,24 +9,15 @@ importScripts('core.js');
 /* VERSION es la de Kai que se ve en Ajustes: sube solo al pasar algo a main (lo publicado). ENTREGA cuenta las
  * subidas a prueba dentro de esa versión: sube en cada una (el navegador solo instala de nuevo si este archivo
  * cambia) y vuelve a 1 cuando sube VERSION. */
-const VERSION = 43;
+const VERSION = 44;
 const ENTREGA = 1;
 const CACHE = `kai-${VERSION}.${ENTREGA}`;
 /* Lo que cambió en esta versión, corto y en palabras de todos los días: lo muestran la burbuja de "Versión nueva"
  * (al tocarla) y Ajustes → Versión. Se escribe de nuevo al empezar cada versión. */
 const CAMBIOS = [
-  'Los pósters de películas también tienen su menú al mantener presionado y su tarjeta con la sinopsis al pasar el ratón.',
-  'Descargados muestra todo lo que está bajando o en cola, cada uno con su avance, y separa los capítulos por temporada.',
-  'Ajustes más corto: lo que casi nunca se toca va plegado en «Avanzado».',
-  'La transferencia de MEGA usada se pone al día en cada sincronización.',
-  'Perfiles: lo que ve cada quien ya no se puede mezclar al cambiar de perfil, y lo último que viste se sube aunque cambies enseguida.',
-  'Si un dispositivo tiene la hora adelantada, ya no pisa lo que viste después en otro.',
-  'Kai se actualiza sola al volver a abrirla, si no estás viendo ni descargando nada.',
-  'Al salir del reproductor con la flecha o con "atrás", el video vuela al mini (antes saltaba de tamaño).',
-  'Al tocar el mini, el video se agranda sin esperar a que cargue la lista de capítulos.',
-  'Ajustes → Apariencia: Animaciones (completas o reducidas) y Modo liviano, para teléfonos donde Kai se traba.',
-  'Con tema claro, Kai ya no abre con un destello oscuro.',
-  'Al pasar el video al mini, la página de atrás aparece más rápido.',
+  'Cada tono tiene su color: el botón principal, la pestaña abierta, lo que eliges y la barra de avance combinan con el fondo.',
+  'Estilo nuevo, Bloques (Ajustes → Apariencia): superficies lisas, letra de máquina en los datos y cuatro tonos: Grafito, Bosque, Piedra y Papel.',
+  'Bloques no usa desenfoques, así que también va más liviano en teléfonos que se traban.',
 ];
 const SHELL = [
   './', 'styles.css', 'app.js', 'core.js', 'models/mp4.js', 'models/meta-api.js',
