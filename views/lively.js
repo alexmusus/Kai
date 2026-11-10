@@ -1,8 +1,8 @@
 // @ts-check
 /*
  * views/lively.js — las animaciones al tocar del estilo Bloques (Laboratorio): la píldora que se desliza en los
- * selectores y en la barra de abajo, y los números de Tu resumen que suben hasta su valor. El resto (casillas que
- * saltan, el botón de descarga que se completa, Sincronizar ahora, los plegables) es CSS de styles.css.
+ * selectores y en la barra de abajo, y los números de Tu resumen que suben hasta su valor. El resto (el ✓ de las
+ * casillas, el botón de descarga que se completa, Sincronizar ahora, los plegables) es CSS de styles.css.
  *
  * Solo trabaja con Bloques, con las animaciones encendidas (sin html.calm) y si el sistema no pide reducir el
  * movimiento: con Vidrio no observa nada.

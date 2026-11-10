@@ -17,7 +17,7 @@ const CACHE = `kai-${VERSION}.${ENTREGA}`;
 const CAMBIOS = [
   'Cada tono tiene su color: el botón principal, la pestaña abierta, lo que eliges y la barra de avance combinan con el fondo.',
   'Ajustes → Avanzado → Laboratorio: lo que está en prueba, solo en este dispositivo. Al encenderlo aparece el estilo Bloques en Apariencia.',
-  'Bloques: superficies lisas, letra de máquina en los datos, cuatro tonos (Grafito, Bosque, Piedra y Papel) y animaciones al tocar: la selección se desliza, las casillas saltan, los números suben y cada temporada muestra su avance en un anillo.',
+  'Bloques: superficies lisas, letra de máquina en los datos, cuatro tonos (Grafito, Bosque, Piedra y Papel) y animaciones al tocar: la selección se desliza, los ✓ aparecen suaves, los números suben y cada temporada muestra su avance en un anillo.',
   'En monitores grandes (1440p): la serie, los capítulos y el reproductor usan más ancho, y Ajustes va en dos columnas.',
   'La transferencia de MEGA en Ajustes cuenta todo lo que cuenta MEGA y dice cuándo se revisó por última vez.',
 ];
