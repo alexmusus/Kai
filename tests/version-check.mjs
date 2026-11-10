@@ -40,7 +40,7 @@ const now = versionAt('HEAD');
 if (before && now && before.version === now.version && before.entrega === now.entrega) {
   console.error(
     `Cambió la app (${changed.slice(0, 8).join(', ')}${changed.length > 8 ? '…' : ''}) pero sw.js sigue en ` +
-      `Kai ${now.version} · entrega ${now.entrega}.\n` +
+      `Kai ${now.version}.${now.entrega}.\n` +
       'Sube ENTREGA en sw.js (o VERSION si va a main): si no, los teléfonos siguen con la versión de su caché.',
   );
   process.exit(1);

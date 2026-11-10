@@ -23,7 +23,7 @@ export function setRegistration(r) {
 
 /** @typedef {{ label: string, version: number, cambios: string[] }} SwInfo */
 
-/** La versión instalada ("Kai 38", y "· entrega 3" si es una prueba posterior a la primera) y lo que cambió en ella;
+/** La versión instalada ("Kai 44", y "Kai 44.3" desde la tercera subida de esa versión) y lo que cambió en ella;
  * label vacío si no hay service worker o no responde en 2 s. @returns {Promise<SwInfo>} */
 export function swInfo() {
   const sw = navigator.serviceWorker && navigator.serviceWorker.controller;
@@ -37,7 +37,7 @@ export function swInfo() {
         const { version: v, entrega: n, cambios } = e.data;
         if (typeof v !== 'number') return res(none);
         res({
-          label: `Kai ${v}${n > 1 ? ` · entrega ${n}` : ''}`,
+          label: `Kai ${v}${n > 1 ? `.${n}` : ''}`,
           version: v,
           cambios: Array.isArray(cambios) ? cambios : [],
         });
