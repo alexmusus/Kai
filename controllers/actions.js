@@ -121,7 +121,19 @@ async function logout() {
     ok: 'Cerrar sesión',
   });
   if (!ok) return;
-  if (state.dirty) await sync().catch(() => {});
+  // siempre se intenta subir antes de borrar lo de este dispositivo; si algo no subió, se avisa (antes se perdía)
+  await sync().catch(() => {});
+  const pending =
+    state.dirty ||
+    (!!state.storage && state.syncState === 'error') ||
+    visibleProfiles().some((p) => LS.get(`p.${p.id}.dirty`, false));
+  if (pending) {
+    const sure = await askConfirm('Hay progreso que no se pudo subir a MEGA.', {
+      detail: 'Si cierras sesión ahora, lo que viste en este dispositivo y no se subió se pierde.',
+      ok: 'Cerrar sesión igual',
+    });
+    if (!sure) return;
+  }
   try {
     if (state.storage) state.storage.close();
   } catch {

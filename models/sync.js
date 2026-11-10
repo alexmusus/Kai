@@ -3,8 +3,8 @@
  * models/sync.js — juntar lo de este dispositivo con lo que hay en MEGA, y dejar en MEGA una sola copia al día.
  *
  *  1. Lo compartido (.kai-compartido.json): perfiles, intros, fichas elegidas, claves.
- *  2. El progreso del perfil activo (.kai-progreso-<perfil>.json), sumando el de antes de que hubiera perfiles
- *     y el de perfiles duplicados que se juntaron con este.
+ *  2. El progreso de cada perfil con algo pendiente en este dispositivo (.kai-progreso-<perfil>.json), sumando el de
+ *     antes de que hubiera perfiles y el de perfiles duplicados que se juntaron con ese.
  *
  * Regla de Kai: si un archivo no se pudo LEER, todo se detiene con error y no se escribe nada (readJson lanza).
  * Solo se escribe cuando lo de aquí trae algo que MEGA no tiene, o cuando hay copias repetidas que juntar.
@@ -12,7 +12,15 @@
  */
 
 import { LS, stable } from '../lib/util.js';
-import { state, SHARED_FILE, LEGACY_PROGRESS, profileFile, saveShared, saveProgressLocal } from './store.js';
+import {
+  state,
+  SHARED_FILE,
+  LEGACY_PROGRESS,
+  profileFile,
+  saveShared,
+  saveProgressLocal,
+  visibleProfiles,
+} from './store.js';
 import { filesNamed, visibleChildren, readJson as realReadJson, writeJson as realWriteJson } from './mega.js';
 import { findFolder, migrateProgressKeys, loadProfileState } from './library.js';
 import { mergeProgress } from './progress.js';
@@ -83,16 +91,47 @@ function followMergedProfile() {
   saveProgressLocal();
 }
 
+/** ¿Ese perfil es el que está en pantalla? @param {string} pid */
+const isActive = (pid) => !!state.profile && state.profile.id === pid;
+
 /**
- * Paso 2: el progreso del perfil activo. Lee su archivo (y los viejos que le tocan), junta todo con lo de aquí y
- * sube una copia si MEGA no tiene todo o si había varias.
+ * Lo visto de un perfil en este dispositivo, sea o no el que está en pantalla. Se lee en el momento: nunca se usa
+ * una copia tomada antes de esperar a MEGA.
+ * @param {string} pid
+ * @returns {ProgressMap}
+ */
+const localOf = (pid) => (isActive(pid) ? state.progress : LS.get(`p.${pid}.progress`, {}) || {});
+
+/**
+ * Guarda lo visto de un perfil en este dispositivo y si le queda algo por subir.
+ * @param {string} pid @param {ProgressMap} items @param {boolean} dirty
+ */
+function storeLocal(pid, items, dirty) {
+  if (isActive(pid)) {
+    state.progress = items;
+    state.dirty = dirty;
+    saveProgressLocal();
+  } else {
+    LS.set(`p.${pid}.progress`, items);
+    LS.set(`p.${pid}.dirty`, dirty);
+  }
+}
+
+/**
+ * Paso 2: el progreso de UN perfil (si no se dice cuál, el que está en pantalla). Lee su archivo (y los viejos que le
+ * tocan), junta todo con lo de ese perfil en este dispositivo y sube una copia si MEGA no tiene todo o si había
+ * varias.
+ *
+ * El perfil es un dato fijo de principio a fin: lo leído de `pid` solo se junta con lo local de `pid` y se sube al
+ * archivo de `pid`, aunque mientras tanto se cambie de perfil en este dispositivo. (Hasta Kai 40 se juntaba con "lo
+ * que hay en pantalla", y cambiar de perfil a media sincronización dejaba a los dos con lo mismo visto.)
  * @param {MegaNode} home raíz de la cuenta
  * @param {SyncIO} [io]
- * @returns {Promise<boolean>} si cambió lo visto aquí (hay que redibujar)
+ * @param {string | null} [pid] el perfil que se sincroniza
+ * @returns {Promise<boolean>} si cambió lo que se ve en pantalla (hay que redibujar)
  */
-export async function syncProgress(home, io = REAL_IO) {
-  if (!state.profile) return false;
-  const pid = state.profile.id;
+export async function syncProgress(home, io = REAL_IO, pid = state.profile ? state.profile.id : null) {
+  if (!pid) return false;
   const nodes = filesNamed(home, profileFile(pid));
   const extra = olderProgressFiles(home, pid);
   /** @type {ProgressMap} */
@@ -105,22 +144,41 @@ export async function syncProgress(home, io = REAL_IO) {
     remote = mergeProgress(remote, items);
     if (data.intros) state.shared.intros = mergeShared(state.shared, { intros: data.intros }).intros;
   }
-  /* Si mientras se leía MEGA este dispositivo cambió de perfil, lo leído es de otro perfil: no se junta con nada
-   * ni se escribe (antes se mezclaba con el perfil nuevo y quedaban los dos con lo mismo visto). La sincronización
-   * del perfil nuevo viene después (controllers/sync.js). */
-  if (!state.profile || state.profile.id !== pid) return false;
-  const merged = mergeProgress(state.progress, remote);
-  const changed = JSON.stringify(merged) !== JSON.stringify(state.progress);
+  // lo de aquí se lee DESPUÉS de esperar a MEGA, y por perfil
+  const before = JSON.stringify(localOf(pid));
+  const merged = mergeProgress(localOf(pid), remote);
   const hasData = Object.keys(merged).length > 0;
   const remoteIsBehind = Object.keys(merged).some((k) => !remote[k] || merged[k].u > remote[k].u);
-  state.progress = merged;
+  let uploaded = remote; // lo que MEGA tiene al terminar
   if (hasData && (nodes.length !== 1 || extra.length > 0 || remoteIsBehind)) {
     await io.writeJson(home, profileFile(pid), { v: 3, app: 'kai', profile: pid, items: merged }, [...nodes, ...extra]);
-    // lo subido es de este perfil; si mientras tanto se cambió a otro, lo de ese no se toca
-    if (!state.profile || state.profile.id !== pid) return false;
+    uploaded = merged;
   }
-  state.dirty = false;
-  saveProgressLocal();
+  /* Lo que se marcó mientras se subía (el reproductor guarda cada pocos segundos) se conserva y sigue pendiente:
+   * antes quedaba como "ya sincronizado" sin haber subido. */
+  const final = mergeProgress(localOf(pid), merged);
+  const dirty = Object.keys(final).some((k) => !uploaded[k] || final[k].u > uploaded[k].u);
+  const active = isActive(pid);
+  storeLocal(pid, final, dirty);
+  return active && JSON.stringify(final) !== before;
+}
+
+/**
+ * Sube lo pendiente de cada perfil de este dispositivo, no solo del que está en pantalla: así lo último que vio
+ * alguien antes de cambiar de perfil llega a MEGA sin tener que volver a entrar con ese perfil. El de pantalla va
+ * al final. Si uno falla, los demás no se intentan (se reintenta todo en la siguiente sincronización).
+ * @param {MegaNode} home raíz de la cuenta
+ * @param {SyncIO} [io]
+ * @returns {Promise<boolean>} si cambió lo que se ve en pantalla (hay que redibujar)
+ */
+export async function syncAllProgress(home, io = REAL_IO) {
+  const active = state.profile ? state.profile.id : null;
+  const pids = visibleProfiles()
+    .filter((p) => p.id !== active && LS.get(`p.${p.id}.dirty`, false))
+    .map((p) => p.id);
+  if (active) pids.push(active);
+  let changed = false;
+  for (const pid of pids) changed = (await syncProgress(home, io, pid)) || changed;
   return changed;
 }
 

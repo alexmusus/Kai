@@ -1,10 +1,11 @@
 /*
  * controllers/sync.js — cuándo sincronizar con MEGA y qué redibujar después: la biblioteca (al llegar cambios),
- * lo compartido, las fichas, las sinopsis y el progreso. Una sola sincronización a la vez.
+ * lo compartido, las fichas, las sinopsis y el progreso (de todos los perfiles con algo pendiente aquí). Una sola
+ * sincronización a la vez.
  */
 import { state } from '../models/store.js';
 import { paintSync } from '../views/dock.js';
-import { syncShared, syncProgress } from '../models/sync.js';
+import { syncShared, syncAllProgress } from '../models/sync.js';
 import { syncSynopses, syncFichas, ensureMeta } from '../models/fichas-sync.js';
 import { softRender, render } from './router.js';
 import { megaMessage } from '../models/mega.js';
@@ -53,8 +54,8 @@ async function doSync() {
     } catch (err) {
       console.warn('fichas', err);
     }
-    // 2) progreso del perfil activo
-    const changedHere = await syncProgress(home);
+    // 2) progreso: lo pendiente de cada perfil de este dispositivo y, al final, el del perfil en pantalla
+    const changedHere = await syncAllProgress(home);
     state.syncState = 'idle';
     if (changedHere || sharedChanged) softRender();
   } catch (err) {
