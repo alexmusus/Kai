@@ -6,7 +6,7 @@ import { app, header } from './components.js';
 import { refreshSaved, getDir, dirPermission } from '../models/downloads.js';
 import { index, knownEps, state } from '../models/store.js';
 import { route } from '../lib/route.js';
-import { titleFor } from '../models/context.js';
+import { titleFor, resolveContext } from '../models/context.js';
 import { fmtSize, plural, esc } from '../lib/util.js';
 import { sortEpisodes } from '../models/naming.js';
 import { episodeRow } from './episodes.js';
@@ -14,6 +14,23 @@ import { paintSync } from './dock.js';
 import { ICON } from './icons.js';
 import { hydrateThumbs } from './thumbs.js';
 import { prog } from '../models/progress.js';
+
+/**
+ * Los capítulos de una serie separados por temporada, en el orden de la serie (si no, el 1 y el 2 de la temporada 2
+ * salían antes que el 11 y el 12 de la temporada 1, todos juntos). Lo que no tiene temporada (una serie de una sola,
+ * una película, algo que ya no está en la biblioteca) queda en un solo grupo sin título.
+ * @returns {{ label: string, eps: any[] }[]}
+ */
+function bySeason(eps) {
+  const groups = new Map();
+  for (const ep of eps) {
+    const c = resolveContext(ep.id);
+    const ki = c && c.sub && c.ki != null ? c.ki : -1;
+    if (!groups.has(ki)) groups.set(ki, { label: ki < 0 ? '' : c.sub, eps: [] });
+    groups.get(ki).eps.push(ep);
+  }
+  return [...groups.entries()].sort((a, b) => a[0] - b[0]).map((x) => x[1]);
+}
 
 export async function renderDownloads() {
   if (!app.querySelector('main.downloads')) app.innerHTML = header('Descargados') + '<main class="downloads"></main>';
@@ -77,9 +94,14 @@ export async function renderDownloads() {
       .map(
         ([t, eps]) => `<section class="block">
       <h3 class="group-title">${esc(t)}</h3>
-      <ol class="episodes">${sortEpisodes(eps)
-        .map((ep) => episodeRow(ep))
-        .join('')}</ol>
+      ${bySeason(eps)
+        .map(
+          (g) =>
+            `${g.label ? `<h4 class="group-sub">${esc(g.label)}</h4>` : ''}<ol class="episodes">${sortEpisodes(g.eps)
+              .map((ep) => episodeRow(ep))
+              .join('')}</ol>`,
+        )
+        .join('')}
     </section>`,
       )
       .join('')}

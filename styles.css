@@ -467,6 +467,9 @@ html.kai-fs-on .dock { display: none; }
 .file-name { font-weight: 500; overflow-wrap: anywhere; }
 .file-meta { color: var(--dim); font-size: 13px; }
 .downloads-sum { margin: 8px 0 20px; }
+/* Descargados: la temporada, debajo del nombre de la serie */
+.group-sub { margin: 14px 0 2px; font: 600 14px/1.3 var(--font); color: var(--dim); }
+.group-title + .group-sub { margin-top: 6px; }
 .group-title { margin: 0 0 4px; font: 700 19px/1.2 var(--font-display); letter-spacing: -0.015em; }
 
 /* ───────── hoja de opciones ───────── */

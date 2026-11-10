@@ -10,13 +10,13 @@ importScripts('core.js');
  * subidas a prueba dentro de esa versión: sube en cada una (el navegador solo instala de nuevo si este archivo
  * cambia) y vuelve a 1 cuando sube VERSION. */
 const VERSION = 43;
-const ENTREGA = 2;
+const ENTREGA = 3;
 const CACHE = `kai-${VERSION}.${ENTREGA}`;
 /* Lo que cambió en esta versión, corto y en palabras de todos los días: lo muestran la burbuja de "Versión nueva"
  * (al tocarla) y Ajustes → Versión. Se escribe de nuevo al empezar cada versión. */
 const CAMBIOS = [
   'Los pósters de películas también tienen su menú al mantener presionado y su tarjeta con la sinopsis al pasar el ratón.',
-  'Descargados muestra todo lo que está bajando o en cola, cada uno con su avance.',
+  'Descargados muestra todo lo que está bajando o en cola, cada uno con su avance, y separa los capítulos por temporada.',
   'Ajustes más corto: lo que casi nunca se toca va plegado en «Avanzado».',
   'La transferencia de MEGA usada se pone al día en cada sincronización.',
   'Perfiles: lo que ve cada quien ya no se puede mezclar al cambiar de perfil, y lo último que viste se sube aunque cambies enseguida.',
