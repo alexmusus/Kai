@@ -50,9 +50,12 @@ on('news', () => paintNewsDot());
 on('download-changed', (id) => {
   paintEpisode(id);
   paintDrawerCount();
+  // en Descargados, uno que se acaba de poner en cola todavía no tiene su fila: se dibuja la lista de nuevo
+  if (route().view === 'descargas' && !document.querySelector(`.ep[data-id="${CSS.escape(id)}"]`)) renderDownloads();
 });
 on('download-done', (ep) => {
   cacheChapters(ep).catch(() => {});
+  if (route().view === 'descargas') renderDownloads(); // el total y "quitar lo ya visto" cambian
 });
 on('downloads-removed', () => {
   if (route().view === 'descargas') renderDownloads();

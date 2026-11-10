@@ -159,7 +159,12 @@ test('perfiles, ajustes, descargas', async ({ page }, info) => {
   expect(await page.locator('#app').innerText()).toContain('Diego');
   await shot(page, 'perfiles', info);
   await go(page, '#/ajustes');
+  // los tonos, las animaciones y lo avanzado van plegados: se abren al tocar su título
+  await expect(page.locator('#fold-adv')).not.toHaveAttribute('open', '');
+  await page.locator('#fold-look > summary').click();
   expect(await page.locator('#app').innerText()).toContain('Gris Culero');
+  await page.locator('#fold-adv > summary').click();
+  await expect(page.locator('#cine-key')).toBeVisible();
   await shot(page, 'ajustes', info);
   await go(page, '#/descargas');
   await page.waitForTimeout(300);
@@ -627,5 +632,37 @@ test('pósters: tarjeta al pasar el ratón (PC) y menú al mantener presionado (
   await poster.click();
   await expect(page).toHaveURL(new RegExp(`#/serie/${k.si('Dorohedoro')}$`));
   await expect(page.locator('.series-hero .tv-title')).toHaveText('Dorohedoro');
+  expect(k.errors).toEqual([]);
+
+  // las películas también: su tarjeta con "Más tarde" (PC) y su menú con "Marcar como vista" (teléfono)
+  await page.goto('/#/');
+  await expect(page.locator('.tv.is-home')).toBeVisible();
+  const movie = page.locator('a.shelf-item[href^="#/pelicula/"]').first();
+  await movie.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(300);
+  const laterKeys = () =>
+    page.evaluate(() => Object.entries(JSON.parse(localStorage.getItem('kai.p.pA.progress') || '{}')).filter(([key, v]) => key.startsWith('@later/Peliculas/') && v.on).length);
+  if (info.project.name === 'pc') {
+    await movie.hover();
+    await expect(card).toBeVisible();
+    await expect(card.locator('.pc-title')).toHaveText('Kimi no Na wa');
+    await expect(card.locator('.pc-syn')).toContainText('Sinopsis de Your Name.');
+    await expect(card.locator('.tv-btn')).toContainText('Ver');
+    await card.locator('[data-act="later-item"]').click();
+    await expect.poll(laterKeys).toBe(1);
+    await expect(card.locator('[data-act="later-item"]')).toHaveAttribute('aria-pressed', 'true');
+  } else {
+    const box = await movie.boundingBox();
+    const at = { x: (box?.x || 0) + 30, y: (box?.y || 0) + 30 };
+    await movie.dispatchEvent('pointerdown', { pointerType: 'touch', clientX: at.x, clientY: at.y, isPrimary: true });
+    await page.waitForTimeout(650);
+    await movie.dispatchEvent('pointerup', { pointerType: 'touch', clientX: at.x, clientY: at.y, isPrimary: true });
+    await movie.dispatchEvent('click');
+    await expect(page.locator('.sheet-title')).toHaveText('Kimi no Na wa');
+    await expect(page.locator('.sheet-panel')).toContainText('Ir a la película');
+    await expect(page).toHaveURL(/#\/$/);
+    await page.locator('.sheet-panel [data-act="qs-seen"]').click();
+    await expect(movie.locator('.shelf-sub')).toContainText('Vista');
+  }
   expect(k.errors).toEqual([]);
 });

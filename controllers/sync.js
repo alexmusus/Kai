@@ -15,6 +15,7 @@ import { librarySignature, buildLibrary, setLibrary } from '../models/library.js
 import { initKnown, announceNew } from '../models/news.js';
 import { setLaterFlag } from '../models/progress.js';
 import { toast } from '../views/toast.js';
+import { refreshAccountInfo } from '../models/quota.js';
 
 /** @type {Promise<void> | null} */
 export let syncing = null;
@@ -66,6 +67,7 @@ async function doSync() {
     state.syncState = 'idle';
     if (changedHere || sharedChanged) softRender();
     reloaded = false;
+    refreshAccountInfo(); // la transferencia usada de la cuenta, al día (sin esperar)
   } catch (err) {
     state.syncState = 'error';
     const gone = fileGone(err);

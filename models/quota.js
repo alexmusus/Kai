@@ -49,8 +49,16 @@ export function quotaUntil() {
 /** Cuota de la cuenta Pro, si es Pro. @returns {{ used: number, total: number } | null} */
 export const proQuota = () => LS.get(KEY_PRO, null);
 
-/** Pregunta a MEGA el tipo de cuenta y cuánto se ha usado de la transferencia Pro. */
-export async function refreshAccountInfo() {
+let askedAt = 0;
+/**
+ * Pregunta a MEGA el tipo de cuenta y cuánto se ha usado de la transferencia Pro. Se pregunta al abrir Kai, después
+ * de cada sincronización y al entrar a Ajustes (antes solo al abrir: en una pestaña que nunca se cierra el número se
+ * quedaba fijo), pero no más de una vez por minuto salvo que se pida con `force`.
+ * @param {boolean} [force]
+ */
+export async function refreshAccountInfo(force = false) {
+  if (!state.storage || (!force && Date.now() - askedAt < 60000)) return;
+  askedAt = Date.now();
   try {
     const r = await state.storage.api.request({ a: 'uq', xfer: 1, pro: 1 });
     if (r && r.utype > 0 && r.mxfer) LS.set(KEY_PRO, { used: r.caxfer || 0, total: r.mxfer });

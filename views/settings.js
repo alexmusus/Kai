@@ -14,6 +14,7 @@ import { isCollection, episodeLabel, isCine } from '../models/collections.js';
 import { app, header } from './components.js';
 import { ICON } from './icons.js';
 import { quotaText } from './quota.js';
+import { refreshAccountInfo } from '../models/quota.js';
 import { isUpdateReady, swVersion } from '../models/updates.js';
 import { tmdbKey } from '../models/fichas.js';
 import { tmdbCheckKey } from '../models/meta-api.js';
@@ -171,6 +172,9 @@ export function renderSettings() {
   const s = state.settings;
   const unread = hasUnreadNews();
   markNewsRead();
+  // lo plegable que estaba abierto sigue abierto al volver a dibujar (cada cambio de un ajuste redibuja la página)
+  const open = new Set([...app.querySelectorAll('details.settings-fold[open]')].map((d) => d.id));
+  refreshAccountInfo(); // la transferencia de MEGA usada, al día (llega con el aviso "quota")
   app.innerHTML =
     header('Ajustes') +
     `<main class="settings">
@@ -187,6 +191,8 @@ export function renderSettings() {
             `<button class="seg ${s.theme === v ? 'is-on' : ''}" data-act="set-theme" data-v="${v}" aria-pressed="${s.theme === v}">${l}</button>`,
         )
         .join('')}</div>
+      <details class="settings-fold" id="fold-look" ${open.has('fold-look') ? 'open' : ''}>
+        <summary>Tonos, animaciones y modo liviano</summary>
       <p class="settings-label">Tono del modo claro</p>
       <div class="segmented" role="group" aria-label="Tono del modo claro">${Object.entries(TONES)
         .map(
@@ -225,18 +231,13 @@ export function renderSettings() {
         )
         .join('')}</div>
       <p class="dim settings-hint">Si Kai se traba al abrir o cerrar el video, elige Reducidas. El modo liviano quita los desenfoques. Se guarda en este dispositivo.</p>
+      </details>
     </section>
     ${(() => {
       const h = statsHTML();
       return h ? `<section class="settings-group" id="profile-stats">${h}</section>` : '';
     })()}
     <section class="settings-group" id="player-prefs">${playerPrefsHTML()}</section>
-    <section class="settings-group" id="cine-key">${cineKeyHTML()}</section>
-    <section class="settings-group">
-      <p class="settings-label">Carpeta de series</p>
-      <p class="settings-value">${esc(s.root)}</p>
-      <a class="btn" href="#/explorar${state.library && state.library.rootId ? '/' + encodeURIComponent(state.library.rootId) : ''}">Cambiar carpeta</a>
-    </section>
     <form id="settings" class="form settings-group">
       <label class="switch"><input type="checkbox" name="autoplay" ${s.autoplay ? 'checked' : ''}><span>Reproducir el siguiente capítulo solo</span></label>
       <label class="switch"><input type="checkbox" name="autoSkip" ${s.autoSkip ? 'checked' : ''}><span>Saltar intros solo cuando Kai sepa dónde están</span></label>
@@ -244,6 +245,28 @@ export function renderSettings() {
       <label class="switch"><input type="checkbox" name="prefetchNext" ${s.prefetchNext !== false ? 'checked' : ''}><span>Preparar el siguiente capítulo para que empiece sin espera (usa unos 3 MB de MEGA)</span></label>
     </form>
     <section class="settings-group" id="dl-where">${downloadsWhereHTML()}</section>
+    <section class="settings-group">
+      <p class="dim" id="space">Calculando espacio…</p>
+      <p class="dim" id="quota-text">${esc(quotaText(true))}</p>
+      <div class="btn-row">
+        <button class="btn" data-act="sync-now">Sincronizar ahora</button>
+        <a class="btn" href="#/descargas">Ver descargados</a>
+      </div>
+    </section>
+    <section class="settings-group">
+      <p class="settings-label">Versión</p>
+      <p class="settings-value" id="app-version">…</p>
+      <button class="btn" data-act="check-update" id="check-update">${ICON.refresh}<span>${isUpdateReady() ? 'Actualizar ahora' : 'Buscar actualización'}</span></button>
+    </section>
+    <details class="settings-group settings-fold" id="fold-adv" ${open.has('fold-adv') ? 'open' : ''}>
+      <summary>Avanzado</summary>
+      <p class="dim settings-hint">Lo que casi nunca se toca: la carpeta de series, la clave de Cine, separar perfiles y el espacio.</p>
+    <section class="settings-group">
+      <p class="settings-label">Carpeta de series</p>
+      <p class="settings-value">${esc(s.root)}</p>
+      <a class="btn" href="#/explorar${state.library && state.library.rootId ? '/' + encodeURIComponent(state.library.rootId) : ''}">Cambiar carpeta</a>
+    </section>
+    <section class="settings-group" id="cine-key">${cineKeyHTML()}</section>
     ${
       visibleProfiles().filter((p) => !p.mergedInto).length > 1
         ? `<section class="settings-group" id="copies">
@@ -261,20 +284,6 @@ export function renderSettings() {
       <button class="btn" data-act="seen-all">${ICON.refresh}<span>Revisar</span></button>
     </section>
     <section class="settings-group">
-      <p class="dim" id="space">Calculando espacio…</p>
-      <p class="dim">${esc(quotaText(true))}</p>
-      <div class="btn-row">
-        <button class="btn" data-act="sync-now">Sincronizar ahora</button>
-        <a class="btn" href="#/descargas">Ver descargados</a>
-      </div>
-    </section>
-    <section class="settings-group">
-      <p class="settings-label">Versión</p>
-      <p class="settings-value" id="app-version">…</p>
-      <button class="btn" data-act="check-update" id="check-update">${ICON.refresh}<span>${isUpdateReady() ? 'Actualizar ahora' : 'Buscar actualización'}</span></button>
-    </section>
-    <section class="settings-group">
-      <p class="dim">Sesión de MEGA: ${esc((LS.get('session', {}).options || {}).email || '')}</p>
       <p class="dim">Datos de Kai en este navegador: ${(() => {
         const kb = (n) => (n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.round(n / 1024) + ' KB');
         const sizes = [];
@@ -299,6 +308,10 @@ export function renderSettings() {
           libInfo
         );
       })()}${LS.full ? ' · <strong>sin espacio: algo no se pudo guardar</strong>' : LS.freed ? ' · se liberó espacio' : ''}</p>
+    </section>
+    </details>
+    <section class="settings-group">
+      <p class="dim">Sesión de MEGA: ${esc((LS.get('session', {}).options || {}).email || '')}</p>
       <button class="btn btn-quiet" data-act="logout">Cerrar sesión en este dispositivo</button>
     </section>
   </main>`;

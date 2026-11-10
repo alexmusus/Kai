@@ -22,4 +22,7 @@ export function quotaText(long = false) {
 /** La marca de límite alcanzado en el botón de perfil (body.quota-hit). */
 export function paintQuota() {
   document.body.classList.toggle('quota-hit', !!quotaUntil());
+  // el texto de Ajustes, si está a la vista, se pone al día sin tener que volver a entrar
+  const line = document.getElementById('quota-text');
+  if (line) line.textContent = quotaText(true);
 }

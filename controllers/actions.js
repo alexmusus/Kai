@@ -21,6 +21,7 @@ import { nextUnseen, resumeOffer, prog, setProgress, isLater } from '../models/p
 import { saveMeta } from '../models/fichas.js';
 import { setTmdbKey, saveSyn, translateMissing, resetFichas } from '../models/fichas-sync.js';
 import { idb } from '../models/idb.js';
+import { refreshAccountInfo } from '../models/quota.js';
 import { saveKnown } from '../models/news.js';
 import { nextFor } from '../models/plans.js';
 import { resolveContext } from '../models/context.js';
@@ -368,6 +369,7 @@ const ACTIONS = {
   refresh: refreshNow,
   'sync-now': async () => {
     await sync();
+    refreshAccountInfo(true);
     toast(state.syncState === 'error' ? 'No se pudo sincronizar. Revisa la conexión.' : 'Progreso sincronizado.');
   },
   'set-root': setRoot,

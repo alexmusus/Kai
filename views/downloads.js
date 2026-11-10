@@ -20,6 +20,22 @@ export async function renderDownloads() {
   const metas = [...(await refreshSaved()).values()].filter((m) => m.ep || index.byId.get(m.id));
   if (route().view !== 'descargas') return;
   for (const m of metas) if (!m.ep) m.ep = index.byId.get(m.id).ep;
+  /* Lo que está bajando o esperando su turno también sale, cada uno con su avance: en IndexedDB solo está lo que ya
+   * empezó, así que al poner varios en cola se veía solo el primero hasta que terminaba. */
+  const have = new Set(metas.map((m) => m.id));
+  const pending = [
+    ...Object.keys(state.dls).map((id) => {
+      const e = index.byId.get(id);
+      const ep = e ? e.ep : knownEps.get(id);
+      return ep ? { ep, title: titleFor(ep) } : null;
+    }),
+    ...state.queue,
+  ];
+  for (const q of pending) {
+    if (!q || have.has(q.ep.id)) continue;
+    have.add(q.ep.id);
+    metas.push({ id: q.ep.id, ep: q.ep, title: q.title, done: false });
+  }
   metas.forEach((m) => {
     if (!index.byId.has(m.id)) knownEps.set(m.id, m.ep);
   });

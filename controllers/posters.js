@@ -1,30 +1,50 @@
 /*
- * controllers/posters.js — lo que se puede hacer con el póster de una serie sin entrar a ella (y las flechas de las
- * filas que se deslizan, en la computadora):
+ * controllers/posters.js — lo que se puede hacer con el póster de una serie o de una película sin entrar a ella (y las
+ * flechas de las filas que se deslizan, en la computadora):
  *  - en el teléfono, mantenerlo presionado abre un menú rápido (ver, Más tarde, descargar, marcar como vista);
  *  - en la computadora, dejar el ratón encima un momento muestra una tarjeta con la sinopsis y el botón para ver.
  */
 import { esc, plural } from '../lib/util.js';
 import { state } from '../models/store.js';
 import { prog, isLater, setProgress } from '../models/progress.js';
-import { heroPlan } from '../models/plans.js';
+import { heroPlan, moviePlan } from '../models/plans.js';
 import { displayMeta, synopsisOf } from '../models/fichas.js';
-import { isCollection } from '../models/collections.js';
+import { isCollection, collectionItems, itemMeta, movieTitle } from '../models/collections.js';
+import { movieHref } from '../lib/route.js';
 import { app } from '../views/components.js';
 import { showSheet, closeSheet, askConfirm } from '../views/sheet.js';
 import { ICON } from '../views/icons.js';
 import { softRender } from './router.js';
 import { sync } from './sync.js';
 
-/** El póster de serie (no película ni capítulo) bajo ese elemento, y su serie. @param {EventTarget | null} t */
+/**
+ * El póster (de serie o de película, no de capítulo) bajo ese elemento: su serie y, si es una película, cuál.
+ * `id` lo distingue de los demás ("3" una serie, "5/Kimi no Na wa" una película).
+ * @param {EventTarget | null} t
+ */
 function seriesPoster(t) {
   const a = /** @type {HTMLAnchorElement | null} */ (
-    t instanceof Element ? t.closest('a.shelf-item[href^="#/serie/"]') : null
+    t instanceof Element ? t.closest('a.shelf-item[href^="#/serie/"], a.shelf-item[href^="#/pelicula/"]') : null
   );
   if (!a || !app.contains(a)) return null;
-  const si = Number(a.getAttribute('href').split('/')[2]);
+  const parts = (a.getAttribute('href') || '').split('/');
+  const si = Number(parts[2]);
   const s = state.library && state.library.series[si];
-  return s && !isCollection(s) ? { a, si, s } : null;
+  if (!s) return null;
+  if (parts[1] === 'pelicula') {
+    const key = decodeURIComponent(parts.slice(3).join('/'));
+    const it = isCollection(s) ? collectionItems(s).find((x) => x.key === key) : null;
+    return it ? { a, si, s, it, id: `${si}/${key}` } : null;
+  }
+  return isCollection(s) ? null : { a, si, s, it: null, id: String(si) };
+}
+
+/** Lo que se dice de una película: el botón grande, sus datos y la sinopsis. */
+function aboutMovie(s, it) {
+  const plan = moviePlan(it);
+  const m = itemMeta(s, it.key);
+  const facts = [m && m.year, m && m.format, plan.seen ? 'Vista' : plan.left].filter(Boolean);
+  return { plan, m, facts, syn: synopsisOf(m), title: movieTitle(s, it) };
 }
 
 /** Lo que se dice de una serie: el botón grande, cuánto lleva y la sinopsis. */
@@ -70,6 +90,45 @@ export function openPosterSheet(si) {
   );
 }
 
+/** El menú rápido de una película. @param {number} si @param {string} key */
+export function openMovieSheet(si, key) {
+  const s = state.library && state.library.series[si];
+  const it = s && collectionItems(s).find((x) => x.key === key);
+  if (!s || !it) return;
+  const { plan, title } = aboutMovie(s, it);
+  const attrs = `data-si="${si}" data-key="${esc(it.key)}"`;
+  const pending = it.eps.some((e) => !state.saved.has(e.id));
+  showSheet(
+    `<div class="sheet-back" data-act="close"></div>
+    <div class="sheet-panel" role="dialog" aria-modal="true" aria-label="${esc(title)}">
+      <p class="sheet-title">${esc(title)}</p>
+      <p class="sheet-sub">${esc(plan.seen ? 'Ya la viste' : plan.left ? `${plan.label}, ${plan.left}` : plan.label)}</p>
+      <a class="sheet-btn" data-act="close" href="#/play/${encodeURIComponent(plan.ep.id)}">${esc(plan.label)}</a>
+      <a class="sheet-btn" data-act="close" href="${movieHref(si, it.key)}">Ir a la película</a>
+      <button class="sheet-btn" data-act="later-item" ${attrs}>${isLater(s, it.key) ? 'Quitar de Más tarde' : 'Ver más tarde'}</button>
+      ${pending ? `<button class="sheet-btn" data-act="movie-dl" ${attrs}>Descargar</button>` : ''}
+      <button class="sheet-btn" data-act="qs-seen">${plan.seen ? 'Marcar como no vista' : 'Marcar como vista'}</button>
+      <button class="sheet-btn is-quiet" data-act="close">Cerrar</button>
+    </div>`,
+    (e) => {
+      const b = /** @type {HTMLElement | null} */ (/** @type {HTMLElement} */ (e.target).closest('[data-act]'));
+      if (!b) return;
+      closeSheet(); // "later-item" y "movie-dl" los hace el manejador de siempre (el clic sigue hasta el documento)
+      if (b.dataset.act === 'later-item') setTimeout(softRender, 0);
+      if (b.dataset.act === 'qs-seen') {
+        // una película se marca de una vez (es una sola; lo de preguntar es para una serie entera)
+        const seen = !plan.seen;
+        for (const ep of it.eps) {
+          const d = (prog(ep) || {}).d || 0;
+          setProgress(ep, seen ? d : 0, d, seen);
+        }
+        softRender();
+        sync();
+      }
+    },
+  );
+}
+
 /** Marca (o desmarca) todos los capítulos de una serie, preguntando antes. */
 async function markSeries(s, seen) {
   const ok = await askConfirm(seen ? `¿Marcar ${s.name} como vista?` : `¿Marcar ${s.name} como no vista?`, {
@@ -87,7 +146,7 @@ async function markSeries(s, seen) {
   sync();
 }
 
-let press = /** @type {{ timer: number, x: number, y: number, si: number } | null} */ (null);
+let press = /** @type {{ timer: number, x: number, y: number, si: number, key: string | null } | null} */ (null);
 let swallowUntil = 0; // el clic que sigue a mantener presionado no abre la serie
 function cancelPress() {
   if (press) clearTimeout(press.timer);
@@ -102,13 +161,15 @@ app.addEventListener('pointerdown', (e) => {
     x: e.clientX,
     y: e.clientY,
     si: p.si,
+    key: p.it ? p.it.key : null,
     timer: window.setTimeout(() => {
       if (!press) return;
-      const si = press.si;
+      const { si, key } = press;
       press = null;
       swallowUntil = Date.now() + 800;
       navigator.vibrate?.(12);
-      openPosterSheet(si);
+      if (key != null) openMovieSheet(si, key);
+      else openPosterSheet(si);
     }, 480),
   };
 });
@@ -143,30 +204,39 @@ const card = document.createElement('div');
 card.className = 'poster-card';
 card.hidden = true;
 document.body.appendChild(card);
-let cardSi = -1;
+let cardId = ''; // el póster cuya tarjeta está a la vista ('' = ninguna)
 let showTimer = 0;
 let hideTimer = 0;
 
 function hideCard() {
   clearTimeout(showTimer);
-  cardSi = -1;
+  cardId = '';
   card.classList.remove('is-in');
   hideTimer = window.setTimeout(() => {
-    if (cardSi < 0) card.hidden = true;
+    if (!cardId) card.hidden = true;
   }, 160);
 }
 
-/** Muestra la tarjeta de la serie junto a su póster (a la derecha; si no cabe, a la izquierda). */
-function showCard(/** @type {HTMLElement} */ a, /** @type {number} */ si) {
-  const s = state.library && state.library.series[si];
-  if (!s) return;
-  const { plan, facts, syn } = about(s);
-  card.innerHTML = `<p class="pc-title">${esc(s.name)}</p>
-    <p class="pc-facts">${facts.map((f) => `<span>${esc(String(f))}</span>`).join('')}</p>
+/** Muestra la tarjeta de la serie o película junto a su póster (a la derecha; si no cabe, a la izquierda). */
+function showCard(/** @type {NonNullable<ReturnType<typeof seriesPoster>>} */ p) {
+  const { a, si, s, it } = p;
+  const mv = it ? aboutMovie(s, it) : null;
+  const sr = it ? null : about(s);
+  const title = mv ? mv.title : s.name;
+  const facts = mv ? mv.facts : /** @type {any} */ (sr).facts;
+  const syn = mv ? mv.syn : /** @type {any} */ (sr).syn;
+  const playId = mv ? mv.plan.ep.id : /** @type {any} */ (sr).plan.next && /** @type {any} */ (sr).plan.next.id;
+  const label = mv ? mv.plan.label : /** @type {any} */ (sr).plan.label;
+  const later = isLater(s, it ? it.key : '');
+  const laterAttrs = it
+    ? `data-act="later-item" data-si="${si}" data-key="${esc(it.key)}"`
+    : `data-act="later" data-si="${si}"`;
+  card.innerHTML = `<p class="pc-title">${esc(title)}</p>
+    <p class="pc-facts">${facts.map((/** @type {unknown} */ f) => `<span>${esc(String(f))}</span>`).join('')}</p>
     ${syn ? `<p class="pc-syn">${esc(syn)}</p>` : ''}
     <div class="pc-actions">
-      ${plan.next ? `<a class="tv-btn is-primary" href="#/play/${encodeURIComponent(plan.next.id)}">${ICON.play}<span>${esc(plan.label)}</span></a>` : ''}
-      <button class="pc-btn" data-act="later" data-si="${si}" aria-label="Más tarde" aria-pressed="${isLater(s)}">${isLater(s) ? ICON.laterOn : ICON.later}</button>
+      ${playId ? `<a class="tv-btn is-primary" href="#/play/${encodeURIComponent(playId)}">${ICON.play}<span>${esc(label)}</span></a>` : ''}
+      <button class="pc-btn" ${laterAttrs} aria-label="Más tarde" aria-pressed="${later}">${later ? ICON.laterOn : ICON.later}</button>
     </div>`;
   const r = (a.querySelector('.shelf-poster') || a).getBoundingClientRect();
   const W = 320;
@@ -177,7 +247,7 @@ function showCard(/** @type {HTMLElement} */ a, /** @type {number} */ si) {
   card.dataset.side = right ? 'right' : 'left';
   clearTimeout(hideTimer);
   card.hidden = false;
-  cardSi = si;
+  cardId = p.id;
   requestAnimationFrame(() => card.classList.add('is-in'));
 }
 
@@ -186,9 +256,9 @@ app.addEventListener('pointerover', (e) => {
   if (e.pointerType !== 'mouse' || !HOVER.matches) return;
   const p = seriesPoster(e.target);
   if (!p) return;
-  if (p.si === cardSi) return clearTimeout(hideTimer);
+  if (p.id === cardId) return clearTimeout(hideTimer);
   clearTimeout(showTimer);
-  showTimer = window.setTimeout(() => showCard(p.a, p.si), cardSi >= 0 ? 120 : 550);
+  showTimer = window.setTimeout(() => showCard(p), cardId ? 120 : 550);
 });
 app.addEventListener('pointerout', (e) => {
   if (e.pointerType !== 'mouse') return;
@@ -201,18 +271,21 @@ app.addEventListener('pointerout', (e) => {
 card.addEventListener('pointerenter', () => clearTimeout(hideTimer));
 card.addEventListener('pointerleave', () => (hideTimer = window.setTimeout(hideCard, 180)));
 card.addEventListener('click', (e) => {
-  const b = /** @type {HTMLElement} */ (e.target).closest('[data-act="later"]');
-  if (b) setTimeout(() => cardSi >= 0 && card.querySelector('[data-act="later"]') && refreshLater(b), 0);
+  const b = /** @type {HTMLElement | null} */ (
+    /** @type {HTMLElement} */ (e.target).closest('[data-act="later"], [data-act="later-item"]')
+  );
+  if (b) setTimeout(() => cardId && card.contains(b) && refreshLater(b), 0);
   else if (/** @type {HTMLElement} */ (e.target).closest('a')) hideCard();
 });
 function refreshLater(/** @type {HTMLElement} */ b) {
   const s = state.library && state.library.series[Number(b.dataset.si)];
   if (!s) return;
-  b.setAttribute('aria-pressed', String(isLater(s)));
-  b.innerHTML = isLater(s) ? ICON.laterOn : ICON.later;
+  const on = isLater(s, b.dataset.key || '');
+  b.setAttribute('aria-pressed', String(on));
+  b.innerHTML = on ? ICON.laterOn : ICON.later;
 }
 // al cambiar de página o desplazarse, la tarjeta se va
-addEventListener('scroll', () => cardSi >= 0 && hideCard(), { passive: true });
+addEventListener('scroll', () => cardId && hideCard(), { passive: true });
 addEventListener('hashchange', hideCard);
 
 /* ── filas que se deslizan: flechas en la computadora ── */

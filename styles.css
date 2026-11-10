@@ -1859,6 +1859,15 @@ html.calm .mini > :not(.mini-video) { transition: none; }
 .stat span { font-size: 13px; color: var(--dim); }
 .stats-month { margin: 0 0 8px; }
 .stats-month strong { color: var(--text); font-weight: 600; }
+/* Ajustes: lo que casi nunca se toca va plegado (se abre al tocar el título) */
+.settings-fold > summary { cursor: pointer; list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px; font-weight: 600; }
+.settings-fold > summary::-webkit-details-marker { display: none; }
+.settings-fold > summary::after { content: ''; width: 9px; height: 9px; flex: none; margin-right: 4px; border-right: 2px solid var(--dim); border-bottom: 2px solid var(--dim); transform: rotate(45deg); transition: transform 0.2s; }
+.settings-fold[open] > summary::after { transform: rotate(-135deg); }
+.settings-fold { display: block; justify-self: stretch; }
+.settings-fold > * + * { margin-top: 12px; }
+.settings-fold:not(.settings-group) { margin-top: 4px; }
+.settings-fold .settings-group { margin-top: 18px; padding: 0; border: 0; background: none; box-shadow: none; }
 .stats-done summary { cursor: pointer; color: var(--accent); font-size: 14px; font-weight: 600; }
 .stats-done p { margin: 6px 0 0; line-height: 1.5; }
 @media (max-width: 400px) { .stat { padding: 10px; } .stat b { font-size: 19px; } }
