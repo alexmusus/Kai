@@ -1,7 +1,9 @@
 // Avisos, cuota y lectura de archivos de MEGA (lib/events.js, models/quota.js, models/mega.js).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { on, emit } from '../../lib/events.js';
-import { countBytes, noteQuota, quotaUntil, xferUsed } from '../../models/quota.js';
+import { countBytes, noteQuota, quotaUntil, xferUsed, refreshAccountInfo, proQuota } from '../../models/quota.js';
+import { state } from '../../models/store.js';
+import { quotaText } from '../../views/quota.js';
 import { readJson, megaMessage, filesNamed, goneNodes } from '../../models/mega.js';
 
 beforeEach(() => {
@@ -56,6 +58,20 @@ describe('cuota', () => {
     expect(quotaUntil()).toBe(0);
     noteQuota(0); // sin segundos no se anota nada
     expect(quotaUntil()).toBe(0);
+  });
+  it('cuenta Pro: lo usado es lo bajado más lo que se bajó de tus enlaces, y dice cuándo se revisó', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(5_000_000);
+    const request = vi.fn(async () => ({ utype: 1, mxfer: 4e12, caxfer: 1e9, csxfer: 5e8 }));
+    const before = state.storage;
+    state.storage = /** @type {any} */ ({ api: { request } });
+    await refreshAccountInfo(true);
+    expect(proQuota()).toEqual({ used: 1.5e9, total: 4e12, at: 5_000_000 });
+    expect(quotaText(true)).toContain('Al día.');
+    vi.setSystemTime(5_000_000 + 12 * 60000);
+    expect(quotaText(true)).toContain('Revisado hace 12 min.');
+    expect(quotaText()).not.toContain('Revisado');
+    state.storage = before;
   });
   it('el mensaje del límite dice cuánto falta', () => {
     vi.useFakeTimers();

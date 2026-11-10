@@ -11,7 +11,12 @@ export function quotaText(long = false) {
   const until = quotaUntil();
   if (until) return `Límite de MEGA alcanzado. Se renueva en ${fmtWait(Math.ceil((until - Date.now()) / 60000))}.`;
   const pro = proQuota();
-  if (pro) return `Transferencia de MEGA: ${fmtSize(pro.used)} de ${fmtSize(pro.total)}.`;
+  if (pro) {
+    const m = pro.at ? Math.round((Date.now() - pro.at) / 60000) : -1;
+    const when =
+      !long || m < 0 ? '' : m < 2 ? ' Al día.' : ` Revisado hace ${m < 60 ? `${m} min` : `${Math.round(m / 60)} h`}.`;
+    return `Transferencia de MEGA: ${fmtSize(pro.used)} de ${fmtSize(pro.total)}.${when}`;
+  }
   const used = xferUsed();
   if (!used) return long ? 'Kai no ha usado transferencia de MEGA en las últimas 6 horas.' : '';
   return long

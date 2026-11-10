@@ -46,7 +46,7 @@ export function quotaUntil() {
   return q && q.until > Date.now() ? q.until : 0;
 }
 
-/** Cuota de la cuenta Pro, si es Pro. @returns {{ used: number, total: number } | null} */
+/** Cuota de la cuenta Pro, si es Pro, y cuándo se preguntó. @returns {{ used: number, total: number, at?: number } | null} */
 export const proQuota = () => LS.get(KEY_PRO, null);
 
 let askedAt = 0;
@@ -61,7 +61,10 @@ export async function refreshAccountInfo(force = false) {
   askedAt = Date.now();
   try {
     const r = await state.storage.api.request({ a: 'uq', xfer: 1, pro: 1 });
-    if (r && r.utype > 0 && r.mxfer) LS.set(KEY_PRO, { used: r.caxfer || 0, total: r.mxfer });
+    // lo usado es lo que bajaste tú (caxfer) más lo que se bajó de tus enlaces (csxfer), como lo cuenta MEGA en su
+    // web: antes solo caxfer, y si lo que subía era lo otro, el número parecía no moverse
+    if (r && r.utype > 0 && r.mxfer)
+      LS.set(KEY_PRO, { used: (r.caxfer || 0) + (r.csxfer || 0), total: r.mxfer, at: Date.now() });
     else LS.del(KEY_PRO);
     emit('quota');
   } catch {

@@ -18,6 +18,7 @@ const CAMBIOS = [
   'Cada tono tiene su color: el botón principal, la pestaña abierta, lo que eliges y la barra de avance combinan con el fondo.',
   'Estilo nuevo, Bloques (Ajustes → Apariencia): superficies lisas, letra de máquina en los datos y cuatro tonos: Grafito, Bosque, Piedra y Papel.',
   'Bloques no usa desenfoques, así que también va más liviano en teléfonos que se traban.',
+  'La transferencia de MEGA en Ajustes cuenta todo lo que cuenta MEGA y dice cuándo se revisó por última vez.',
 ];
 const SHELL = [
   './', 'styles.css', 'app.js', 'core.js', 'models/mp4.js', 'models/meta-api.js',
@@ -53,8 +54,10 @@ function reportBytes(n) {
     const n2 = pendingBytes;
     pendingBytes = 0;
     bytesTimer = null;
+    // a una sola ventana (si no, se contaría dos veces), la que está a la vista si hay una
     const list = await self.clients.matchAll({ type: 'window' });
-    if (list[0]) list[0].postMessage({ type: 'mega-bytes', n: n2 });
+    const c = list.find((w) => w.visibilityState === 'visible') || list[0];
+    if (c) c.postMessage({ type: 'mega-bytes', n: n2 });
   }, 2000);
 }
 async function reportQuota(timeLeft) {
