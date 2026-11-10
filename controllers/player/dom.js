@@ -31,6 +31,25 @@ export const ui = {
 
 export const mini = $('#mini');
 
+/**
+ * Mueve un elemento a otro lugar de la página. Donde el navegador lo permite (moveBefore; Chrome, también en Android)
+ * lo mueve sin desmontarlo: el video no pierde su superficie ni se vuelve a montar (en teléfonos de gama media, al
+ * agrandar o achicar quedaba mal un momento y después se acomodaba). Donde no (Safari), se inserta como siempre.
+ * @param {Element} parent @param {Element} el @param {Node | null} [before]
+ */
+export function moveInto(parent, el, before = null) {
+  const p = /** @type {any} */ (parent);
+  if (typeof p.moveBefore === 'function' && el.isConnected && parent.isConnected) {
+    try {
+      p.moveBefore(el, before);
+      return;
+    } catch {
+      /* no se pudo mover así: se inserta como siempre */
+    }
+  }
+  parent.insertBefore(el, before);
+}
+
 /* Gestos sobre el video.
  * Mouse: un clic pausa, doble clic pantalla completa.
  * Táctil: un toque muestra u oculta los controles; doble toque a la izquierda o derecha salta 10 s

@@ -1353,7 +1353,9 @@ html.lite .dock-bar::before { background: var(--glass-solid); -webkit-backdrop-f
   html.has-mini .dock { bottom: max(8px, calc(env(safe-area-inset-bottom) - 12px)); }
   html.has-mini .pick-bar, html.has-mini .toast { bottom: calc(74px + var(--mini-space) + max(8px, calc(env(safe-area-inset-bottom) - 12px))); }
   body:has(main.watch) { padding-bottom: 0; }
-  body:has(main.watch) .mini { bottom: calc(18px + env(safe-area-inset-bottom)); }
+  /* mientras vuela no cuenta: sale de la página del reproductor y aterriza en la de atrás, donde va encima de la
+   * barra flotante; si cambiaba de altura a medio vuelo, daba un salto */
+  body:has(main.watch) .mini:not(.is-flying) { bottom: calc(18px + env(safe-area-inset-bottom)); }
 }
 /* PC: la barra va arriba, al centro, con el texto al lado del ícono */
 @media (min-width: 900px) {
@@ -1805,6 +1807,9 @@ section.empty .btn { margin-top: 10px; }
 .mini > :not(.mini-video) { transition: opacity 0.18s; }
 .mini.is-flying { background: transparent; box-shadow: none; border-color: transparent; }
 .mini.is-flying > :not(.mini-video) { opacity: 0; transition: none; }
+/* al aterrizar, el título y los botones del mini aparecen con un fundido corto (antes aparecían de golpe) */
+.mini > :not(.mini-video) { transition: opacity 120ms ease-out; }
+html.calm .mini > :not(.mini-video) { transition: none; }
 
 /* reproductor: los botones de arriba sin barra de fondo, como en el resto de Kai (la barra gris y el brillo de la
  * serie debajo dejaban una franja de otro tono justo encima del video) */

@@ -33,7 +33,10 @@ import { hydrateThumbs } from '../views/thumbs.js';
 /** Lo que el enrutador necesita del reproductor. */
 const player = {
   /** ¿hay un video cargado? */ hasMedia: () => false,
-  /** pasa al mini reproductor */ toMini: () => {},
+  /** pasa al mini reproductor; con `from`, volando desde ahí @param {{ from?: DOMRect }} [opts] */ toMini: (
+    opts,
+  ) => {},
+  /** dónde se ve el video, si está en la página de reproducción @returns {DOMRect | null} */ rect: () => null,
   /** detiene y cierra el video */ stop: () => {},
   /** dibuja la página de reproducción de ese capítulo @param {string} id */ show: (id) => {},
   /** redibuja la información junto al video (sin tocar el video) */ refreshInfo: () => {},
@@ -287,8 +290,13 @@ function draw() {
     setTint(si != null && state.library && state.library.series[si] ? seriesColor(state.library.series[si]) : null);
     player.show(arg);
   } else {
-    if (player.hasMedia()) player.toMini();
-    else player.stop();
+    if (player.hasMedia()) {
+      /* Al salir del reproductor con la flecha, "atrás" o un enlace, el video vuela al mini desde donde estaba (antes
+       * saltaba de tamaño en un cuadro; solo deslizarlo hacia abajo tenía vuelo). Se mide antes de dibujar la página
+       * nueva. Si ya está en el mini no hay nada que medir. */
+      const from = player.rect();
+      player.toMini(from ? { from } : undefined);
+    } else player.stop();
     setTint(null);
     const before = [...app.childNodes];
     if (view === 'serie') renderSeries(arg);

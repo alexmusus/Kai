@@ -4,7 +4,7 @@
  */
 
 import { P } from './state.js';
-import { stage, mini, video } from './dom.js';
+import { stage, mini, video, moveInto } from './dom.js';
 import { $ } from '../../lib/util.js';
 import { calmMotion, motionMs, motionEase } from '../../lib/motion.js';
 import { episodeLabel } from '../../models/collections.js';
@@ -97,7 +97,9 @@ export function enterMini({ from, opacity } = {}) {
   if (document.body.classList.contains('lights-off')) setLights(false);
   closeMenu();
   const slot = $('#mini-slot');
-  if (stage.parentElement !== slot) slot.prepend(stage);
+  // el mini se muestra antes de recibir el video: así el video nunca pasa por un contenedor oculto
+  mini.hidden = false;
+  if (stage.parentElement !== slot) moveInto(slot, stage, slot.firstChild);
   // lo que le dejó el gesto de deslizar hacia abajo
   stage.style.transition = '';
   stage.style.transform = '';
@@ -105,17 +107,16 @@ export function enterMini({ from, opacity } = {}) {
   stage.style.opacity = '';
   stage.classList.add('is-mini');
   stage.hidden = false;
-  mini.hidden = false;
   document.documentElement.classList.add('has-mini');
   paintMini();
   if (from && wasHidden && !calmMotion()) {
     mini.style.animation = 'none'; // la entrada de siempre (CSS) no se suma al vuelo
+    // "volando" se marca antes de medir: el mini se mide donde va a aterrizar (styles.css, .mini:not(.is-flying))
+    mini.classList.add('is-flying');
+    const land = () => mini.classList.remove('is-flying');
     const fly = flyFrom(mini, from, /** @type {HTMLElement} */ ($('#mini-slot')).getBoundingClientRect(), opacity);
-    if (fly) {
-      mini.classList.add('is-flying');
-      const land = () => mini.classList.remove('is-flying');
-      fly.finished.then(land, land);
-    }
+    if (fly) fly.finished.then(land, land);
+    else land();
     return fly;
   }
   return null;

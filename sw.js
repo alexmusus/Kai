@@ -9,27 +9,20 @@ importScripts('core.js');
 /* VERSION es la de Kai que se ve en Ajustes: sube solo al pasar algo a main (lo publicado). ENTREGA cuenta las
  * subidas a prueba dentro de esa versión: sube en cada una (el navegador solo instala de nuevo si este archivo
  * cambia) y vuelve a 1 cuando sube VERSION. */
-const VERSION = 42;
-const ENTREGA = 4;
+const VERSION = 43;
+const ENTREGA = 1;
 const CACHE = `kai-${VERSION}.${ENTREGA}`;
 /* Lo que cambió en esta versión, corto y en palabras de todos los días: lo muestran la burbuja de "Versión nueva"
  * (al tocarla) y Ajustes → Versión. Se escribe de nuevo al empezar cada versión. */
 const CAMBIOS = [
+  'Perfiles: lo que ve cada quien ya no se puede mezclar al cambiar de perfil, y lo último que viste se sube aunque cambies enseguida.',
+  'Si un dispositivo tiene la hora adelantada, ya no pisa lo que viste después en otro.',
+  'Kai se actualiza sola al volver a abrirla, si no estás viendo ni descargando nada.',
+  'Al salir del reproductor con la flecha o con "atrás", el video vuela al mini (antes saltaba de tamaño).',
+  'Al tocar el mini, el video se agranda sin esperar a que cargue la lista de capítulos.',
   'Ajustes → Apariencia: Animaciones (completas o reducidas) y Modo liviano, para teléfonos donde Kai se traba.',
   'Con tema claro, Kai ya no abre con un destello oscuro.',
-  'Kai se actualiza sola al volver a abrirla, si no estás viendo ni descargando nada.',
-  'Perfiles: lo último que viste se sube aunque cambies de perfil enseguida, y lo que marcas mientras se sincroniza ya no se queda sin subir.',
-  'En el teléfono, el video se queda arriba mientras bajas a ver los capítulos.',
-  'En la barra del video, el teléfono muestra solo el capítulo; la computadora, la serie y el capítulo.',
-  'Seleccionar capítulos: «Todos» de una vez y, en la computadora, Shift + clic para elegir varios seguidos.',
-  'Descargados: un botón para quitar de una vez lo que ya viste.',
-  'En pantallas grandes, el inicio y el catálogo aprovechan mejor el espacio, y Descubrir va en una sola fila.',
-  'En la computadora, Kai (el gatito) ocupa el lugar del saludo.',
-  'La barra flotante del teléfono se achica más suave.',
-  'En el teléfono, mantener presionado un póster abre un menú rápido; en la computadora, pasar el ratón muestra la sinopsis.',
-  'En la computadora, las filas de pósters tienen flechas para avanzar.',
-  'Ajustes → Tu resumen: cuánto has visto, las series terminadas y lo más visto del mes.',
-  'Studio: reproducir todo seguido o en aleatorio.',
+  'Al pasar el video al mini, la página de atrás aparece más rápido.',
 ];
 const SHELL = [
   './', 'styles.css', 'app.js', 'core.js', 'models/mp4.js', 'models/meta-api.js',

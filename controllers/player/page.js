@@ -10,7 +10,7 @@ import { LS, $, esc } from '../../lib/util.js';
 import { app, header } from '../../views/components.js';
 import { go } from '../router.js';
 import { P } from './state.js';
-import { stage, parking, mini } from './dom.js';
+import { stage, parking, mini, moveInto } from './dom.js';
 import { leaveMini, flyFrom, calmMotion } from './mini.js';
 import { motionMs } from '../../lib/motion.js';
 import { startPlayback } from './engine.js';
@@ -35,11 +35,14 @@ export function renderWatch(id) {
     return;
   }
   const same = P.playing && P.playing.ep.id === id && stage.isConnected && app.contains(stage);
+  /** @type {Animation | null} el vuelo del video desde el mini, si lo hay */
+  let fly = null;
   if (!same) {
     // desde el mini, el video crece desde donde estaba el mini hasta su lugar
     const from = !mini.hidden ? /** @type {HTMLElement} */ ($('#mini-slot')).getBoundingClientRect() : null;
-    leaveMini();
-    parkStage();
+    /* El video solo se guarda aparte si está dentro de la página que se va a reemplazar (si no, se borraría con ella).
+     * Viniendo del mini está fuera: pasa directo del mini a su lugar, sin pasar por el contenedor oculto. */
+    if (app.contains(stage)) parkStage();
     app.innerHTML =
       header('') +
       `<main class="watch">
@@ -52,10 +55,11 @@ export function renderWatch(id) {
       </div>
     </main>`;
     const slot = $('#stage-slot');
-    slot.appendChild(stage);
+    moveInto(slot, stage);
+    leaveMini();
     watchStuck(slot);
     if (from) {
-      flyFrom(slot, from, slot.getBoundingClientRect());
+      fly = flyFrom(slot, from, slot.getBoundingClientRect());
       // lo demás de la página aparece un poco después, cuando el video ya va llegando
       if (!calmMotion())
         for (const el of app.querySelectorAll('.watch-info, .watch-list'))
@@ -70,20 +74,42 @@ export function renderWatch(id) {
     if (!P.playing || P.playing.ep.id !== id) startPlayback(ctx);
     else P.playing.ctx = ctx;
   }
-  paintWatchInfo();
+  if (!fly) {
+    paintWatchInfo();
+    return;
+  }
+  /* Con vuelo: el título se pinta ya; la lista de capítulos (con sus miniaturas, lo más pesado de la página) se pinta
+   * cuando el video llegó a su lugar. Armarla antes retrasaba el primer cuadro de la animación. */
+  paintWatchText();
+  const list = () => {
+    if (route().view === 'play' && P.playing && P.playing.ep.id === id) paintWatchList();
+  };
+  fly.finished.then(list, list);
 }
 
+/** La información junto al video: el título y los botones, y la lista de la temporada. */
 export function paintWatchInfo() {
-  if (!P.playing || route().view !== 'play') return;
+  paintWatchText();
+  paintWatchList();
+}
+
+/** El capítulo que suena y su serie, si se está en la página de reproducción. */
+function watchContext() {
+  if (!P.playing || route().view !== 'play') return null;
   const ctx = resolveContext(P.playing.ep.id) || P.playing.ctx;
   P.playing.ctx = ctx;
   const ep = P.playing.ep;
-  const i = ctx.list.findIndex((x) => x.id === ep.id);
+  return { ctx, ep, i: ctx.list.findIndex((/** @type {any} */ x) => x.id === ep.id) };
+}
+
+function paintWatchText() {
+  const w = watchContext();
+  const info = $('#watch-info');
+  if (!w || !info) return;
+  const { ctx, ep, i } = w;
   const prev = ctx.list[i - 1];
   const next = ctx.list[i + 1];
   const upcoming = nextUnseen(ep, ctx.list, 3).filter((x) => !state.saved.has(x.id) && !state.dls[x.id]);
-  const info = $('#watch-info');
-  if (!info) return;
   const studio = isStudio(state.library && ctx.si != null ? state.library.series[ctx.si] : null);
   info.innerHTML = `<div class="watch-text">
       <a class="watch-series" href="${ctx.back}">${esc(ctx.title)}</a>
@@ -98,7 +124,13 @@ export function paintWatchInfo() {
       ${upcoming.length ? `<button class="btn" data-act="w-dl-next">${ICON.down}<span>Descargar ${upcoming.length === 1 ? 'el siguiente' : `los ${upcoming.length} siguientes`}</span></button>` : ''}
       <button class="icon-btn" data-act="w-more" aria-label="Más opciones">${ICON.more}</button>
     </div>`;
+}
+
+function paintWatchList() {
+  const w = watchContext();
   const list = $('#watch-list');
+  if (!w || !list) return;
+  const { ctx, ep, i } = w;
   const nextUp = ctx.list[i + 1];
   const done = ctx.shown.filter((x) => (prog(x) || {}).w).length;
   list.innerHTML = `<div class="wl-head"><h3 class="wl-title">${esc(ctx.sub || ctx.title)}</h3><span class="wl-count">${done} de ${ctx.shown.length} vistos</span></div>
@@ -156,5 +188,5 @@ function watchStuck(slot) {
 }
 
 export function parkStage() {
-  if (stage.parentElement !== parking) parking.appendChild(stage);
+  if (stage.parentElement !== parking) moveInto(parking, stage);
 }

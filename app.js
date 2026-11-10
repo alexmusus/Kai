@@ -31,7 +31,7 @@ import { initHomeNav } from './controllers/home.js';
 import { initLifecycle } from './controllers/lifecycle.js';
 import { initUpdates } from './controllers/updates.js';
 import { P } from './controllers/player/state.js';
-import { video } from './controllers/player/dom.js';
+import { video, stage } from './controllers/player/dom.js';
 import { enterMini } from './controllers/player/mini.js';
 import { savePosition, stopPlayback } from './controllers/player/engine.js';
 import { renderWatch, paintWatchInfo } from './controllers/player/page.js';
@@ -70,7 +70,8 @@ setInUseCheck((id) => !!(P.playing && P.playing.ep.id === id));
 viewState.isPlaying = () => !!P.playing;
 setPlayer({
   hasMedia: () => !!(P.playing && video.currentSrc),
-  toMini: () => enterMini(),
+  toMini: (opts) => enterMini(opts),
+  rect: () => (stage.parentElement && stage.parentElement.id === 'stage-slot' ? stage.getBoundingClientRect() : null),
   stop: () => stopPlayback(),
   show: (id) => renderWatch(id),
   refreshInfo: () => paintWatchInfo(),
