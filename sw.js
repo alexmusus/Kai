@@ -10,7 +10,7 @@ importScripts('core.js');
  * subidas a prueba dentro de esa versión: sube en cada una (el navegador solo instala de nuevo si este archivo
  * cambia) y vuelve a 1 cuando sube VERSION. */
 const VERSION = 43;
-const ENTREGA = 3;
+const ENTREGA = 1;
 const CACHE = `kai-${VERSION}.${ENTREGA}`;
 /* Lo que cambió en esta versión, corto y en palabras de todos los días: lo muestran la burbuja de "Versión nueva"
  * (al tocarla) y Ajustes → Versión. Se escribe de nuevo al empezar cada versión. */
