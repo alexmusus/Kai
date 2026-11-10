@@ -10,7 +10,7 @@ importScripts('core.js');
  * subidas a prueba dentro de esa versión: sube en cada una (el navegador solo instala de nuevo si este archivo
  * cambia) y vuelve a 1 cuando sube VERSION. */
 const VERSION = 44;
-const ENTREGA = 2;
+const ENTREGA = 3;
 const CACHE = `kai-${VERSION}.${ENTREGA}`;
 /* Lo que cambió en esta versión, corto y en palabras de todos los días: lo muestran la burbuja de "Versión nueva"
  * (al tocarla) y Ajustes → Versión. Se escribe de nuevo al empezar cada versión. */
@@ -18,6 +18,7 @@ const CAMBIOS = [
   'Cada tono tiene su color: el botón principal, la pestaña abierta, lo que eliges y la barra de avance combinan con el fondo.',
   'Ajustes → Avanzado → Laboratorio: lo que está en prueba, solo en este dispositivo. Al encenderlo aparece el estilo Bloques en Apariencia.',
   'Bloques: superficies lisas, letra de máquina en los datos, cuatro tonos (Grafito, Bosque, Piedra y Papel) y animaciones al tocar: la selección se desliza, las casillas saltan, los números suben y cada temporada muestra su avance en un anillo.',
+  'En monitores grandes (1440p): la serie, los capítulos y el reproductor usan más ancho, y Ajustes va en dos columnas.',
   'La transferencia de MEGA en Ajustes cuenta todo lo que cuenta MEGA y dice cuándo se revisó por última vez.',
 ];
 const SHELL = [

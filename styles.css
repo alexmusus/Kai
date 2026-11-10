@@ -1853,6 +1853,19 @@ html.calm .mini > :not(.mini-video) { transition: none; }
   .home-links { max-width: none; }
   .catalog { max-width: 2200px; }
   .catalog .shelf { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 26px 20px; }
+  /* la serie y sus temporadas: más ancho (antes ~1100 px al centro de 2560) y capítulos de 5 en 5 */
+  .tv.is-series .tv-main { max-width: 1720px; }
+  .season-grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 26px 20px; }
+  .episodes.is-grid { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 22px; }
+  .episodes.is-grid .ep-num { font-size: 54px; }
+  /* el reproductor: el video casi a todo lo ancho, sin pasarse del alto de la pantalla, y la lista más cómoda */
+  .watch { max-width: min(2300px, calc((100dvh - 250px) * 16 / 9 + 480px)); }
+  .watch-grid { grid-template-columns: minmax(0, 1fr) 440px; gap: 28px; }
+  /* Ajustes en dos columnas (cada grupo entero en una) */
+  .settings { max-width: 1340px; display: block; columns: 2; column-gap: 18px; }
+  .settings > * { break-inside: avoid; margin: 0 0 14px; }
+  .settings > .settings-fold { column-span: all; }
+  .shelf-main { max-width: 2000px; }
 }
 
 /* Ajustes → tu resumen */
@@ -1987,6 +2000,7 @@ html.lite .poster-card { background: var(--glass-solid); -webkit-backdrop-filter
 [data-style='bloques'] .settings-label::before { content: '● '; color: var(--accent); }
 [data-style='bloques'] .tv-facts { font-size: 12px; }
 [data-style='bloques'] .dock-tab { font-size: 9.5px; }
+@media (min-width: 900px) { [data-style='bloques'] .dock-tab { font-size: 13px; } }
 /* superficies lisas */
 [data-style='bloques'] :is(.settings-group, .stat, .home-link) { background: var(--surface) !important; border: 0 !important; box-shadow: none !important; border-radius: 18px !important; }
 [data-style='bloques'] :is(.tv.is-home .tv-hero, .series-hero, .hero-card) { border-radius: 22px !important; box-shadow: none !important; }
