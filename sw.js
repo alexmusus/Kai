@@ -10,7 +10,7 @@ importScripts('core.js');
  * cada subida dentro de esa versión (el navegador solo instala de nuevo si este archivo cambia) y vuelve a 1 cuando
  * sube VERSION. */
 const VERSION = 44;
-const ENTREGA = 4;
+const ENTREGA = 5;
 const CACHE = `kai-${VERSION}.${ENTREGA}`;
 /* Lo que cambió en esta versión, corto y en palabras de todos los días: lo muestran la burbuja de "Versión nueva"
  * (al tocarla) y Ajustes → Versión. Se escribe de nuevo al empezar cada versión. */
@@ -39,7 +39,7 @@ const SHELL = [
 /* Lo que casi nunca cambia (la librería de MEGA, los íconos y el gatito: unos 680 KB) va en su propia caché, que no
  * se vuelve a bajar con cada versión de Kai. Si cambia uno de estos archivos, sube ASSETS_V (GitHub Actions lo
  * revisa: tests/version-check.mjs). */
-const ASSETS_V = 1;
+const ASSETS_V = 2;
 const ASSET_CACHE = `kai-assets-${ASSETS_V}`;
 const ASSETS = [
   'vendor/mega.js', 'icon-32.png', 'icon-180.png', 'icon-192.png', 'icon-512.png',
