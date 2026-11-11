@@ -179,7 +179,11 @@ export function renderCatalog() {
     $('#cat-q').blur();
   });
   $('#cat-q').addEventListener('input', debounce(paintCatalog, 120));
-  $('#cat-filters').addEventListener('change', paintCatalog);
+  $('#cat-filters').addEventListener('change', (e) => {
+    paintCatalog();
+    // al elegir, el selector suelta el foco: su marco se quedaba puesto un rato después de cerrarse la lista
+    if (e.target instanceof HTMLElement) e.target.blur();
+  });
   paintCatalog();
   if (q.get('buscar') === '1') $('#cat-q').focus();
 }

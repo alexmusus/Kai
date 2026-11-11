@@ -38,7 +38,6 @@ import {
   renderSettings,
   paintCineKey,
   paintDownloadsWhere,
-  playerPrefsHTML,
   avatarPickHTML,
 } from '../views/settings.js';
 import { setProfilePref, setProfileAvatar, setProfileImage } from '../models/profiles.js';
@@ -568,8 +567,15 @@ function pickAvatarImage() {
 /** Una preferencia del reproductor del perfil activo (Ajustes): se guarda, se redibuja su sección y se sincroniza. */
 function setPlayerPref(/** @type {'hold' | 'step'} */ key, /** @type {number} */ v) {
   setProfilePref(key, v);
+  // solo se mueve la opción marcada (redibujar el grupo hacía saltar la píldora)
   const box = $('#player-prefs');
-  if (box) box.innerHTML = playerPrefsHTML();
+  const act = key === 'hold' ? 'set-hold' : 'set-step';
+  if (box)
+    for (const b of box.querySelectorAll(`[data-act="${act}"]`)) {
+      const on = Number(/** @type {HTMLElement} */ (b).dataset.v) === v;
+      b.classList.toggle('is-on', on);
+      b.setAttribute('aria-pressed', String(on));
+    }
   paintControls();
   sync();
 }

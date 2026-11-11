@@ -211,8 +211,27 @@ export function softRender() {
     player.refreshInfo();
     return;
   }
+  /* Con una lista de filtros abierta o escribiendo en un buscador, redibujar la página cerraba la lista o quitaba
+   * el foco (una sincronización que terminaba justo entonces: la lista del catálogo se cerraba sola). Se espera a
+   * que se suelte. */
+  const busy = document.activeElement;
+  if (busy && app.contains(busy) && /^(SELECT|INPUT|TEXTAREA)$/.test(busy.tagName)) {
+    if (!softPending) {
+      softPending = true;
+      busy.addEventListener(
+        'blur',
+        () => {
+          softPending = false;
+          setTimeout(softRender, 0);
+        },
+        { once: true },
+      );
+    }
+    return;
+  }
   render();
 }
+let softPending = false;
 
 /** La página que llega después de leavePage aparece suave (si llegaba de golpe, su portada "saltaba" a la vista
  * mientras el video todavía volaba al mini). */

@@ -6,7 +6,8 @@
 import { resumeOffer } from '../models/progress.js';
 import { app, rowHTML } from './components.js';
 import { movieHref } from '../lib/route.js';
-import { state } from '../models/store.js';
+import { state, visibleProfiles } from '../models/store.js';
+import { avatarHTML } from './account.js';
 import { esc, $, fmtLeft, plural, fmtTime } from '../lib/util.js';
 import {
   catHTML,
@@ -49,12 +50,21 @@ setInterval(() => {
   if (g && g.textContent !== greeting()) g.textContent = greeting();
 }, 60000);
 
+/** Bloques, teléfono: tu avatar arriba, junto a la lupa (abre el menú del perfil). En la computadora y en Vidrio va
+ * en la barra flotante, como siempre. */
+function topAvatarHTML() {
+  if (!isBlocks() || !state.profile) return '';
+  const p = visibleProfiles().find((x) => x.id === state.profile.id) || state.profile;
+  return `<button class="top-avatar" data-act="dock" aria-haspopup="menu" aria-label="Menú de ${esc(p.name)}">${avatarHTML(p)}<span class="top-sync" aria-hidden="true"></span></button>`;
+}
+
 export function tvTop() {
   // cabecera compacta: el nombre de la app (con Kai, el gatito, echado encima en la PC), el saludo y la búsqueda
   return `<header class="tv-top">
     <div class="tv-brand"><span class="tv-word">Kai${catHTML('top')}</span><p class="tv-greet" id="tv-greet">${esc(greeting())}</p></div>
     <div class="tv-top-tools">
       <button class="tv-icon" data-act="home-search" aria-label="Buscar" aria-expanded="false">${ICON.search}</button>
+      ${topAvatarHTML()}
     </div>
   </header>
   <div class="home-search" id="home-search" hidden>

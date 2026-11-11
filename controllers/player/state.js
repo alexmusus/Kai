@@ -18,6 +18,8 @@ export const P = {
   chapCtrl: null,
   /** el último error del flujo de video que avisó el service worker */
   lastStreamError: '',
+  /** @type {number | null} a dónde se está saltando con ± (el video llega un momento después) */
+  jumpTo: null,
   /** @type {number | null} desde dónde se adelantó (para "volver a la intro") */
   seekFrom: null,
   /* toques en el video (doble toque a los lados para ±10 s) */

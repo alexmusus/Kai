@@ -48,7 +48,7 @@ describe('Bloques solo con el Laboratorio', () => {
       theme: 'light',
       style: 'bloques',
       tone: 'papel',
-      color: '#eeede9',
+      color: '#e6e0d5',
       fonts: true,
     });
   });

@@ -16,6 +16,7 @@ export function paintSync() {
   const pending = state.dirty || state.syncState === 'error';
   const st = offline ? 'offline' : state.syncState === 'syncing' ? 'syncing' : pending ? 'pending' : 'ok';
   d.dataset.sync = st;
+  document.documentElement.dataset.sync = st; // también para el avatar de arriba (Bloques, teléfono)
   const btn = d.querySelector('.dock-btn');
   if (btn && btn.dataset.name)
     btn.setAttribute(

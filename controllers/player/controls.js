@@ -54,7 +54,8 @@ export function paintControls() {
     ui.title.innerHTML = v;
   });
   const d = isFinite(video.duration) ? video.duration : 0;
-  const t = P.seeking ? Number(ui.seek.value) : video.currentTime;
+  // a dónde se está saltando (una racha de ±) manda sobre dónde va el video, que llega un momento después
+  const t = P.seeking ? Number(ui.seek.value) : (P.jumpTo ?? video.currentTime);
   ui.seek.max = String(d || 0);
   if (!P.seeking) ui.seek.value = String(t || 0);
   let buf = 0;
@@ -122,9 +123,43 @@ export function stopFast() {
   holdEl.classList.remove('is-on');
 }
 
+/* Saltar ± segundos. Varios toques seguidos son una racha: el primero salta de inmediato; los siguientes se suman
+ * (el aviso dice el total, "+30 s", y la línea de tiempo ya muestra a dónde vas) y el video se mueve una sola vez
+ * cuando paras. Antes cada toque movía el video, y con el capítulo llegando de MEGA cada movimiento es una espera:
+ * tres toques eran tres esperas. */
+let jumpSum = 0;
+let jumpAt = 0;
+let jumpTimer = 0;
+const endJump = () => {
+  P.jumpTo = null;
+  jumpSum = 0;
+};
+video.addEventListener('seeked', () => {
+  if (!jumpTimer) endJump();
+});
+video.addEventListener('emptied', endJump);
+
 export function seekBy(s, { quiet = false } = {}) {
   if (!video.duration) return;
-  video.currentTime = Math.max(0, Math.min(video.duration - 0.5, video.currentTime + s));
+  const now = performance.now();
+  const streak = P.jumpTo != null && now - jumpAt < 800 && Math.sign(s) === Math.sign(jumpSum);
+  jumpAt = now;
+  jumpSum = streak ? jumpSum + s : s;
+  const from = streak ? /** @type {number} */ (P.jumpTo) : video.currentTime;
+  const to = Math.max(0, Math.min(video.duration - 0.5, from + s));
+  P.jumpTo = to;
+  clearTimeout(jumpTimer);
+  if (streak) {
+    jumpTimer = window.setTimeout(() => {
+      jumpTimer = 0;
+      video.currentTime = to;
+    }, 220);
+  } else {
+    jumpTimer = 0;
+    video.currentTime = to;
+  }
+  paintControls(); // la línea de tiempo y el reloj, ya en su lugar nuevo
+  s = jumpSum;
   ui.flash.textContent = s > 0 ? `+${s} s` : `−${-s} s`;
   ui.flash.dataset.side = s > 0 ? 'right' : 'left';
   ui.flash.classList.remove('is-on');

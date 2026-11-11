@@ -30,7 +30,14 @@ jobs:
       - run: npm run types
       - run: npm run format:check
       - run: npx vitest run
-      - run: npx playwright install --with-deps chromium
+      # la descarga de dependencias del sistema a veces falla por la red de GitHub (no por Kai): hasta 3 intentos
+      - name: Navegador de pruebas
+        run: |
+          for i in 1 2 3; do
+            npx playwright install --with-deps chromium && exit 0
+            echo "intento $i falló; se reintenta en 20 s"; sleep 20
+          done
+          exit 1
       - run: npx playwright test
       - uses: actions/upload-artifact@v4
         if: failure()

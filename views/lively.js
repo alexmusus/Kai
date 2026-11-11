@@ -36,7 +36,16 @@ function placePill(g) {
     return;
   }
   const key = g.getAttribute('aria-label') || g.className;
-  const now = { x: sel.offsetLeft, y: sel.offsetTop, w: sel.offsetWidth, h: sel.offsetHeight };
+  // contra el propio grupo: offsetLeft/offsetTop se miden contra otro elemento hasta que el grupo recibe su clase, y
+  // la píldora de un grupo recién dibujado salía desde más abajo (un salto raro al elegir)
+  const gr = g.getBoundingClientRect();
+  const sr = sel.getBoundingClientRect();
+  const now = {
+    x: Math.round(sr.left - gr.left - g.clientLeft),
+    y: Math.round(sr.top - gr.top - g.clientTop),
+    w: Math.round(sr.width),
+    h: Math.round(sr.height),
+  };
   const set = (/** @type {typeof now} */ p) => {
     g.style.setProperty('--pill-x', p.x + 'px');
     g.style.setProperty('--pill-y', p.y + 'px');

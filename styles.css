@@ -1864,7 +1864,7 @@ html.calm .mini > :not(.mini-video) { transition: none; }
   /* Ajustes en dos columnas (cada grupo entero en una) */
   .settings { max-width: 1340px; display: block; columns: 2; column-gap: 18px; }
   .settings > * { break-inside: avoid; margin: 0 0 14px; }
-  .settings > .settings-fold { column-span: all; }
+  /* (Avanzado va en su columna como los demás: ocupando las dos, quedaba montado sobre lo de arriba) */
   .shelf-main { max-width: 2000px; }
 }
 
@@ -1982,11 +1982,11 @@ html.lite .poster-card { background: var(--glass-solid); -webkit-backdrop-filter
   --text: #1b1a17; --dim: #534d43; --faint: #5f594e; --thumb-bg: #c9c2b4; --shadow: rgba(40, 30, 10, 0.12);
   --accent: #2f6b3b; --accent-ink: #f4f1ea; --accent2: #285c33; --chip-bg: #2f6b3b; --chip-ink: #f4f1ea;
 }
-/* Papel: blanco roto y naranja (la letra sobre el naranja es oscura: en blanco no se leía) */
+/* Papel: el beige del tono Arena (un claro que no molesta a la vista) con naranja; la letra sobre el naranja es oscura */
 [data-style='bloques'][data-theme='light'][data-tone='papel'] {
-  --bg: #eeede9; --surface: #ffffff; --surface2: #e2e0da; --edge: rgba(0, 0, 0, 0.06); --dots: rgba(0, 0, 0, 0.1);
-  --text: #1c1c1c; --dim: #5f5e59; --faint: #6c6a65; --thumb-bg: #e2e0da;
-  --accent: #ee7438; --accent-ink: #1c1c1c; --accent2: #b0440f; --chip-bg: #1c1c1c; --chip-ink: #ffffff;
+  --bg: #e6e0d5; --surface: #f2ede3; --surface2: #d8d0c1; --edge: rgba(0, 0, 0, 0.06); --dots: rgba(60, 40, 10, 0.1);
+  --text: #1f1b16; --dim: #5a5348; --faint: #655e52; --thumb-bg: #d8d0c1; --shadow: rgba(40, 30, 10, 0.12);
+  --accent: #e8743a; --accent-ink: #1f1b16; --accent2: #9c3d0d; --chip-bg: #1f1b16; --chip-ink: #f2ede3;
 }
 [data-style='bloques'] body { background: radial-gradient(circle at 1px 1px, var(--dots) 1.1px, transparent 1.4px) 0 0 / 18px 18px, var(--bg); }
 [data-style='bloques'] *, [data-style='bloques'] *::before { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
@@ -2194,7 +2194,8 @@ html[data-style='bloques'] .ficha-card:first-child .ficha-seg i.is-on { backgrou
   /* la sinopsis a la izquierda y la ficha a la derecha */
   .series-about.has-ficha { grid-template-columns: minmax(0, 75ch) minmax(320px, 460px); justify-content: space-between; column-gap: 48px; align-items: start; }
   .series-about.has-ficha > :not(.ficha) { grid-column: 1; }
-  .series-about.has-ficha .ficha { grid-column: 2; grid-row: 1 / span 3; margin-top: 0; }
+  /* en la primera fila nada más: ocupando tres, el navegador repartía su alto entre ellas y dejaba un hueco debajo */
+  .series-about.has-ficha .ficha { grid-column: 2; grid-row: 1; margin-top: 0; }
   .ficha-n { font-size: 44px; }
   /* la barra flota arriba al centro: lo de cada página (el buscador del catálogo, por ejemplo) empieza debajo de ella */
   .bar:not(.is-overlay) { min-height: 76px; }
@@ -2265,3 +2266,35 @@ html[data-style='bloques'] .episodes.is-grid .ep.is-next:not(.is-seen) .ep-more 
 html[data-style='bloques'] .episodes.is-grid .ep.is-next .ep-thumb { box-shadow: none; }
 @media (min-width: 641px) { html[data-style='bloques'] .episodes.is-grid .ep-tools { right: 8px; bottom: 8px; } }
 html[data-style='bloques'] .ep-num { font-family: var(--mono) !important; font-weight: 400 !important; letter-spacing: -0.02em; }
+
+/* ───────────── ajustes de la 44.7 ───────────── */
+/* filtros del catálogo: el marco de foco solo con el teclado, y sobre la pastilla entera */
+.cat-select select:focus, .cat-select select:focus-visible { outline: none; }
+.cat-select:has(select:focus-visible) { box-shadow: inset 0 0 0 2px var(--accent); }
+@media (hover: none) { .cat-select:has(select:focus-visible) { box-shadow: none; } }
+/* Bloques, teléfono: el avatar arriba junto a la lupa; en la barra de abajo quedan solo las pestañas */
+.top-avatar { display: none; }
+@media (max-width: 899px) {
+  html[data-style='bloques'] .top-avatar { position: relative; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 14px; }
+  html[data-style='bloques'] .top-avatar .avatar { width: 40px; height: 40px; border-radius: 14px; font-size: 16px; }
+  html[data-style='bloques'] .top-avatar .avatar.has-img img { border-radius: 14px; }
+  html[data-style='bloques'] .top-sync { position: absolute; right: -2px; bottom: -2px; width: 11px; height: 11px; border-radius: 50%; background: var(--ok, #4caf6a); border: 2px solid var(--bg); }
+  html[data-style='bloques'][data-sync='syncing'] .top-sync, html[data-style='bloques'][data-sync='pending'] .top-sync { background: var(--accent); }
+  html[data-style='bloques'][data-sync='offline'] .top-sync { background: var(--faint); }
+  html[data-style='bloques'] body:has(.tv.is-home) .dock:not(.is-open) .dock-btn { display: none; }
+  html[data-style='bloques'] .tv.is-home .tv-icon { border-radius: 14px; width: 44px; height: 44px; }
+}
+/* reproductor en la computadora: el video ocupa justo su 16:9 (con el alto limitado quedaban franjas negras a los
+ * lados, con sus esquinas curvas) y, en Bloques, sin sombra alrededor */
+@media (min-width: 900px) {
+  .stage-slot .stage:not(.kai-fs):not(:fullscreen) { width: min(100%, calc(78vh * 16 / 9)); max-height: none; margin-inline: auto; }
+  html[data-style='bloques'] .stage-slot .stage { box-shadow: none !important; }
+}
+/* la línea de tiempo: más fácil de agarrar con el dedo sin verse más grande (la zona que responde al toque crece
+ * hacia arriba y hacia abajo; la línea sigue igual de fina) */
+@media (hover: none) {
+  .st-seek { height: 34px; margin: -6px 0; touch-action: none; }
+  .st-seek::-webkit-slider-thumb { width: 16px; height: 16px; margin-top: -6.5px; }
+  .st-seek:active::-webkit-slider-thumb { transform: scale(1.5); }
+  .st-seek:active::-webkit-slider-runnable-track { height: 6px; }
+}
