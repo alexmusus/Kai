@@ -42,6 +42,7 @@ import {
   langChip,
   factRows,
   moviePosterHTML,
+  rowHTML,
 } from './components.js';
 import { esc, plural, hue, $, fmtSize } from '../lib/util.js';
 import { langText } from '../models/naming.js';
@@ -61,10 +62,37 @@ export function langSwitchHTML(s, langs) {
 function heroCardHTML({ m, thumbId = '', kicker = '', title, alt = '', facts = '', lang = '', actions }) {
   return `<section class="series-hero hero-card">${heroArtHTML(m, thumbId)}<div class="tvh-text">${kicker}<h2 class="tv-title${titleSize(title)}">${esc(title)}</h2>${alt}${facts}${lang ? `<div class="hero-lang">${lang}</div>` : ''}<div class="tv-actions">${actions}</div></div></section>`;
 }
-/** La sinopsis y el botón para traducirla, debajo de la tarjeta. */
-function aboutHTML(syn, translate) {
-  return syn || translate
-    ? `<section class="series-about">${syn ? `<p class="tv-synopsis is-long" id="synopsis">${esc(syn)}</p>` : ''}${translate}</section>`
+/**
+ * La ficha en números, al lado de la sinopsis: la nota (con su medidor de 10 segmentos) y tu avance. En la
+ * computadora llena la mitad derecha, que antes quedaba vacía en las películas y en las series de pocas temporadas.
+ * @param {{ m: any, seen?: number, total?: number, movie?: { seen: boolean, left: string, dur?: number } }} o
+ */
+function fichaHTML({ m, seen = 0, total = 0, movie }) {
+  const cards = [];
+  const score = m && m.score ? Number(m.score) : 0;
+  if (score) {
+    const on = Math.round(score / 10);
+    cards.push(`<div class="ficha-card"><span class="ficha-k">Nota en ${m.src === 'TMDB' ? 'TMDB' : 'AniList'}</span>
+      <b class="ficha-n">${(score / 10).toFixed(1).replace('.', ',')}<small> de 10</small></b>
+      <span class="ficha-seg" aria-hidden="true">${Array.from({ length: 10 }, (_, i) => `<i${i < on ? ' class="is-on"' : ''}></i>`).join('')}</span></div>`);
+  }
+  if (movie) {
+    const mins = movie.dur ? `${Math.round(movie.dur / 60)} min` : '';
+    cards.push(`<div class="ficha-card"><span class="ficha-k">Tu avance</span>
+      <b class="ficha-n is-text">${movie.seen ? 'Vista' : movie.left ? esc(movie.left) : 'Sin ver'}</b>
+      ${mins ? `<span class="ficha-k">Dura ${mins}</span>` : ''}</div>`);
+  } else if (total) {
+    cards.push(`<div class="ficha-card"><span class="ficha-k">Tu avance</span>
+      <b class="ficha-n">${seen}<small> de ${total}</small></b>
+      <span class="ficha-bar" aria-hidden="true"><i style="width:${Math.round((seen / total) * 100)}%"></i></span></div>`);
+  }
+  return cards.length ? `<aside class="ficha" aria-label="Ficha">${cards.join('')}</aside>` : '';
+}
+
+/** La sinopsis y el botón para traducirla, debajo de la tarjeta; al lado, la ficha en números. */
+function aboutHTML(syn, translate, ficha = '') {
+  return syn || translate || ficha
+    ? `<section class="series-about${ficha ? ' has-ficha' : ''}">${syn ? `<p class="tv-synopsis is-long" id="synopsis">${esc(syn)}</p>` : ''}${translate}${ficha}</section>`
     : '';
 }
 /** El nombre alternativo de la ficha, si es distinto del que se muestra. */
@@ -151,7 +179,7 @@ export function renderSeries(arg) {
           ${upcoming.length ? squareBtn(`data-act="series-dl" data-si="${si}"${multi ? ` data-from="${esc(next.id)}"` : ''}`, dlLabel, ICON.down) : ''}
           ${flat ? '' : squareBtn(`data-act="later" data-si="${si}" aria-pressed="${isLater(s)}"`, 'Más tarde', isLater(s) ? ICON.laterOn : ICON.later, isLater(s))}`,
       })}
-      ${aboutHTML(syn, m && !hasSpanish(m) && m.synopsis && canTranslate() ? `<button class="link-btn" data-act="translate"${ownMeta ? ` data-key="${esc(season.name)}"` : ''}>Traducir sinopsis al español</button>` : '')}
+      ${aboutHTML(syn, m && !hasSpanish(m) && m.synopsis && canTranslate() ? `<button class="link-btn" data-act="translate"${ownMeta ? ` data-key="${esc(season.name)}"` : ''}>Traducir sinopsis al español</button>` : '', fichaHTML({ m, seen, total: scope.length }))}
       <section class="ep-section">
         ${
           multi
@@ -276,7 +304,7 @@ export function renderSeasonMenu(s, si) {
           ${upcoming.length ? squareBtn(`data-act="series-dl" data-si="${si}"`, dlLabel, ICON.down) : ''}
           ${squareBtn(`data-act="later" data-si="${si}" aria-pressed="${isLater(s)}"`, 'Más tarde', isLater(s) ? ICON.laterOn : ICON.later, isLater(s))}`,
       })}
-      ${aboutHTML(syn, m && !hasSpanish(m) && m.synopsis && canTranslate() ? `<button class="link-btn" data-act="translate"${metaKey ? ` data-key="${esc(metaKey)}"` : ''}>Traducir sinopsis al español</button>` : '')}
+      ${aboutHTML(syn, m && !hasSpanish(m) && m.synopsis && canTranslate() ? `<button class="link-btn" data-act="translate"${metaKey ? ` data-key="${esc(metaKey)}"` : ''}>Traducir sinopsis al español</button>` : '', fichaHTML({ m, seen: s.all.filter((e) => (prog(e) || {}).w).length, total: s.all.length }))}
       <section class="ep-section">
         <div class="ep-head"><h3 class="ep-heading">Temporadas</h3></div>
         <ul class="shelf season-grid" role="list">${cards}</ul>
@@ -394,7 +422,7 @@ export function renderMovie(arg) {
           }
           ${squareBtn(`data-act="later-item" data-si="${si}" data-key="${esc(it.key)}" aria-pressed="${later}"`, 'Más tarde', later ? ICON.laterOn : ICON.later, later)}`,
       })}
-      ${aboutHTML(syn, m && !hasSpanish(m) && m.synopsis && canTranslate() ? `<button class="link-btn" data-act="translate" data-key="${esc(it.key)}">Traducir sinopsis al español</button>` : '')}
+      ${aboutHTML(syn, m && !hasSpanish(m) && m.synopsis && canTranslate() ? `<button class="link-btn" data-act="translate" data-key="${esc(it.key)}">Traducir sinopsis al español</button>` : '', fichaHTML({ m, movie: { seen: plan.seen, left: plan.left, dur } }))}
       ${
         it.eps.length > 1
           ? `<section class="ep-section">
@@ -403,8 +431,20 @@ export function renderMovie(arg) {
       </section>`
           : ''
       }
+      ${moreMoviesHTML(s, si, it.key)}
     </main>
   </div>`;
+}
+
+/** Las demás películas de la colección, en una fila: la página de una película ya no termina en la sinopsis. */
+function moreMoviesHTML(s, si, key) {
+  const others = shelfItems(s).filter((x) => x.it.key !== key);
+  if (!others.length) return '';
+  const fresh = new Set(newEpisodes(s).map((e) => e.id));
+  return `<section class="ep-section more-movies">
+    <div class="ep-head"><h3 class="ep-heading">Más ${s.name === 'Cine' ? 'de Cine' : 'películas'}</h3></div>
+    ${rowHTML(others.map((x) => moviePosterHTML(s, si, x, fresh)).join(''))}
+  </section>`;
 }
 
 export function pickSeason() {

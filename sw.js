@@ -10,11 +10,16 @@ importScripts('core.js');
  * cada subida dentro de esa versión (el navegador solo instala de nuevo si este archivo cambia) y vuelve a 1 cuando
  * sube VERSION. */
 const VERSION = 44;
-const ENTREGA = 5;
+const ENTREGA = 6;
 const CACHE = `kai-${VERSION}.${ENTREGA}`;
 /* Lo que cambió en esta versión, corto y en palabras de todos los días: lo muestran la burbuja de "Versión nueva"
  * (al tocarla) y Ajustes → Versión. Se escribe de nuevo al empezar cada versión. */
 const CAMBIOS = [
+  'La página de una serie o película muestra su ficha en números (la nota y tu avance) junto a la sinopsis, y la de una película termina con «Más películas».',
+  'Tu avatar: en Ajustes puedes elegir un dibujo (gato, estrella, luna…) en lugar de tu inicial.',
+  'Catálogo: filtrar por la nota de AniList y ordenar por la mejor nota.',
+  'En la computadora, la tarjeta de un póster ya sale siempre al pasar de uno al de al lado, y las listas de los filtros siguen el tema.',
+  'Bloques: la casita achicada sin el cuadro de color suelto, Descubrir como un solo bloque y «Ver catálogo» como pastilla.',
   'Bloques: se ve igual en todas las pantallas (menús, avisos, la tarjeta de la serie y los botones sobre la portada) y sus letras ya van dentro de Kai, sin pedirlas a internet.',
   'Bloques: textos y botones con mejor contraste en Papel, Piedra, Bosque y Grafito.',
   'Sincronizar es más liviano: si nada cambió en MEGA, no vuelve a bajar tus archivos.',

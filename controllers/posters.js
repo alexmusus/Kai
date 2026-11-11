@@ -256,7 +256,10 @@ app.addEventListener('pointerover', (e) => {
   if (e.pointerType !== 'mouse' || !HOVER.matches) return;
   const p = seriesPoster(e.target);
   if (!p) return;
-  if (p.id === cardId) return clearTimeout(hideTimer);
+  // el "esconder" que dejó pendiente el póster del que se viene se cancela: si no, 180 ms después apagaba también
+  // el temporizador de esta tarjeta (pasando de un póster al de al lado, la tarjeta no salía)
+  clearTimeout(hideTimer);
+  if (p.id === cardId) return;
   clearTimeout(showTimer);
   showTimer = window.setTimeout(() => showCard(p), cardId ? 120 : 550);
 });

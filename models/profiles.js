@@ -188,6 +188,20 @@ export function profilePrefs() {
   };
 }
 
+/**
+ * El dibujo del avatar del perfil activo ('' = su inicial). Queda por sincronizar.
+ * @param {string} key
+ */
+export function setProfileAvatar(key) {
+  const id = state.profile && state.profile.id;
+  const p = id && /** @type {any} */ (state.shared.profiles.find((x) => x.id === id));
+  if (!p) return;
+  if (key) p.avatar = key;
+  else delete p.avatar;
+  p.u = Date.now();
+  saveShared();
+}
+
 /** Cambia una preferencia del perfil activo (queda por sincronizar). @param {'hold' | 'step'} key @param {number} value */
 export function setProfilePref(key, value) {
   const id = state.profile && state.profile.id;

@@ -21,6 +21,7 @@ import { mergeProgress, prog } from '../models/progress.js';
 import { profileStats, fmtWatched } from '../models/stats.js';
 import { isCollection, episodeLabel, isCine } from '../models/collections.js';
 import { app, header } from './components.js';
+import { avatarHTML, AVATARS } from './account.js';
 import { ICON } from './icons.js';
 import { quotaText } from './quota.js';
 import { refreshAccountInfo } from '../models/quota.js';
@@ -53,6 +54,20 @@ export function statsHTML() {
   return `<p class="settings-label">Tu resumen · ${esc(state.profile.name)}</p>
     <div class="stats">${fig(fmtWatched(st.seconds, true), 'vistos')}${fig(String(st.eps), st.eps === 1 ? 'capítulo' : 'capítulos')}${fig(String(st.done.length), st.done.length === 1 ? 'serie terminada' : 'series terminadas')}</div>
     ${month}${done}`;
+}
+
+/** Tu avatar: la inicial o uno de los dibujos. */
+export function avatarPickHTML() {
+  const p = visibleProfiles().find((x) => state.profile && x.id === state.profile.id);
+  if (!p) return '';
+  const cur = /** @type {any} */ (p).avatar || '';
+  const opt = (/** @type {string} */ v, /** @type {string} */ label) =>
+    `<button class="avatar-opt ${cur === v ? 'is-on' : ''}" data-act="set-avatar" data-v="${v}" aria-pressed="${cur === v}" aria-label="${label}" title="${label}">${avatarHTML(p, '', v)}</button>`;
+  return `<p class="settings-label">Tu avatar · ${esc(p.name)}</p>
+    <div class="avatar-pick" role="group" aria-label="Tu avatar">${opt('', 'Tu inicial')}${Object.entries(AVATARS)
+      .map(([v, a]) => opt(v, a.label))
+      .join('')}</div>
+    <p class="dim settings-hint">Se ve en todos tus dispositivos.</p>`;
 }
 
 /** Lo del reproductor que elige cada perfil: la velocidad al mantener presionado y cuánto saltan los ±. */
@@ -260,6 +275,7 @@ export function renderSettings() {
       const h = statsHTML();
       return h ? `<section class="settings-group" id="profile-stats">${h}</section>` : '';
     })()}
+    ${state.profile ? `<section class="settings-group" id="avatar-pick">${avatarPickHTML()}</section>` : ''}
     <section class="settings-group" id="player-prefs">${playerPrefsHTML()}</section>
     <form id="settings" class="form settings-group">
       <label class="switch"><input type="checkbox" name="autoplay" ${s.autoplay ? 'checked' : ''}><span>Reproducir el siguiente capítulo solo</span></label>

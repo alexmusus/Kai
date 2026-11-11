@@ -39,9 +39,39 @@ export function renderLogin(message = '', needCode = false, email = '') {
   });
 }
 
-export function avatarHTML(p, cls = '') {
+/* Los dibujos que un perfil puede elegir en lugar de su inicial (Ajustes → Tu avatar). Se guardan por nombre en el
+ * perfil (`avatar`), dentro de lo compartido: se ven igual en todos los dispositivos. */
+const draw = (/** @type {string} */ d) => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${d}"/></svg>`;
+export const AVATARS = {
+  gato: { label: 'Gato', svg: draw('M5 11V4l5 3.5h4L19 4v7a7 7 0 0 1-14 0z M9.5 12.5h.01 M14.5 12.5h.01') },
+  estrella: {
+    label: 'Estrella',
+    svg: draw('M12 3.5l2.6 5.3 5.9.9-4.2 4.1 1 5.8-5.3-2.8-5.3 2.8 1-5.8L3.5 9.7l5.9-.9z'),
+  },
+  luna: { label: 'Luna', svg: draw('M19.5 14.5A8 8 0 0 1 9.5 4.5a8 8 0 1 0 10 10z') },
+  rayo: { label: 'Rayo', svg: draw('M13 3L5 13.5h6L10 21l8-10.5h-6z') },
+  hoja: { label: 'Hoja', svg: draw('M5 19c0-8 5-13 14-14 0 9-5 14-14 14z M5 19l8-8') },
+  corazon: { label: 'Corazón', svg: draw('M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.5-7 10-7 10z') },
+  llama: {
+    label: 'Llama',
+    svg: draw('M12 21a6 6 0 0 1-6-6c0-3 2-4.5 3-7 .5 2 2 2.5 2 0 0-2-1-3.5-1-5 4 2 8 6 8 12a6 6 0 0 1-6 6z'),
+  },
+  gota: { label: 'Gota', svg: draw('M12 3.5s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z') },
+  nota: {
+    label: 'Nota',
+    svg: draw('M9 18V6l10-2v12 M9 18a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0z M19 16a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0z'),
+  },
+  fantasma: {
+    label: 'Fantasma',
+    svg: draw('M6 20V11a6 6 0 0 1 12 0v9l-2-1.5-2 1.5-2-1.5-2 1.5-2-1.5z M10 11h.01 M14 11h.01'),
+  },
+};
+
+/** El avatar de un perfil: su dibujo si eligió uno, o su inicial. `as` deja ver cómo quedaría otro dibujo. */
+export function avatarHTML(p, cls = '', as = p.avatar) {
   const h = p.hue ?? hue(p.name);
-  return `<span class="avatar ${cls}" style="--h:${h}" aria-hidden="true">${esc([...p.name.trim()][0] || '?').toUpperCase()}</span>`;
+  const pic = as && Object.hasOwn(AVATARS, as) ? AVATARS[as].svg : '';
+  return `<span class="avatar ${cls}${pic ? ' has-pic' : ''}" style="--h:${h}" aria-hidden="true">${pic || esc([...p.name.trim()][0] || '?').toUpperCase()}</span>`;
 }
 
 export function renderProfiles(editing = false, adding = false) {

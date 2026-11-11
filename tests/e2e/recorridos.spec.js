@@ -714,3 +714,42 @@ for (const [theme, tone] of [['dark', 'grafito'], ['dark', 'bosque'], ['light', 
     expect(k.errors).toEqual([]);
   });
 }
+
+test('catálogo: filtrar y ordenar por la nota de AniList; Ajustes: elegir un dibujo de avatar', async ({ page }) => {
+  const k = await openKai(page, '#/catalogo');
+  const titles = () => page.locator('#cat-results .shelf-title').allInnerTexts();
+  await page.selectOption('select[name="s"]', '80');
+  await expect(page.locator('#cat-count')).toHaveText('4 títulos');
+  await expect(page).toHaveURL(/s=80/);
+  await page.selectOption('select[name="s"]', '90');
+  await expect(page.locator('#cat-count')).toContainText('Nada coincide');
+  await page.locator('[data-act="cat-clear"]').click();
+  await page.selectOption('select[name="s"]', '80');
+  await page.selectOption('select[name="o"]', 'score');
+  // la mejor nota primero: Koe no Katachi (88), Kimi no Na wa (85), Dorohedoro (82)
+  expect((await titles()).slice(0, 3)).toEqual(['Koe no Katachi', 'Kimi no Na wa', 'Dorohedoro']);
+
+  await go(page, '#/ajustes');
+  await page.locator('[data-act="set-avatar"][data-v="gato"]').click();
+  await expect(page.locator('[data-act="set-avatar"][data-v="gato"]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.dock-btn .dock-avatar svg')).toHaveCount(1); // también en la barra
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('kai.shared')).profiles.find((p) => p.id === 'pA').avatar)).toBe('gato');
+  await page.locator('[data-act="set-avatar"][data-v=""]').click();
+  await expect(page.locator('.dock-btn .dock-avatar')).toHaveText('A');
+  expect(k.errors).toEqual([]);
+});
+
+test('PC: al pasar de un póster al de al lado, la tarjeta del nuevo sale (antes se cancelaba)', async ({ page }, info) => {
+  test.skip(info.project.name !== 'pc', 'la tarjeta es de la computadora');
+  const k = await openKai(page, '#/');
+  const posters = page.locator('a.shelf-item');
+  await posters.nth(0).scrollIntoViewIfNeeded();
+  await page.waitForTimeout(400);
+  const a = await posters.nth(0).boundingBox();
+  const b = await posters.nth(1).boundingBox();
+  await page.mouse.move(a.x + 40, a.y + 80, { steps: 4 });
+  await page.waitForTimeout(150);
+  await page.mouse.move(b.x + 40, b.y + 80, { steps: 4 });
+  await expect(page.locator('.poster-card')).toBeVisible();
+  expect(k.errors).toEqual([]);
+});

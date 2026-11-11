@@ -40,6 +40,7 @@ export function catalogEntries() {
           m,
           img: m && (m.banner || m.cover),
           year: m && m.year,
+          score: (m && m.score) || 0,
           genres: (m && m.genres) || [],
           format: 'Película',
           added: Math.max(0, ...it.eps.map((e) => e.ts || 0)),
@@ -59,6 +60,7 @@ export function catalogEntries() {
         m,
         img: m && (m.banner || m.cover),
         year: m && m.year,
+        score: (m && m.score) || 0,
         genres: (m && m.genres) || [],
         format: (m && m.format) || 'Serie',
         added: s.added || 0,
@@ -71,7 +73,7 @@ export function catalogEntries() {
   });
   return out;
 }
-export function filterEntries(list, { q = '', g = '', y = '', f = '', l = '' }) {
+export function filterEntries(list, { q = '', g = '', y = '', f = '', l = '', s = '' }) {
   const terms = norm(q).split(/\s+/).filter(Boolean);
   return list.filter(
     (e) =>
@@ -79,7 +81,8 @@ export function filterEntries(list, { q = '', g = '', y = '', f = '', l = '' }) 
       (!g || e.genres.includes(g)) &&
       (!y || String(e.year) === String(y)) &&
       (!f || e.format === f) &&
-      (!l || (e.langs || []).includes(l)),
+      (!l || (e.langs || []).includes(l)) &&
+      (!s || (e.score || 0) >= Number(s)), // la nota de AniList (0 a 100); lo que no tiene nota no pasa
   );
 }
 /** Ordena el catálogo; lo que ya viste completo va al final (en el mismo orden), para que no se mezcle con lo
@@ -91,14 +94,16 @@ export function sortEntries(list, o) {
       ? (a, b) => (b.added || 0) - (a.added || 0) || az(a, b)
       : o === 'year'
         ? (a, b) => (b.year || 0) - (a.year || 0) || az(a, b)
-        : az; // por defecto, A–Z
+        : o === 'score'
+          ? (a, b) => (b.score || 0) - (a.score || 0) || az(a, b)
+          : az; // por defecto, A–Z
   return list.sort((a, b) => Number(!!a.done) - Number(!!b.done) || by(a, b));
 }
 
 /* Dos catálogos, Series y Películas (?t=series | ?t=peliculas). Al buscar o filtrar por una etiqueta,
  * se busca en todo: series y películas juntas. */
 export const CAT_TITLES = { series: 'Series', peliculas: 'Películas' };
-export const isFiltering = (st) => !!(st.q || st.g || st.y || st.f || st.l);
+export const isFiltering = (st) => !!(st.q || st.g || st.y || st.f || st.l || st.s);
 export function catalogBase(t, st) {
   const all = catalogEntries().filter((e) => !e.cine || st.q); // Cine no se mezcla: solo aparece al buscar
   if (!CAT_TITLES[t] || isFiltering(st)) return all;
@@ -142,6 +147,16 @@ export function renderCatalog() {
             ])
           : ''
       }
+      ${
+        all.some((e) => e.score)
+          ? select('s', 'Nota', [
+              ['90', '9 o más'],
+              ['80', '8 o más'],
+              ['70', '7 o más'],
+              ['60', '6 o más'],
+            ])
+          : ''
+      }
       ${select(
         'o',
         'Orden',
@@ -149,6 +164,7 @@ export function renderCatalog() {
           ['az', 'A–Z'],
           ['recent', 'Recientes'],
           ['year', 'Año'],
+          ['score', 'Mejor nota'],
         ],
         false,
       )}
@@ -178,6 +194,7 @@ export function catalogState() {
     y: val('y'),
     f: val('f'),
     l: val('l'),
+    s: val('s'),
     o: val('o') || 'az',
   };
 }
@@ -208,11 +225,11 @@ export function paintCatalog() {
     : state.library
       ? 'Nada coincide con la búsqueda o los filtros.'
       : 'Cargando la biblioteca…';
-  app.querySelector('[data-act="cat-clear"]').hidden = !(st.g || st.y || st.f || st.l || st.q);
+  app.querySelector('[data-act="cat-clear"]').hidden = !(st.g || st.y || st.f || st.l || st.s || st.q);
   // la dirección refleja la búsqueda (para volver atrás o compartirla), sin redibujar la página
   const params = new URLSearchParams();
   if (t) params.set('t', t);
-  for (const k of ['q', 'g', 'y', 'f', 'l']) if (st[k]) params.set(k, st[k]);
+  for (const k of ['q', 'g', 'y', 'f', 'l', 's']) if (st[k]) params.set(k, st[k]);
   if (st.o !== 'az') params.set('o', st.o);
   const h = '#/catalogo' + (params.toString() ? '?' + params : '');
   if (location.hash !== h) history.replaceState(history.state, '', h);

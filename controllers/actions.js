@@ -39,8 +39,9 @@ import {
   paintCineKey,
   paintDownloadsWhere,
   playerPrefsHTML,
+  avatarPickHTML,
 } from '../views/settings.js';
-import { setProfilePref } from '../models/profiles.js';
+import { setProfilePref, setProfileAvatar } from '../models/profiles.js';
 import { openDiscoverSheet } from '../views/discover.js';
 import { startPicking, endPicking, pickAction, pickAll } from './picking.js';
 import { go, goHome, goBack, render, softRender } from './router.js';
@@ -460,6 +461,13 @@ const ACTIONS = {
   // tema y luz
   theme: () => setThemeSetting('theme', resolvedTheme() === 'dark' ? 'light' : 'dark', false),
   'set-theme': (el) => setThemeSetting('theme', el.dataset.v, true, el),
+  'set-avatar': (el) => {
+    setProfileAvatar(el.dataset.v || '');
+    const box = $('#avatar-pick');
+    if (box) box.innerHTML = avatarPickHTML();
+    paintDock(); // el avatar de la barra
+    sync();
+  },
   'set-hold': (el) => setPlayerPref('hold', Number(el.dataset.v)),
   'set-step': (el) => setPlayerPref('step', Number(el.dataset.v)),
   'set-dark-tone': (el) => setThemeSetting('darkTone', el.dataset.v, true, el),
