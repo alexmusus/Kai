@@ -21,7 +21,7 @@ import { mergeProgress, prog } from '../models/progress.js';
 import { profileStats, fmtWatched } from '../models/stats.js';
 import { isCollection, episodeLabel, isCine } from '../models/collections.js';
 import { app, header } from './components.js';
-import { avatarHTML, AVATARS } from './account.js';
+import { avatarHTML, AVATARS, isAvatarImage } from './account.js';
 import { ICON } from './icons.js';
 import { quotaText } from './quota.js';
 import { refreshAccountInfo } from '../models/quota.js';
@@ -60,14 +60,21 @@ export function statsHTML() {
 export function avatarPickHTML() {
   const p = visibleProfiles().find((x) => state.profile && x.id === state.profile.id);
   if (!p) return '';
-  const cur = /** @type {any} */ (p).avatar || '';
+  const hasImg = isAvatarImage(/** @type {any} */ (p).img);
+  const cur = hasImg ? null : /** @type {any} */ (p).avatar || '';
   const opt = (/** @type {string} */ v, /** @type {string} */ label) =>
     `<button class="avatar-opt ${cur === v ? 'is-on' : ''}" data-act="set-avatar" data-v="${v}" aria-pressed="${cur === v}" aria-label="${label}" title="${label}">${avatarHTML(p, '', v)}</button>`;
   return `<p class="settings-label">Tu avatar · ${esc(p.name)}</p>
-    <div class="avatar-pick" role="group" aria-label="Tu avatar">${opt('', 'Tu inicial')}${Object.entries(AVATARS)
+    <div class="avatar-pick" role="group" aria-label="Tu avatar">${
+      hasImg ? `<span class="avatar-opt is-on" title="Tu imagen">${avatarHTML(p)}</span>` : ''
+    }${opt('', 'Tu inicial')}${Object.entries(AVATARS)
       .map(([v, a]) => opt(v, a.label))
       .join('')}</div>
-    <p class="dim settings-hint">Se ve en todos tus dispositivos.</p>`;
+    <div class="btn-row">
+      <button class="btn" data-act="avatar-upload"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V9M7 13l5-5 5 5M5 4h14"/></svg><span>${hasImg ? 'Cambiar imagen' : 'Subir una imagen'}</span></button>
+      <input id="avatar-file" type="file" accept="image/*" hidden>
+    </div>
+    <p class="dim settings-hint">Se ve en todos tus dispositivos. La imagen se guarda pequeña (192 px) dentro de tu perfil: al cambiarla o elegir un dibujo, la anterior se borra.</p>`;
 }
 
 /** Lo del reproductor que elige cada perfil: la velocidad al mantener presionado y cuánto saltan los ±. */

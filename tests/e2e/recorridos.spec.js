@@ -736,6 +736,26 @@ test('catálogo: filtrar y ordenar por la nota de AniList; Ajustes: elegir un di
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('kai.shared')).profiles.find((p) => p.id === 'pA').avatar)).toBe('gato');
   await page.locator('[data-act="set-avatar"][data-v=""]').click();
   await expect(page.locator('.dock-btn .dock-avatar')).toHaveText('A');
+  // subir una imagen: queda chica dentro del perfil (una sola), y elegir otra cosa la borra
+  const png = await page.evaluate(() => {
+    const c = document.createElement('canvas');
+    c.width = 600;
+    c.height = 400;
+    const g = c.getContext('2d');
+    g.fillStyle = '#c33';
+    g.fillRect(0, 0, 600, 400);
+    return c.toDataURL('image/png').split(',')[1];
+  });
+  await page.locator('#avatar-file').setInputFiles({ name: 'foto.png', mimeType: 'image/png', buffer: Buffer.from(png, 'base64') });
+  await page.locator('[data-act="avatar-upload"]').click();
+  await page.locator('#avatar-file').setInputFiles({ name: 'foto.png', mimeType: 'image/png', buffer: Buffer.from(png, 'base64') });
+  await expect(page.locator('.dock-btn .dock-avatar img')).toHaveCount(1);
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('kai.shared')).profiles.find((p) => p.id === 'pA'));
+  expect(saved.img).toMatch(/^data:image\/jpeg;base64,/);
+  expect(saved.img.length).toBeLessThan(60000);
+  expect(await page.locator('.dock-btn .dock-avatar img').evaluate((i) => i.naturalWidth)).toBe(192);
+  await page.locator('[data-act="set-avatar"][data-v="luna"]').click();
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('kai.shared')).profiles.find((p) => p.id === 'pA').img)).toBeUndefined();
   expect(k.errors).toEqual([]);
 });
 

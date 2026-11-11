@@ -67,9 +67,17 @@ export const AVATARS = {
   },
 };
 
-/** El avatar de un perfil: su dibujo si eligió uno, o su inicial. `as` deja ver cómo quedaría otro dibujo. */
-export function avatarHTML(p, cls = '', as = p.avatar) {
+/** ¿Es una imagen de avatar válida? Solo una imagen pequeña guardada como texto (data:), nunca una dirección. */
+export const isAvatarImage = (v) =>
+  typeof v === 'string' && v.length < 90000 && /^data:image\/(jpeg|webp|png);base64,[A-Za-z0-9+/=]+$/.test(v);
+
+/** El avatar de un perfil: su imagen si subió una, su dibujo si eligió uno, o su inicial. `as` deja ver cómo
+ * quedaría otro dibujo ('' = la inicial). */
+export function avatarHTML(p, cls = '', as = undefined) {
   const h = p.hue ?? hue(p.name);
+  if (as === undefined && isAvatarImage(p.img))
+    return `<span class="avatar ${cls} has-img" style="--h:${h}" aria-hidden="true"><img src="${esc(p.img)}" alt="" decoding="async"></span>`;
+  if (as === undefined) as = p.avatar;
   const pic = as && Object.hasOwn(AVATARS, as) ? AVATARS[as].svg : '';
   return `<span class="avatar ${cls}${pic ? ' has-pic' : ''}" style="--h:${h}" aria-hidden="true">${pic || esc([...p.name.trim()][0] || '?').toUpperCase()}</span>`;
 }

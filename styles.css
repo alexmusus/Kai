@@ -2203,3 +2203,7 @@ html[data-style='bloques'] .ficha-card:first-child .ficha-seg i.is-on { backgrou
   /* serie y película: la portada empieza debajo de la barra flotante (antes la barra quedaba encima de su borde) */
   .tv.is-series .tv-main { padding-top: 82px; }
 }
+/* el avatar con una imagen subida */
+.avatar.has-img { background: var(--thumb-bg); box-shadow: none; overflow: hidden; }
+.avatar.has-img img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; display: block; }
+.dock-btn .dock-avatar.has-img { background: var(--thumb-bg); }

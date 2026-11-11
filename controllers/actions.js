@@ -41,7 +41,7 @@ import {
   playerPrefsHTML,
   avatarPickHTML,
 } from '../views/settings.js';
-import { setProfilePref, setProfileAvatar } from '../models/profiles.js';
+import { setProfilePref, setProfileAvatar, setProfileImage } from '../models/profiles.js';
 import { openDiscoverSheet } from '../views/discover.js';
 import { startPicking, endPicking, pickAction, pickAll } from './picking.js';
 import { go, goHome, goBack, render, softRender } from './router.js';
@@ -463,11 +463,9 @@ const ACTIONS = {
   'set-theme': (el) => setThemeSetting('theme', el.dataset.v, true, el),
   'set-avatar': (el) => {
     setProfileAvatar(el.dataset.v || '');
-    const box = $('#avatar-pick');
-    if (box) box.innerHTML = avatarPickHTML();
-    paintDock(); // el avatar de la barra
-    sync();
+    repaintAvatar();
   },
+  'avatar-upload': () => pickAvatarImage(),
   'set-hold': (el) => setPlayerPref('hold', Number(el.dataset.v)),
   'set-step': (el) => setPlayerPref('step', Number(el.dataset.v)),
   'set-dark-tone': (el) => setThemeSetting('darkTone', el.dataset.v, true, el),
@@ -516,6 +514,55 @@ function closeSearchOutside(e) {
   if (!bar || bar.hidden) return;
   if (e.target.closest('#home-search, #home-results, [data-act="home-search"]')) return;
   closeHomeSearch();
+}
+
+/** Después de cambiar el avatar: su sección de Ajustes, la barra, y a sincronizar. */
+function repaintAvatar() {
+  const box = $('#avatar-pick');
+  if (box) box.innerHTML = avatarPickHTML();
+  paintDock();
+  sync();
+}
+
+const AVATAR_PX = 192;
+/**
+ * Achica una imagen a un cuadrado de 192 px (recortando el centro) y la devuelve como texto (JPEG). Queda en unos
+ * 10 a 20 KB: lo bastante chica para viajar dentro del perfil.
+ * @param {File} file
+ */
+async function squareAvatar(file) {
+  const bmp = await createImageBitmap(file);
+  const side = Math.min(bmp.width, bmp.height);
+  const c = document.createElement('canvas');
+  c.width = c.height = AVATAR_PX;
+  const g = c.getContext('2d');
+  g.drawImage(bmp, (bmp.width - side) / 2, (bmp.height - side) / 2, side, side, 0, 0, AVATAR_PX, AVATAR_PX);
+  if (bmp.close) bmp.close();
+  for (const q of [0.85, 0.7, 0.55]) {
+    const url = c.toDataURL('image/jpeg', q);
+    if (url.length < 60000) return url;
+  }
+  return c.toDataURL('image/jpeg', 0.4);
+}
+
+/** Abre el selector de archivos y deja la imagen elegida como avatar del perfil. */
+function pickAvatarImage() {
+  const input = /** @type {HTMLInputElement | null} */ ($('#avatar-file'));
+  if (!input) return;
+  input.onchange = async () => {
+    const file = input.files && input.files[0];
+    input.value = '';
+    if (!file) return;
+    try {
+      if (!setProfileImage(await squareAvatar(file))) throw new Error('no se pudo guardar');
+      repaintAvatar();
+      toast('Listo: tu avatar se verá en todos tus dispositivos.');
+    } catch (err) {
+      console.warn('avatar', err);
+      toast('No se pudo usar esa imagen. Prueba con una foto en JPG o PNG.');
+    }
+  };
+  input.click();
 }
 
 /** Una preferencia del reproductor del perfil activo (Ajustes): se guarda, se redibuja su sección y se sincroniza. */

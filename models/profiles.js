@@ -198,8 +198,27 @@ export function setProfileAvatar(key) {
   if (!p) return;
   if (key) p.avatar = key;
   else delete p.avatar;
+  delete p.img; // un dibujo o la inicial reemplazan la imagen subida
   p.u = Date.now();
   saveShared();
+}
+
+/**
+ * La imagen del avatar del perfil activo: una sola, pequeña, guardada como texto dentro del perfil (en lo
+ * compartido). Así llega a todos los dispositivos con la sincronización de siempre y, al cambiarla, la anterior
+ * desaparece sola: no queda ningún archivo suelto en MEGA. Queda por sincronizar.
+ * @param {string} dataUrl "data:image/jpeg;base64,…"
+ * @returns {boolean} si se guardó
+ */
+export function setProfileImage(dataUrl) {
+  const id = state.profile && state.profile.id;
+  const p = id && /** @type {any} */ (state.shared.profiles.find((x) => x.id === id));
+  if (!p || !/^data:image\/(jpeg|webp|png);base64,/.test(dataUrl) || dataUrl.length >= 90000) return false;
+  p.img = dataUrl;
+  delete p.avatar;
+  p.u = Date.now();
+  saveShared();
+  return true;
 }
 
 /** Cambia una preferencia del perfil activo (queda por sincronizar). @param {'hold' | 'step'} key @param {number} value */
