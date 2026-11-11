@@ -102,6 +102,26 @@ se cambian sus campos, nunca se reemplazan (`setIndex` cambia el contenido del �
 - Ningún desenfoque sobre el video ni en listas: el único que queda es el de la barra flotante (y el modo liviano
   lo quita).
 
+## Estilos: Vidrio y Bloques (Kai 44)
+
+Kai tiene dos estilos. **Vidrio** es el de siempre. **Bloques** está en prueba: solo aparece con el Laboratorio
+encendido (Ajustes → Avanzado), y solo en ese dispositivo (`settings.lab`, `settings.style`).
+
+- `html[data-style='bloques']` y su tono (`data-tone` claro: Piedra, Papel; `data-dark` oscuro: Grafito, Bosque). Los
+  colores de fondo están en `models/store.js` (`BLOCK_TONES`, `BLOCK_DARK`), en el arranque de `index.html` y en
+  `styles.css`; `tests/unit/tema-inicial.test.js` revisa que coincidan.
+- Bloques no redefine cada componente: cambia las variables (`--surface`, `--surface2`, `--edge`, `--accent`,
+  `--accent2`) y apunta a ellas las del vidrio (`--glass…`, `--card`, `--btn`, `--line`). Un componente nuevo que use
+  esas variables sale bien en los dos estilos; si usa un color fijo, en Bloques se nota. Las capas flotantes (hoja de
+  opciones, selección, avisos, tarjeta del póster, mini) y la portada oscura tienen su regla al final de `styles.css`
+  ("Bloques: lo mismo en todas las pantallas").
+- `tests/unit/contraste.test.js` exige contraste 4.5 en cada tono (texto, tenue, apagado, botón, enlaces): al cambiar
+  un color de Bloques, esa prueba dice si se lee.
+- `views/lively.js`: las animaciones al tocar de Bloques (la píldora que se desliza, los números que suben). Con Vidrio
+  no observa nada.
+- Los recorridos (`tests/e2e/recorridos.spec.js`, "Bloques …") abren los cuatro tonos y revisan el inicio, una serie,
+  el menú de un capítulo y Ajustes.
+
 ## Diseño (Kai 39)
 
 Estilo de las apps de Apple: fondo neutro, la imagen manda, datos en una línea sin pastillas, botones lisos
@@ -120,6 +140,9 @@ use los mismos tokens (`--btn`, `--card`, `--text`, `--dim`) para que se vea en 
   se junta con lo local de ese perfil, aunque se cambie de perfil en medio. Se sube lo pendiente de todos los
   perfiles del dispositivo (`syncAllProgress`). Una marca posterior a la subida de su archivo (reloj adelantado)
   se baja a esa hora.
+- Si el archivo de MEGA es el mismo de la última sincronización (su id, tamaño y fecha) y lo de aquí tampoco cambió,
+  no se vuelve a bajar. Solo durante 5 minutos, por si este dispositivo dejó de recibir los avisos de MEGA; "Sincronizar
+  ahora" y volver a Kai leen siempre (`forgetSyncSkips`).
 - MEGA permite archivos repetidos con el mismo nombre: se leen todos, se juntan y queda una copia.
 - El progreso se guarda por ruta del archivo; si una carpeta se renombra, se sigue por el id de MEGA.
 - Lo que no se puede guardar o leer de localStorage no rompe la app: `LS` nunca lanza.
@@ -135,10 +158,11 @@ use los mismos tokens (`--btn`, `--card`, `--text`, `--dim`) para que se vea en 
 - Claves de localStorage: con prefijo `kai.` (lo pone `LS`), declaradas como constantes en el módulo dueño.
 - Cada módulo nuevo va en `SHELL` de `sw.js` (para abrir sin conexión) y en un `<link rel="modulepreload">`
   de `index.html` (para pedirlos todos a la vez); `tests/unit/modulos.test.js` revisa las dos listas.
-- Versiones (`sw.js`): `VERSION` es la de Kai y sube solo al pasar `prueba` a `main`; `ENTREGA` sube en cada
-  subida a `prueba` (sin cambiar `sw.js` el navegador no instala lo nuevo) y vuelve a 1 al subir `VERSION`.
+- Versiones (`sw.js`): lo que se ve en Ajustes es `VERSION.ENTREGA` ("Kai 44.3"; con entrega 1, "Kai 44"). `ENTREGA`
+  sube en cada subida dentro de una versión (sin cambiar `sw.js` el navegador no instala lo nuevo) y vuelve a 1 al
+  subir `VERSION`.
   GitHub Actions falla si cambia algo de la app sin que cambie una de las dos (`tests/version-check.mjs`).
-- Lo que casi nunca cambia (`vendor/mega.js`, los íconos y el gatito) va en `ASSETS`, en su propia caché, que no se
+- Lo que casi nunca cambia (`vendor/mega.js`, los íconos, el gatito y las letras de Bloques, `fonts/`) va en `ASSETS`, en su propia caché, que no se
   vuelve a bajar con cada versión: si cambia uno de esos archivos sube `ASSETS_V` (el mismo chequeo lo exige).
 
 ## Pruebas

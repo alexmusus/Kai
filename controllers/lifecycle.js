@@ -9,6 +9,7 @@ import { resumePendingDownloads, holdWake } from '../models/downloads.js';
 import { paintSync } from '../views/dock.js';
 import { render, onHashChange, alreadyArrived } from './router.js';
 import { sync, refreshLibrary } from './sync.js';
+import { forgetSyncSkips } from '../models/sync.js';
 import { savePosition } from './player/engine.js';
 
 async function onOnline() {
@@ -32,6 +33,8 @@ function onVisibility() {
     return;
   }
   if (Object.keys(state.dls).length) holdWake();
+  // al volver a Kai se lee todo de MEGA: en segundo plano pudo dejar de enterarse de los cambios
+  forgetSyncSkips();
   if (state.storage && route().view !== 'play') sync();
 }
 

@@ -33,6 +33,46 @@ import { mergeShared, dedupeProfiles, finalProfileId, backupProfiles } from './p
 /** @type {SyncIO} */
 const REAL_IO = { readJson: (n) => realReadJson(n), writeJson: realWriteJson };
 
+/* ── no volver a bajar lo que no cambió ──
+ * Cada sincronización bajaba el archivo de lo compartido y el del progreso, aunque estuvieran iguales (viendo un
+ * capítulo se sincroniza cada minuto). MEGA le da a cada archivo un id nuevo al subirlo, así que si el archivo es el
+ * mismo de la última vez (su "firma") y lo de aquí tampoco cambió, no hay nada que leer ni que subir.
+ * Solo se confía en eso unos minutos: si este dispositivo dejó de recibir los avisos de MEGA (pasa al volver de
+ * segundo plano), su lista de archivos está vieja y no se enteraría de un cambio; pasado ese rato se lee de verdad.
+ * "Sincronizar ahora" y volver a Kai leen siempre (forgetSyncSkips). */
+const SKIP_FOR_MS = 5 * 60 * 1000;
+/** @type {Map<string, number>} archivo → cuándo se leyó de verdad por última vez (en esta sesión) */
+const readAt = new Map();
+/** La próxima sincronización lee todo de MEGA, aunque parezca igual. */
+export function forgetSyncSkips() {
+  readAt.clear();
+}
+/** @param {MegaNode[]} nodes */
+const sigOf = (nodes) => nodes.map((n) => `${n.nodeId}:${n.size}:${/** @type {any} */ (n).timestamp || 0}`).join('|');
+/** Una huella corta de un texto (para saber si lo de aquí cambió sin guardar otra copia entera). @param {string} str */
+function hash(str) {
+  let h = 5381;
+  for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0;
+  return `${str.length}.${h >>> 0}`;
+}
+/** ¿Se puede saltar la lectura de ese archivo? @param {string} name @param {MegaNode[]} nodes @param {string} localHash */
+function unchanged(name, nodes, localHash) {
+  const saved = LS.get(`sig.${name}`, null);
+  return (
+    nodes.length === 1 &&
+    Date.now() - (readAt.get(name) || 0) < SKIP_FOR_MS &&
+    !!saved &&
+    saved.sig === sigOf(nodes) &&
+    saved.local === localHash
+  );
+}
+/** Anota cómo quedó el archivo y lo de aquí después de sincronizar de verdad. @param {string} name @param {MegaNode[]} nodes @param {string | null} localHash null = lo de aquí no quedó igual a MEGA */
+function remember(name, nodes, localHash) {
+  readAt.set(name, Date.now());
+  if (nodes.length === 1 && localHash) LS.set(`sig.${name}`, { sig: sigOf(nodes), local: localHash });
+  else LS.del(`sig.${name}`);
+}
+
 /** El archivo de progreso de antes de la v3 (dentro de la carpeta de la biblioteca). */
 const OLD_LIBRARY_PROGRESS = '.progreso.json';
 
@@ -45,6 +85,10 @@ const OLD_LIBRARY_PROGRESS = '.progreso.json';
  */
 export async function syncShared(home, io = REAL_IO) {
   const nodes = filesNamed(home, SHARED_FILE);
+  if (state.sharedLoaded && unchanged(SHARED_FILE, nodes, hash(stable(state.shared)))) {
+    state.sharedError = false;
+    return false;
+  }
   /** @type {import('./profiles.js').Shared} */
   let remote = { profiles: [], intros: {}, picks: {}, legacyBy: null };
   for (const n of nodes) {
@@ -63,9 +107,12 @@ export async function syncShared(home, io = REAL_IO) {
     Object.keys(sh.intros).length ||
     Object.keys(sh.picks).length ||
     Object.keys(sh.keys || {}).length;
+  let now = nodes;
   if (hasData && (nodes.length !== 1 || stable(sh) !== stable(remote))) {
-    await io.writeJson(home, SHARED_FILE, { v: 3, app: 'kai', ...sh }, nodes);
+    const fresh = await io.writeJson(home, SHARED_FILE, { v: 3, app: 'kai', ...sh }, nodes);
+    now = fresh ? [fresh] : [];
   }
+  remember(SHARED_FILE, now, hash(stable(sh)));
   if (!state.sharedLoaded) {
     state.sharedLoaded = true;
     LS.set('sharedLoaded', true);
@@ -171,6 +218,11 @@ export async function syncProgress(home, io = REAL_IO, pid = state.profile ? sta
   if (!pid) return false;
   const nodes = filesNamed(home, profileFile(pid));
   const extra = olderProgressFiles(home, pid);
+  if (!extra.length && unchanged(profileFile(pid), nodes, hash(JSON.stringify(localOf(pid))))) {
+    // igual que la última vez, aquí y en MEGA: no queda nada pendiente de este perfil
+    if (isActive(pid) ? state.dirty : LS.get(`p.${pid}.dirty`, false)) storeLocal(pid, localOf(pid), false);
+    return false;
+  }
   /** @type {ProgressMap} */
   let remote = {};
   /** @type {FixedMarks} */
@@ -190,9 +242,14 @@ export async function syncProgress(home, io = REAL_IO, pid = state.profile ? sta
   const hasData = Object.keys(merged).length > 0;
   const remoteIsBehind = Object.keys(merged).some((k) => !remote[k] || merged[k].u > remote[k].u);
   let uploaded = remote; // lo que MEGA tiene al terminar
+  let now = extra.length ? [] : nodes; // el archivo que queda en MEGA
   if (hasData && (nodes.length !== 1 || extra.length > 0 || remoteIsBehind)) {
-    await io.writeJson(home, profileFile(pid), { v: 3, app: 'kai', profile: pid, items: merged }, [...nodes, ...extra]);
+    const fresh = await io.writeJson(home, profileFile(pid), { v: 3, app: 'kai', profile: pid, items: merged }, [
+      ...nodes,
+      ...extra,
+    ]);
     uploaded = merged;
+    now = fresh ? [fresh] : [];
   }
   /* Lo que se marcó mientras se subía (el reproductor guarda cada pocos segundos) se conserva y sigue pendiente:
    * antes quedaba como "ya sincronizado" sin haber subido. */
@@ -200,6 +257,7 @@ export async function syncProgress(home, io = REAL_IO, pid = state.profile ? sta
   const dirty = Object.keys(final).some((k) => !uploaded[k] || final[k].u > uploaded[k].u);
   const active = isActive(pid);
   storeLocal(pid, final, dirty);
+  remember(profileFile(pid), now, dirty ? null : hash(JSON.stringify(final)));
   return active && JSON.stringify(final) !== before;
 }
 

@@ -46,6 +46,7 @@ import { startPicking, endPicking, pickAction, pickAll } from './picking.js';
 import { go, goHome, goBack, render, softRender } from './router.js';
 import { paintDock, toggleDock, dockUp } from './dock.js';
 import { sync, syncing, refreshLibrary, setLater } from './sync.js';
+import { forgetSyncSkips } from '../models/sync.js';
 import { selectProfile, checkCopies, pickCopy, applyCopies } from './account.js';
 import { queueDownload, pickFolder, dropFolder } from './downloads.js';
 import { openSheet } from './sheet.js';
@@ -74,10 +75,23 @@ function queueNext(ups, title) {
   toast(`${plural(ups.length, 'capítulo', 'capítulos')} en cola de descarga.`);
 }
 
-function setThemeSetting(key, value, repaint = true) {
+/**
+ * Cambia un ajuste de apariencia. Si viene del selector (`el`), solo se mueve la opción marcada de ese selector: no
+ * hace falta volver a dibujar toda la página de Ajustes (recalculaba el espacio, la versión y todo lo demás en cada
+ * toque). El estilo y el Laboratorio sí la redibujan, porque cambian qué opciones hay.
+ */
+function setThemeSetting(key, value, repaint = true, el = null) {
   state.settings[key] = value;
   saveSettings();
   applyTheme();
+  const group = el && el.closest('.segmented');
+  if (group && key !== 'style' && key !== 'lab') {
+    for (const b of group.querySelectorAll('.seg')) {
+      b.classList.toggle('is-on', b === el);
+      b.setAttribute('aria-pressed', String(b === el));
+    }
+    return;
+  }
   if (repaint) renderSettings();
 }
 
@@ -370,11 +384,15 @@ const ACTIONS = {
   'sync-now': async (el) => {
     // el botón muestra que está trabajando y, al terminar, que quedó (en Bloques se ve con un giro y un ✓)
     el.classList.add('is-working');
+    forgetSyncSkips(); // pedido a mano: se lee todo de MEGA, aunque parezca igual
     await sync();
     el.classList.remove('is-working');
+    // si la sincronización trajo cambios, Ajustes se volvió a dibujar y el botón es otro: se marca el que está ahora
+    const btn = document.querySelector('[data-act="sync-now"]') || el;
+    btn.classList.remove('is-working');
     if (state.syncState !== 'error') {
-      el.classList.add('is-done');
-      setTimeout(() => el.classList.remove('is-done'), 1800);
+      btn.classList.add('is-done');
+      setTimeout(() => btn.classList.remove('is-done'), 1800);
     }
     refreshAccountInfo(true);
     toast(state.syncState === 'error' ? 'No se pudo sincronizar. Revisa la conexión.' : 'Progreso sincronizado.');
@@ -441,17 +459,17 @@ const ACTIONS = {
 
   // tema y luz
   theme: () => setThemeSetting('theme', resolvedTheme() === 'dark' ? 'light' : 'dark', false),
-  'set-theme': (el) => setThemeSetting('theme', el.dataset.v),
+  'set-theme': (el) => setThemeSetting('theme', el.dataset.v, true, el),
   'set-hold': (el) => setPlayerPref('hold', Number(el.dataset.v)),
   'set-step': (el) => setPlayerPref('step', Number(el.dataset.v)),
-  'set-dark-tone': (el) => setThemeSetting('darkTone', el.dataset.v),
-  'set-tone': (el) => setThemeSetting('tone', el.dataset.v),
+  'set-dark-tone': (el) => setThemeSetting('darkTone', el.dataset.v, true, el),
+  'set-tone': (el) => setThemeSetting('tone', el.dataset.v, true, el),
   'set-style': (el) => setThemeSetting('style', el.dataset.v),
   'set-lab': (el) => setThemeSetting('lab', el.dataset.v === 'on'),
-  'set-block-tone': (el) => setThemeSetting('blockTone', el.dataset.v),
-  'set-block-dark': (el) => setThemeSetting('blockDark', el.dataset.v),
-  'set-motion': (el) => setThemeSetting('motion', el.dataset.v),
-  'set-lite': (el) => setThemeSetting('lite', el.dataset.v),
+  'set-block-tone': (el) => setThemeSetting('blockTone', el.dataset.v, true, el),
+  'set-block-dark': (el) => setThemeSetting('blockDark', el.dataset.v, true, el),
+  'set-motion': (el) => setThemeSetting('motion', el.dataset.v, true, el),
+  'set-lite': (el) => setThemeSetting('lite', el.dataset.v, true, el),
   lights: () => setLights(false),
 };
 

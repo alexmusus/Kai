@@ -57,17 +57,6 @@ function toneOf(t) {
     ? { id: DARK_TONES[s.darkTone] ? s.darkTone : 'negro', ...(DARK_TONES[s.darkTone] || DARK_TONES.negro) }
     : { id: TONES[s.tone] ? s.tone : 'blanco', ...(TONES[s.tone] || TONES.blanco) };
 }
-/* Las letras del estilo Bloques se piden solo al elegirlo (el service worker las guarda para usarlas sin conexión). */
-const BLOCK_FONTS =
-  'https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Space+Mono:wght@400;700&display=swap';
-function loadBlockFonts() {
-  if (document.querySelector('link[data-kai-fonts]')) return;
-  const l = document.createElement('link');
-  l.rel = 'stylesheet';
-  l.href = BLOCK_FONTS;
-  l.dataset.kaiFonts = '';
-  document.head.append(l);
-}
 export function applyTheme() {
   const t = resolvedTheme();
   const d = document.documentElement;
@@ -81,7 +70,6 @@ export function applyTheme() {
   else delete d.dataset.tone;
   if (t === 'dark' && (blocks || tone !== 'negro')) d.dataset.dark = tone;
   else delete d.dataset.dark;
-  if (blocks) loadBlockFonts();
   applyMotion();
   paintThemeColor();
   emit('theme');

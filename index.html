@@ -36,11 +36,12 @@
         var k = t === 'dark' ? (bd[s.blockDark] ? s.blockDark : 'grafito') : (bl[s.blockTone] ? s.blockTone : 'piedra');
         if (t === 'dark') d.dataset.dark = k; else d.dataset.tone = k;
         bg = t === 'dark' ? bd[k] : bl[k];
-        // sus letras, pedidas desde ya para que los títulos no cambien de forma al cargar (views/theme.js usa la misma)
-        var f = document.createElement('link');
-        f.rel = 'stylesheet'; f.dataset.kaiFonts = '';
-        f.href = 'https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Space+Mono:wght@400;700&display=swap';
-        document.head.appendChild(f);
+        // sus letras (guardadas en Kai, fonts/), pedidas desde ya para que los títulos no cambien de forma al cargar
+        ['space-grotesk', 'space-mono-400', 'space-mono-700'].forEach(function (n) {
+          var f = document.createElement('link');
+          f.rel = 'preload'; f.as = 'font'; f.type = 'font/woff2'; f.crossOrigin = 'anonymous'; f.href = 'fonts/' + n + '.woff2';
+          document.head.appendChild(f);
+        });
       } else {
         if (t === 'light' && s.tone && s.tone !== 'blanco') d.dataset.tone = s.tone;
         if (t === 'dark' && s.darkTone === 'gris') d.dataset.dark = 'gris';

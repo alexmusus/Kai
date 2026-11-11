@@ -1,0 +1,3 @@
+Space Grotesk (Florian Karsten) y Space Mono (Colophon Foundry), subconjunto latino en WOFF2.
+Licencia: SIL Open Font License 1.1 — https://openfontlicense.org
+Se usan en el estilo Bloques de Kai (styles.css).

@@ -10,11 +10,14 @@ importScripts('core.js');
  * cada subida dentro de esa versión (el navegador solo instala de nuevo si este archivo cambia) y vuelve a 1 cuando
  * sube VERSION. */
 const VERSION = 44;
-const ENTREGA = 3;
+const ENTREGA = 4;
 const CACHE = `kai-${VERSION}.${ENTREGA}`;
 /* Lo que cambió en esta versión, corto y en palabras de todos los días: lo muestran la burbuja de "Versión nueva"
  * (al tocarla) y Ajustes → Versión. Se escribe de nuevo al empezar cada versión. */
 const CAMBIOS = [
+  'Bloques: se ve igual en todas las pantallas (menús, avisos, la tarjeta de la serie y los botones sobre la portada) y sus letras ya van dentro de Kai, sin pedirlas a internet.',
+  'Bloques: textos y botones con mejor contraste en Papel, Piedra, Bosque y Grafito.',
+  'Sincronizar es más liviano: si nada cambió en MEGA, no vuelve a bajar tus archivos.',
   'Cada tono tiene su color: el botón principal, la pestaña abierta, lo que eliges y la barra de avance combinan con el fondo.',
   'Ajustes → Avanzado → Laboratorio: lo que está en prueba, solo en este dispositivo. Al encenderlo aparece el estilo Bloques en Apariencia.',
   'Bloques: superficies lisas, letra de máquina en los datos, cuatro tonos (Grafito, Bosque, Piedra y Papel) y animaciones al tocar: la selección se desliza, los ✓ aparecen suaves, los números suben y cada temporada muestra su avance en un anillo.',
@@ -41,6 +44,8 @@ const ASSET_CACHE = `kai-assets-${ASSETS_V}`;
 const ASSETS = [
   'vendor/mega.js', 'icon-32.png', 'icon-180.png', 'icon-192.png', 'icon-512.png',
   'gato/sentado.webp', 'gato/sentado-cierra.webp', 'gato/echado.webp',
+  // las letras del estilo Bloques (Space Grotesk y Space Mono, licencia OFL): antes se pedían a Google
+  'fonts/space-grotesk.woff2', 'fonts/space-mono-400.woff2', 'fonts/space-mono-700.woff2',
 ];
 const FONT_CACHE = 'kai-fonts';
 const ART_CACHE = 'kai-art';

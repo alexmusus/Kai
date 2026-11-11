@@ -1876,7 +1876,7 @@ html.calm .mini > :not(.mini-video) { transition: none; }
 .stats-month { margin: 0 0 8px; }
 .stats-month strong { color: var(--text); font-weight: 600; }
 /* Ajustes: lo que casi nunca se toca va plegado (se abre al tocar el título) */
-.settings-fold > summary { cursor: pointer; list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px; font-weight: 600; }
+.settings-fold > summary { width: 100%; cursor: pointer; list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px; font-weight: 600; }
 .settings-fold > summary::-webkit-details-marker { display: none; }
 .settings-fold > summary::after { content: ''; width: 9px; height: 9px; flex: none; margin-right: 4px; border-right: 2px solid var(--dim); border-bottom: 2px solid var(--dim); transform: rotate(45deg); transition: transform 0.2s; }
 .settings-fold[open] > summary::after { transform: rotate(-135deg); }
@@ -1943,9 +1943,9 @@ html.lite .poster-card { background: var(--glass-solid); -webkit-backdrop-filter
 [data-theme='dark'] { --accent: #b3c9f2; --accent-ink: #0b1322; --primary: #c3d4f4; --primary-ink: #0b1322; }
 [data-theme='dark'][data-dark='gris'] { --accent: #e6c38f; --accent-ink: #2a1d08; --primary: #e9c995; --primary-ink: #2a1d08; }
 [data-theme='light'] { --accent: #2d62cf; --accent-ink: #ffffff; --primary: #2a5bc0; --primary-ink: #ffffff; }
-[data-theme='light'][data-tone='gris'] { --accent: #34558a; --primary: #3a5679; --primary-ink: #ffffff; }
+[data-theme='light'][data-tone='gris'] { --accent: #2f4f82; --primary: #3a5679; --primary-ink: #ffffff; }
 [data-theme='light'][data-tone='celeste'] { --accent: #2a5fbd; --primary: #2a5ab0; --primary-ink: #ffffff; }
-[data-theme='light'][data-tone='arena'] { --accent: #a75d2b; --primary: #9b5a2e; --primary-ink: #fff8f0; }
+[data-theme='light'][data-tone='arena'] { --accent: #8c4b1f; --primary: #9b5a2e; --primary-ink: #fff8f0; }
 .dock-tab.is-on { color: var(--accent); background: color-mix(in srgb, var(--accent) 15%, var(--btn)); }
 .tile-bar span, .shelf-poster .tile-bar span { background: var(--accent); }
 /* la portada y las tarjetas de inicio tenían el botón fijo en blanco, y los selectores la ficha blanca de iPhone */
@@ -1955,7 +1955,7 @@ html.lite .poster-card { background: var(--glass-solid); -webkit-backdrop-filter
 /* ───────────── Estilo Bloques (Ajustes → Apariencia → Estilo) ─────────────
  * Superficies lisas y opacas en lugar del vidrio, datos y etiquetas en letra monoespaciada, títulos en una grotesca,
  * un color fuerte por tono y una cuadrícula de puntos en el fondo. Sin desenfoques: más liviano que el vidrio.
- * Las letras (Space Grotesk y Space Mono) se piden solo con este estilo (views/theme.js e index.html). */
+ * Las letras (Space Grotesk y Space Mono) van guardadas en Kai (fonts/); solo se bajan con este estilo. */
 [data-style='bloques'] {
   --font-display: 'Space Grotesk', ui-sans-serif, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --mono: 'Space Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
@@ -1967,26 +1967,26 @@ html.lite .poster-card { background: var(--glass-solid); -webkit-backdrop-filter
 /* Grafito: gris carbón con un lavanda apagado */
 [data-style='bloques'][data-theme='dark'] {
   --bg: #18181a; --surface: #242426; --surface2: #313134; --edge: rgba(255, 255, 255, 0.07); --dots: rgba(255, 255, 255, 0.07);
-  --text: #f2f0ea; --dim: #9d9a92; --faint: #6e6b65; --thumb-bg: #2a2a2d;
+  --text: #f2f0ea; --dim: #a5a29a; --faint: #8f8c84; --thumb-bg: #2a2a2d;
   --accent: #b3b7d4; --accent-ink: #18181a; --accent2: #b3b7d4; --chip-bg: #b3b7d4; --chip-ink: #18181a;
 }
-/* Bosque: todo verde, botones crema y detalles naranja */
+/* Bosque: todo verde, bloques en un verde más profundo, botones crema y detalles durazno */
 [data-style='bloques'][data-theme='dark'][data-dark='bosque'] {
-  --bg: #2c6337; --surface: #3d7a48; --surface2: #4f8b59; --edge: rgba(255, 255, 255, 0.1); --dots: rgba(255, 255, 255, 0.1);
-  --text: #f3f1e6; --dim: #c7dcc6; --faint: #9fbf9f; --thumb-bg: #3d7a48;
-  --accent: #f3f1e6; --accent-ink: #1f4a28; --accent2: #ff8a4c; --chip-bg: #f3f1e6; --chip-ink: #1f4a28;
+  --bg: #2c6337; --surface: #245530; --surface2: #1d4727; --edge: rgba(255, 255, 255, 0.1); --dots: rgba(255, 255, 255, 0.1);
+  --text: #f3f1e6; --dim: #cfe2cd; --faint: #bfd8be; --thumb-bg: #245530;
+  --accent: #f3f1e6; --accent-ink: #1f4a28; --accent2: #ffc4a0; --chip-bg: #f3f1e6; --chip-ink: #1f4a28;
 }
 /* Piedra: beige cálido y verde bosque */
 [data-style='bloques'][data-theme='light'] {
   --bg: #d9d3c7; --surface: #ebe6dc; --surface2: #cfc8ba; --edge: rgba(0, 0, 0, 0.06); --dots: rgba(0, 0, 0, 0.09);
-  --text: #1b1a17; --dim: #655f54; --faint: #8d8679; --thumb-bg: #c9c2b4; --shadow: rgba(40, 30, 10, 0.12);
+  --text: #1b1a17; --dim: #534d43; --faint: #5f594e; --thumb-bg: #c9c2b4; --shadow: rgba(40, 30, 10, 0.12);
   --accent: #2f6b3b; --accent-ink: #f4f1ea; --accent2: #3447d8; --chip-bg: #2f6b3b; --chip-ink: #f4f1ea;
 }
-/* Papel: blanco roto y naranja */
+/* Papel: blanco roto y naranja (la letra sobre el naranja es oscura: en blanco no se leía) */
 [data-style='bloques'][data-theme='light'][data-tone='papel'] {
   --bg: #eeede9; --surface: #ffffff; --surface2: #e2e0da; --edge: rgba(0, 0, 0, 0.06); --dots: rgba(0, 0, 0, 0.1);
-  --text: #1c1c1c; --dim: #6a6964; --faint: #9a9893; --thumb-bg: #e2e0da;
-  --accent: #ee7438; --accent-ink: #ffffff; --accent2: #e0652a; --chip-bg: #1c1c1c; --chip-ink: #ffffff;
+  --text: #1c1c1c; --dim: #5f5e59; --faint: #6c6a65; --thumb-bg: #e2e0da;
+  --accent: #ee7438; --accent-ink: #1c1c1c; --accent2: #b0440f; --chip-bg: #1c1c1c; --chip-ink: #ffffff;
 }
 [data-style='bloques'] body { background: radial-gradient(circle at 1px 1px, var(--dots) 1.1px, transparent 1.4px) 0 0 / 18px 18px, var(--bg); }
 [data-style='bloques'] *, [data-style='bloques'] *::before { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
@@ -2030,7 +2030,8 @@ html.lite .poster-card { background: var(--glass-solid); -webkit-backdrop-filter
 /* ───────────── Bloques: animaciones al tocar (Laboratorio) ─────────────
  * Solo con Bloques, con las animaciones encendidas (sin html.calm, que también pone el modo liviano en Automático) y
  * si el sistema no pide reducir el movimiento.
- * Todo es transform y opacidad. La píldora la coloca views/lively.js (--pill-x/-y/-w/-h). */
+ * Casi todo es transform y opacidad; las dos excepciones son el ancho de la píldora (un elemento suelto, no mueve
+ * nada más) y el alto de los plegables de Ajustes. La píldora la coloca views/lively.js (--pill-x/-y/-w/-h). */
 @media (prefers-reduced-motion: no-preference) {
 html[data-style='bloques']:not(.calm) {
   /* sin rebote: arranca rápido y frena suave al llegar, sin pasarse (como el resto de Kai: --kai-fly-ease) */
@@ -2084,3 +2085,44 @@ html[data-style='bloques'] .stat b { font-variant-numeric: tabular-nums; }
 /* aparecer: desde un poco más chico y transparente, sin pasarse del tamaño final */
 @keyframes kai-in { from { opacity: 0; transform: scale(0.85); } }
 @keyframes kai-spin { to { transform: rotate(360deg); } }
+
+/* ───────────── Bloques: lo mismo en todas las pantallas ─────────────
+ * Lo que no seguía el estilo al salir del inicio: las capas flotantes (menú de un capítulo, selección, avisos, la
+ * tarjeta del póster, el mini) seguían con los colores del vidrio (carbón en Bosque, blanco puro en Piedra), y los
+ * botones secundarios sobre la portada oscura salían claros con el ícono claro (no se veían) en Piedra y Papel. */
+/* las variables del vidrio apuntan a las de Bloques también en los tonos oscuros (ahí las pisaba la regla del Negro) */
+html[data-style='bloques'][data-theme] {
+  --glass: var(--surface); --glass-strong: var(--surface); --glass-solid: var(--surface); --glass-edge: var(--edge);
+  --card: var(--surface); --card-edge: var(--edge); --card-shadow: none; --seg-on: var(--accent);
+  --btn: var(--surface2); --btn-hover: var(--surface2); --line: var(--edge);
+}
+html[data-style='bloques'] :is(.sheet-panel, .dock-panel, .toast, .pick-bar, .poster-card, .mini, .update-notice, .resume-card) {
+  background: var(--surface) !important; border: 0 !important;
+  box-shadow: 0 0 0 1px var(--edge), 0 16px 40px rgba(0, 0, 0, 0.28) !important;
+}
+html[data-style='bloques'] :is(.sheet-panel, .dock-panel, .poster-card, .mini) { border-radius: 18px !important; }
+html[data-style='bloques'] .pick-bar { border-radius: 18px !important; }
+html[data-style='bloques'] .mini.is-flying { background: transparent !important; box-shadow: none !important; }
+html[data-style='bloques'] .pc-btn { background: var(--surface2); border-radius: 12px; }
+html[data-style='bloques'] :is(.pick-btn, .pick-all, .sheet-btn) { border-radius: 12px; }
+/* la portada es oscura en todos los tonos: sus bloques secundarios son un velo claro, con la letra y los íconos blancos */
+html[data-style='bloques'] :is(.hero-card, .tv.is-home .tv-hero) { --surface2: rgba(255, 255, 255, 0.16); --surface: rgba(255, 255, 255, 0.1); --btn: rgba(255, 255, 255, 0.16); }
+html[data-style='bloques'] :is(.hero-card, .tv.is-home .tv-hero) .tv-btn:not(.is-primary) { color: #fff !important; }
+html[data-style='bloques'] :is(.hero-card, .tv.is-home .tv-hero) .lang-switch button:not(.is-on) { color: rgba(255, 255, 255, 0.78); }
+/* los avatares, lisos como todo lo demás (sin el brillo de vidrio) */
+html[data-style='bloques'] .avatar { background: hsl(var(--h) 42% 40%); box-shadow: none; }
+html[data-style='bloques'] .avatar-add { background: var(--surface); border: 1px dashed var(--faint); color: var(--dim); }
+/* el avance de cada temporada: el anillo va al inicio del texto y el texto se parte como siempre (antes quedaba en
+ * tres renglones con el anillo en medio) */
+html[data-style='bloques'] .shelf-sub.has-ring { display: block; }
+html[data-style='bloques'] .shelf-sub.has-ring::before { display: inline-block; vertical-align: -2px; margin-right: 6px; }
+html[data-style='bloques'] :is(.shelf-sub, .tile-sub) { font-size: 11.5px; letter-spacing: 0 !important; }
+/* dos columnas (monitores grandes): los plegables se abren sin animar su alto, que reacomodaba las columnas cada cuadro */
+@media (min-width: 1900px) {
+  html[data-style='bloques'] details.settings-fold::details-content { transition: none !important; }
+}
+
+/* las letras de Bloques, guardadas en Kai (el navegador solo las baja si el estilo las usa) */
+@font-face { font-family: 'Space Grotesk'; font-style: normal; font-weight: 500 700; font-display: swap; src: url('fonts/space-grotesk.woff2') format('woff2'); }
+@font-face { font-family: 'Space Mono'; font-style: normal; font-weight: 400; font-display: swap; src: url('fonts/space-mono-400.woff2') format('woff2'); }
+@font-face { font-family: 'Space Mono'; font-style: normal; font-weight: 700; font-display: swap; src: url('fonts/space-mono-700.woff2') format('woff2'); }

@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { state, setIndex, SHARED_FILE, profileFile } from '../../models/store.js';
 import { goneNodes } from '../../models/mega.js';
-import { syncShared, syncProgress, syncAllProgress } from '../../models/sync.js';
+import { syncShared, syncProgress, syncAllProgress, forgetSyncSkips } from '../../models/sync.js';
 import { useProfile } from '../../models/profiles.js';
 import { setProgress } from '../../models/progress.js';
 
@@ -25,8 +25,10 @@ function fakeMega(files = []) {
   /** compuertas: gate.read / gate.write = función que devuelve una promesa a esperar antes de seguir */
   const gate = { read: null, write: null };
   const log = [];
+  const reads = [];
   const io = {
     readJson: async (n) => {
+      reads.push(n.name);
       if (gate.read) await gate.read(n);
       if (!home.children.includes(n)) throw new Error('ENOENT (el archivo ya no existe en MEGA)');
       return JSON.parse(JSON.stringify(n.content));
@@ -50,7 +52,7 @@ function fakeMega(files = []) {
   };
   /** una foto del árbol, como lo tendría un dispositivo que no se ha enterado de los cambios */
   const staleView = () => ({ ...home, children: [...home.children] });
-  return { home, io, gate, log, items, staleView };
+  return { home, io, gate, log, reads, items, staleView };
 }
 
 /** Una promesa que se resuelve a mano. */
@@ -123,6 +125,7 @@ const keys = (o) => Object.keys(o).sort();
 
 beforeEach(() => {
   localStorage.clear();
+  forgetSyncSkips();
   goneNodes.clear();
   state.storage = null;
   state.library = null;
@@ -355,5 +358,73 @@ describe('LO QUE QUEDA SIN SUBIR', () => {
     await p;
     expect(keys(m.items('pA'))).not.toContain('A/durante-la-subida.mp4'); // todavía no subió (normal)
     expect(state.dirty, 'tiene que seguir marcado como pendiente').toBe(true);
+  });
+});
+
+describe('NO VOLVER A BAJAR LO QUE NO CAMBIÓ', () => {
+  const full = async (m) => {
+    await syncShared(m.home, m.io);
+    await syncProgress(m.home, m.io);
+  };
+  it('11. la segunda sincronización, sin cambios aquí ni en MEGA, no lee ni escribe nada', async () => {
+    const m = megaAB();
+    useProfile(A);
+    await full(m); // la primera lee y sube lo de aquí
+    await full(m); // esta lee el archivo recién subido y lo deja anotado
+    const reads = m.reads.length;
+    const writes = m.log.length;
+    await full(m);
+    await full(m);
+    expect(m.reads.length, 'lecturas').toBe(reads);
+    expect(m.log.length, 'subidas').toBe(writes);
+    expect(state.dirty).toBe(false);
+  });
+
+  it('12. si algo cambió aquí, sí lee y sube', async () => {
+    const m = megaAB();
+    useProfile(A);
+    await full(m);
+    await full(m);
+    const reads = m.reads.length;
+    setProgress(ep('A/nuevo.mp4'), 30, 100);
+    await full(m);
+    expect(m.reads.length).toBeGreaterThan(reads);
+    expect(keys(m.items('pA'))).toContain('A/nuevo.mp4');
+    expect(state.dirty).toBe(false);
+  });
+
+  it('13. si otro dispositivo subió una copia nueva (otro archivo en MEGA), la lee', async () => {
+    const m = megaAB();
+    useProfile(A);
+    await full(m);
+    await full(m);
+    // otro dispositivo reemplaza el archivo de Alex con algo más
+    const old = m.home.children.find((c) => c.name === profileFile('pA'));
+    const items = { ...old.content.items, 'A/en-otro.mp4': { t: 9, d: 100, w: true, u: Date.now() } };
+    await m.io.writeJson(m.home, profileFile('pA'), { profile: 'pA', items }, [old]);
+    await full(m);
+    expect(keys(state.progress)).toContain('A/en-otro.mp4');
+  });
+
+  it('14. pedir "todo de nuevo" (Sincronizar ahora, volver a Kai) lee aunque nada parezca distinto', async () => {
+    const m = megaAB();
+    useProfile(A);
+    await full(m);
+    await full(m);
+    const reads = m.reads.length;
+    forgetSyncSkips();
+    await full(m);
+    expect(m.reads.length).toBeGreaterThan(reads);
+  });
+
+  it('15. otro perfil en el mismo dispositivo no se salta por lo que se sincronizó del primero', async () => {
+    const m = megaAB();
+    useProfile(A);
+    await full(m);
+    await full(m);
+    useProfile(B);
+    await full(m);
+    expect(keys(state.progress)).toEqual(['B/local.mp4', 'B/nube.mp4']);
+    expectSeparated(m);
   });
 });

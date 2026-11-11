@@ -6,6 +6,7 @@
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
 import { openKai } from './kai.js';
+import { buildFixture } from './fixture.js';
 
 async function shot(page, name, info) {
   const dir = process.env.KAI_SHOTS;
@@ -666,3 +667,50 @@ test('pósters: tarjeta al pasar el ratón (PC) y menú al mantener presionado (
   }
   expect(k.errors).toEqual([]);
 });
+
+// El estilo Bloques (Laboratorio) en sus cuatro tonos: tiene que verse igual en todas las pantallas, no solo en el inicio.
+for (const [theme, tone] of [['dark', 'grafito'], ['dark', 'bosque'], ['light', 'piedra'], ['light', 'papel']]) {
+  test(`Bloques ${tone}: las capas flotantes y la portada siguen el estilo, sin pedir nada a internet`, async ({ page }, info) => {
+    const { ls } = buildFixture();
+    const settings = { ...ls.settings, theme, lab: true, style: 'bloques', blockTone: tone, blockDark: tone };
+    const outside = [];
+    page.on('request', (r) => {
+      if (!/^(http:\/\/127\.0\.0\.1:8123\/|data:|blob:)/.test(r.url())) outside.push(r.url());
+    });
+    const k = await openKai(page, '#/', { extraLS: { settings } });
+    await expect(page.locator('html')).toHaveAttribute('data-style', 'bloques');
+    await shot(page, `bloques-${tone}-inicio`, info);
+    // el color de superficie de este tono, tal como lo resuelve el navegador
+    const surface = await page.evaluate(() => {
+      const d = document.createElement('div');
+      d.style.background = 'var(--surface)';
+      document.body.appendChild(d);
+      const c = getComputedStyle(d).backgroundColor;
+      d.remove();
+      return c;
+    });
+    await go(page, `#/serie/${k.si('Dorohedoro')}`);
+    // sobre la portada (oscura en todos los tonos) los botones secundarios llevan el ícono blanco
+    const second = page.locator('.hero-card .tv-btn:not(.is-primary)').first();
+    await expect(second).toHaveCSS('color', 'rgb(255, 255, 255)');
+    // el menú de un capítulo usa la superficie del tono (antes: carbón en Bosque, blanco puro en Piedra)
+    await page.locator('.ep [data-act="more"]').first().click();
+    await expect(page.locator('.sheet-panel')).toHaveCSS('background-color', surface);
+    await shot(page, `bloques-${tone}-menu`, info);
+    await page.locator('.sheet-panel [data-act="close"]').last().click();
+    await go(page, '#/ajustes');
+    await expect(page.locator('.settings-group').first()).toHaveCSS('background-color', surface);
+    // cambiar un tono no vuelve a dibujar Ajustes: el plegable abierto sigue siendo el mismo elemento
+    await page.locator('#fold-look > summary').click();
+    await page.evaluate(() => (document.querySelector('#fold-look').dataset.mark = '1'));
+    await page.locator('[data-act="set-motion"][data-v="reduced"]').click();
+    await expect(page.locator('#fold-look')).toHaveAttribute('data-mark', '1');
+    await expect(page.locator('[data-act="set-motion"][data-v="reduced"]')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('html')).toHaveClass(/calm/);
+    await shot(page, `bloques-${tone}-ajustes`, info);
+    // las letras del estilo van dentro de Kai
+    expect(await page.evaluate(() => document.fonts.ready.then(() => document.fonts.check("500 20px 'Space Grotesk'")))).toBe(true);
+    expect(outside).toEqual([]);
+    expect(k.errors).toEqual([]);
+  });
+}
