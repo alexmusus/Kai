@@ -28,9 +28,10 @@ import { LS } from '../lib/util.js';
  * @property {'auto' | 'on' | 'off'} [lite]          modo liviano, sin desenfoques (sin valor = auto)
  */
 
-/* Estilo Bloques: superficies lisas, letra monoespaciada en los datos y un color fuerte por tono. */
+/* Estilo Bloques: superficies lisas, letra monoespaciada en los datos y un color fuerte por tono. Dos colores, verde
+ * y naranja, cada uno en claro (Piedra, Papel) y en oscuro (Bosque, Brasa). */
 export const BLOCK_TONES = { piedra: { label: 'Piedra', bg: '#d9d3c7' }, papel: { label: 'Papel', bg: '#eeede9' } };
-export const BLOCK_DARK = { grafito: { label: 'Grafito', bg: '#18181a' }, bosque: { label: 'Bosque', bg: '#2c6337' } };
+export const BLOCK_DARK = { bosque: { label: 'Bosque', bg: '#121614' }, brasa: { label: 'Brasa', bg: '#171412' } };
 /** Tonos del modo claro (el color de fondo sirve para la barra del sistema). */
 export const DARK_TONES = { negro: { label: 'Negro', bg: '#0d0e12' }, gris: { label: 'Gris Culero', bg: '#4d4d4d' } };
 export const TONES = {

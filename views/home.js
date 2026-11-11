@@ -24,7 +24,9 @@ import { heroPlan, shelfItems } from '../models/plans.js';
 import { newEpisodes } from '../models/news.js';
 import { viewState } from './view-state.js';
 import { hydrateThumbs } from './thumbs.js';
-import { continueList, laterList } from '../models/progress.js';
+import { continueList, laterList, prog } from '../models/progress.js';
+import { weekStats, fmtWatched } from '../models/stats.js';
+import { proQuota } from '../models/quota.js';
 import {
   isCollection,
   itemFor,
@@ -62,6 +64,50 @@ export function tvTop() {
   </div>`;
 }
 
+/** ¿Está puesto el estilo Bloques? (solo con el Laboratorio; Vidrio no lleva nada de esto) */
+export const isBlocks = () => !!state.settings.lab && state.settings.style === 'bloques';
+
+/** Bloques: el avance de una serie como una fila de segmentos, uno por capítulo (hasta 40; con más no se lee). */
+export function segMeterHTML(eps) {
+  if (!isBlocks() || eps.length < 2 || eps.length > 40) return '';
+  return `<div class="seg-meter" aria-hidden="true">${eps
+    .map((e) => {
+      const p = prog(e);
+      return `<i${p && p.w ? ' class="is-on"' : p && p.t > 5 ? ' class="is-now"' : ''}></i>`;
+    })
+    .join('')}</div>`;
+}
+
+/** Bloques: al lado de la portada, lo visto esta semana (y la transferencia de MEGA si la cuenta la informa). */
+export function homeSideHTML(lib) {
+  const w = weekStats(lib.series, prog);
+  const max = Math.max(1, ...w.days);
+  const bars = w.days
+    .map(
+      (d, i) =>
+        `<i${d ? ' class="is-on"' : ''} style="height:${d ? Math.max(24, Math.round((d / max) * 100)) : 16}%" title="${w.labels[i]}"></i>`,
+    )
+    .join('');
+  const pro = proQuota();
+  const pct = pro && pro.total ? Math.min(100, Math.max(1, Math.round((pro.used / pro.total) * 100))) : 0;
+  const gb = (/** @type {number} */ n) =>
+    n >= 1e9 ? `${Math.round(n / 1e9).toLocaleString('es')} GB` : `${Math.round(n / 1e6)} MB`;
+  return `<aside class="home-side" aria-label="Tu semana">
+    <div class="side-card side-week"><span class="side-k">esta semana</span>
+      <b class="side-n">${w.seconds ? fmtWatched(w.seconds, true) : '0 min'}</b>
+      <span class="side-k is-plain">${w.eps === 1 ? '1 capítulo visto' : `${w.eps} capítulos vistos`}</span></div>
+    <div class="side-card side-days"><span class="side-k">día por día</span>
+      <div class="side-bars" role="img" aria-label="Lo visto cada día de la semana">${bars}</div>
+      <span class="side-labels" aria-hidden="true">${w.labels.map((l) => `<i>${l}</i>`).join('')}</span></div>
+    ${
+      pro
+        ? `<div class="side-card side-mega"><span class="side-ring" style="--p:${pct}" role="img" aria-label="Transferencia de MEGA usada: ${pct} por ciento"></span>
+      <span class="side-mega-text"><span class="side-k">transferencia de mega</span><b class="side-n is-mid">${gb(pro.used)}</b><span class="side-k is-plain">de ${gb(pro.total)}</span></span></div>`
+        : ''
+    }
+  </aside>`;
+}
+
 export function heroInnerHTML(s, si) {
   const m = displayMeta(s);
   const plan = heroPlan(s);
@@ -71,6 +117,7 @@ export function heroInnerHTML(s, si) {
   return `${heroArtHTML(m, coverEp && coverEp.id)}<div class="tvh-text"><h2 class="tv-title${titleSize(s.name)}"><span class="tvt">${esc(s.name)}</span></h2>
     ${m && m.title && m.title.toLowerCase() !== s.name.toLowerCase() ? `<p class="tv-alt">${esc(m.title)}</p>` : ''}
     <p class="tv-facts">${factsHTML(s, m, fresh ? `<span class="tv-new">${fresh === 1 ? '1 nuevo' : `${fresh} nuevos`}</span>` : '')}</p>
+    ${segMeterHTML(s.all)}
     ${syn ? `<p class="tv-synopsis">${esc(syn.replace(/\s*\n+\s*/g, ' '))}</p>` : ''}
     <div class="tv-actions">
       ${plan.next ? `<a class="tv-btn is-primary" href="#/play/${encodeURIComponent(plan.next.id)}">${ICON.play}<span>${esc(plan.label)}</span></a>` : ''}
@@ -135,7 +182,11 @@ export function renderHome() {
   app.innerHTML = `<div class="tv is-home">
     ${tvTop()}
     <main class="tv-main">
-      <section class="tv-hero" id="tv-hero">${heroInnerHTML(hs, viewState.heroSi)}</section>
+      ${
+        isBlocks()
+          ? `<div class="home-top"><section class="tv-hero" id="tv-hero">${heroInnerHTML(hs, viewState.heroSi)}</section>${homeSideHTML(lib)}</div>`
+          : `<section class="tv-hero" id="tv-hero">${heroInnerHTML(hs, viewState.heroSi)}</section>`
+      }
       ${resumeCardHTML()}
       <section class="tv-row" id="home-results" hidden></section>
       ${

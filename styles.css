@@ -1964,17 +1964,17 @@ html.lite .poster-card { background: var(--glass-solid); -webkit-backdrop-filter
   --btn: var(--surface2); --btn-hover: var(--surface2); --line: var(--edge);
   --primary: var(--accent); --primary-ink: var(--accent-ink);
 }
-/* Grafito: gris carbón con un lavanda apagado */
+/* Bosque: casi negro con un tinte verde, y verde claro como color fuerte (el oscuro de Piedra) */
 [data-style='bloques'][data-theme='dark'] {
-  --bg: #18181a; --surface: #242426; --surface2: #313134; --edge: rgba(255, 255, 255, 0.07); --dots: rgba(255, 255, 255, 0.07);
-  --text: #f2f0ea; --dim: #a5a29a; --faint: #8f8c84; --thumb-bg: #2a2a2d;
-  --accent: #b3b7d4; --accent-ink: #18181a; --accent2: #b3b7d4; --chip-bg: #b3b7d4; --chip-ink: #18181a;
+  --bg: #121614; --surface: #1b211d; --surface2: #283029; --edge: rgba(255, 255, 255, 0.07); --dots: rgba(255, 255, 255, 0.06);
+  --text: #eef0ea; --dim: #a9b3a9; --faint: #8d988d; --thumb-bg: #232a25;
+  --accent: #7fcf8f; --accent-ink: #0f1a12; --accent2: #8fd89d; --chip-bg: #7fcf8f; --chip-ink: #0f1a12;
 }
-/* Bosque: todo verde, bloques en un verde más profundo, botones crema y detalles durazno */
-[data-style='bloques'][data-theme='dark'][data-dark='bosque'] {
-  --bg: #2c6337; --surface: #245530; --surface2: #1d4727; --edge: rgba(255, 255, 255, 0.1); --dots: rgba(255, 255, 255, 0.1);
-  --text: #f3f1e6; --dim: #cfe2cd; --faint: #bfd8be; --thumb-bg: #245530;
-  --accent: #f3f1e6; --accent-ink: #1f4a28; --accent2: #ffc4a0; --chip-bg: #f3f1e6; --chip-ink: #1f4a28;
+/* Brasa: casi negro cálido, y naranja como color fuerte (el oscuro de Papel) */
+[data-style='bloques'][data-theme='dark'][data-dark='brasa'] {
+  --bg: #171412; --surface: #211c19; --surface2: #2f2823; --edge: rgba(255, 255, 255, 0.07); --dots: rgba(255, 255, 255, 0.06);
+  --text: #f3eee8; --dim: #b5aba0; --faint: #978c81; --thumb-bg: #2a2420;
+  --accent: #f08a4b; --accent-ink: #1c120a; --accent2: #f5a06b; --chip-bg: #f08a4b; --chip-ink: #1c120a;
 }
 /* Piedra: beige cálido y verde bosque (los enlaces, en el mismo verde: el azul de antes no era del tema) */
 [data-style='bloques'][data-theme='light'] {
@@ -2207,3 +2207,61 @@ html[data-style='bloques'] .ficha-card:first-child .ficha-seg i.is-on { backgrou
 .avatar.has-img { background: var(--thumb-bg); box-shadow: none; overflow: hidden; }
 .avatar.has-img img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; display: block; }
 .dock-btn .dock-avatar.has-img { background: var(--thumb-bg); }
+
+/* ═════════════ Bloques, versión final: tablero, medidores y mapa de capítulos ═════════════
+ * Solo con el estilo Bloques (Laboratorio). Vidrio no lleva nada de esto. */
+.ficha-dots, .seg-meter { display: none; }
+html[data-style='bloques'] :is(.tv-btn, .btn) { border-radius: 14px !important; }
+/* el avance de una serie en la portada del inicio: un segmento por capítulo */
+html[data-style='bloques'] .seg-meter { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 3px; margin-top: 12px; max-width: 420px; }
+html[data-style='bloques'] .seg-meter i { height: 8px; border-radius: 3px; background: rgba(255, 255, 255, 0.16); }
+html[data-style='bloques'] .seg-meter i.is-on { background: var(--accent); }
+html[data-style='bloques'] .seg-meter i.is-now { background: color-mix(in srgb, var(--accent) 50%, rgba(255, 255, 255, 0.2)); }
+/* el mapa de capítulos de la ficha: un punto por capítulo (lleno = visto, anillo = a medias) */
+html[data-style='bloques'] .ficha-card.has-dots .ficha-bar { display: none; }
+html[data-style='bloques'] .ficha-dots { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 4px; }
+html[data-style='bloques'] .ficha-dots i { aspect-ratio: 1; border-radius: 50%; background: var(--surface2); }
+html[data-style='bloques'] .ficha-dots i.is-on { background: var(--accent); }
+html[data-style='bloques'] .ficha-dots i.is-now { background: transparent; box-shadow: inset 0 0 0 2.5px var(--accent); }
+html[data-style='bloques'] .ficha-card { border-radius: 20px; }
+/* esta semana, junto a la portada del inicio */
+.home-side { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 10px 0 4px; }
+.side-card { display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; border-radius: 20px; background: var(--surface); min-width: 0; }
+.side-k { font-family: var(--mono); font-size: 11px; color: var(--dim); }
+.side-k:not(.is-plain)::before { content: '● '; color: var(--accent); }
+.side-n { font: 500 38px/1 var(--font-display); letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
+.side-n.is-mid { font-size: 28px; }
+.side-week { background: var(--accent); color: var(--accent-ink); }
+.side-week .side-k, .side-week .side-k::before { color: var(--accent-ink); }
+.side-bars { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; align-items: end; height: 40px; }
+.side-bars i { border-radius: 4px; background: var(--surface2); }
+.side-bars i.is-on { background: var(--accent); }
+.side-labels { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; font: 10px var(--mono); color: var(--faint); text-align: center; }
+.side-labels i { font-style: normal; }
+.side-mega { display: none; flex-direction: row; align-items: center; gap: 16px; background: #121413; color: #f4f1ea; }
+.side-mega .side-k { color: #c9c5bb; }
+.side-mega-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.side-ring { width: 84px; height: 84px; flex: none; border-radius: 50%; background: radial-gradient(closest-side, #121413 72%, transparent 74%), conic-gradient(var(--accent) calc(var(--p) * 1%), #2c2f2d 0); }
+@media (min-width: 900px) {
+  /* computadora: la portada a la izquierda y el tablero a la derecha */
+  .home-top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 360px); gap: 14px; align-items: stretch; margin-bottom: 18px; }
+  .home-top .tv-hero { margin-bottom: 0 !important; }
+  .home-side { display: flex; flex-direction: column; gap: 14px; margin: 0; }
+  .home-side .side-card { flex: 1; justify-content: space-between; padding: 18px 20px; border-radius: 24px; }
+  .side-n { font-size: 56px; }
+  .side-bars { height: 64px; }
+  .side-mega { display: flex; flex: none !important; justify-content: flex-start !important; }
+}
+/* los capítulos: cada uno en su bloque; el que toca, en un bloque oscuro. En el teléfono son filas, en la
+ * computadora tarjetas. */
+html[data-style='bloques'] .episodes.is-grid .ep { border-radius: 18px !important; background: var(--surface) !important; padding: 8px !important; }
+html[data-style='bloques'] .episodes.is-grid .ep-thumb { border-radius: 11px; }
+html[data-style='bloques'] .episodes.is-grid .ep.is-next:not(.is-seen) {
+  --text: #f4f1ea; --dim: #c9c5bb; --faint: #a39f96; --surface2: rgba(255, 255, 255, 0.14); --btn: rgba(255, 255, 255, 0.14);
+  background: #121413 !important; color: #f4f1ea;
+}
+html[data-style='bloques'] .episodes.is-grid .ep.is-next:not(.is-seen) :is(.ep-title, .ep-next, .dl, .ep-more) { color: #f4f1ea; }
+html[data-style='bloques'] .episodes.is-grid .ep.is-next:not(.is-seen) .ep-more { background: rgba(255, 255, 255, 0.14) !important; }
+html[data-style='bloques'] .episodes.is-grid .ep.is-next .ep-thumb { box-shadow: none; }
+@media (min-width: 641px) { html[data-style='bloques'] .episodes.is-grid .ep-tools { right: 8px; bottom: 8px; } }
+html[data-style='bloques'] .ep-num { font-family: var(--mono) !important; font-weight: 400 !important; letter-spacing: -0.02em; }

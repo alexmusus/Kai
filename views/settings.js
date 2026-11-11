@@ -251,7 +251,7 @@ export function renderSettings() {
       <p class="settings-label">Tono del modo claro</p>
       ${toneSeg('Tono del modo claro', blocks ? 'set-block-tone' : 'set-tone', blocks ? BLOCK_TONES : TONES, blocks ? s.blockTone || 'piedra' : s.tone || 'blanco')}
       <p class="settings-label">Tono del modo oscuro</p>
-      ${toneSeg('Tono del modo oscuro', blocks ? 'set-block-dark' : 'set-dark-tone', blocks ? BLOCK_DARK : DARK_TONES, blocks ? s.blockDark || 'grafito' : s.darkTone || 'negro')}
+      ${toneSeg('Tono del modo oscuro', blocks ? 'set-block-dark' : 'set-dark-tone', blocks ? BLOCK_DARK : DARK_TONES, blocks ? (s.blockDark && BLOCK_DARK[s.blockDark] ? s.blockDark : 'bosque') : s.darkTone || 'negro')}
       <p class="dim settings-hint">El tono claro se usa con el tema Claro y el oscuro con el tema Oscuro; en Automático, cada uno según la hora del sistema.</p>
       <p class="settings-label">Animaciones</p>
       <div class="segmented" role="group" aria-label="Animaciones">${[

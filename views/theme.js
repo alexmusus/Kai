@@ -51,7 +51,7 @@ function toneOf(t) {
   const s = state.settings;
   if (s.lab && s.style === 'bloques')
     return t === 'dark'
-      ? { id: BLOCK_DARK[s.blockDark] ? s.blockDark : 'grafito', ...(BLOCK_DARK[s.blockDark] || BLOCK_DARK.grafito) }
+      ? { id: BLOCK_DARK[s.blockDark] ? s.blockDark : 'bosque', ...(BLOCK_DARK[s.blockDark] || BLOCK_DARK.bosque) }
       : { id: BLOCK_TONES[s.blockTone] ? s.blockTone : 'piedra', ...(BLOCK_TONES[s.blockTone] || BLOCK_TONES.piedra) };
   return t === 'dark'
     ? { id: DARK_TONES[s.darkTone] ? s.darkTone : 'negro', ...(DARK_TONES[s.darkTone] || DARK_TONES.negro) }

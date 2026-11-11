@@ -65,9 +65,9 @@ function heroCardHTML({ m, thumbId = '', kicker = '', title, alt = '', facts = '
 /**
  * La ficha en números, al lado de la sinopsis: la nota (con su medidor de 10 segmentos) y tu avance. En la
  * computadora llena la mitad derecha, que antes quedaba vacía en las películas y en las series de pocas temporadas.
- * @param {{ m: any, seen?: number, total?: number, movie?: { seen: boolean, left: string, dur?: number } }} o
+ * @param {{ m: any, seen?: number, total?: number, eps?: any[], movie?: { seen: boolean, left: string, dur?: number } }} o
  */
-function fichaHTML({ m, seen = 0, total = 0, movie }) {
+function fichaHTML({ m, seen = 0, total = 0, eps = [], movie }) {
   const cards = [];
   const score = m && m.score ? Number(m.score) : 0;
   if (score) {
@@ -82,9 +82,19 @@ function fichaHTML({ m, seen = 0, total = 0, movie }) {
       <b class="ficha-n is-text">${movie.seen ? 'Vista' : movie.left ? esc(movie.left) : 'Sin ver'}</b>
       ${mins ? `<span class="ficha-k">Dura ${mins}</span>` : ''}</div>`);
   } else if (total) {
-    cards.push(`<div class="ficha-card"><span class="ficha-k">Tu avance</span>
+    // el mapa de capítulos (un punto por capítulo) lo muestra el estilo Bloques en lugar de la barra; con muchos no se lee
+    const dots =
+      eps.length > 1 && eps.length <= 60
+        ? `<span class="ficha-dots" aria-hidden="true">${eps
+            .map((e) => {
+              const p = prog(e);
+              return `<i${p && p.w ? ' class="is-on"' : p && p.t > 5 ? ' class="is-now"' : ''}></i>`;
+            })
+            .join('')}</span>`
+        : '';
+    cards.push(`<div class="ficha-card${dots ? ' has-dots' : ''}"><span class="ficha-k">Tu avance</span>
       <b class="ficha-n">${seen}<small> de ${total}</small></b>
-      <span class="ficha-bar" aria-hidden="true"><i style="width:${Math.round((seen / total) * 100)}%"></i></span></div>`);
+      <span class="ficha-bar" aria-hidden="true"><i style="width:${Math.round((seen / total) * 100)}%"></i></span>${dots}</div>`);
   }
   return cards.length ? `<aside class="ficha" aria-label="Ficha">${cards.join('')}</aside>` : '';
 }
@@ -179,7 +189,7 @@ export function renderSeries(arg) {
           ${upcoming.length ? squareBtn(`data-act="series-dl" data-si="${si}"${multi ? ` data-from="${esc(next.id)}"` : ''}`, dlLabel, ICON.down) : ''}
           ${flat ? '' : squareBtn(`data-act="later" data-si="${si}" aria-pressed="${isLater(s)}"`, 'Más tarde', isLater(s) ? ICON.laterOn : ICON.later, isLater(s))}`,
       })}
-      ${aboutHTML(syn, m && !hasSpanish(m) && m.synopsis && canTranslate() ? `<button class="link-btn" data-act="translate"${ownMeta ? ` data-key="${esc(season.name)}"` : ''}>Traducir sinopsis al español</button>` : '', fichaHTML({ m, seen, total: scope.length }))}
+      ${aboutHTML(syn, m && !hasSpanish(m) && m.synopsis && canTranslate() ? `<button class="link-btn" data-act="translate"${ownMeta ? ` data-key="${esc(season.name)}"` : ''}>Traducir sinopsis al español</button>` : '', fichaHTML({ m, seen, total: scope.length, eps: scope }))}
       <section class="ep-section">
         ${
           multi
@@ -304,7 +314,7 @@ export function renderSeasonMenu(s, si) {
           ${upcoming.length ? squareBtn(`data-act="series-dl" data-si="${si}"`, dlLabel, ICON.down) : ''}
           ${squareBtn(`data-act="later" data-si="${si}" aria-pressed="${isLater(s)}"`, 'Más tarde', isLater(s) ? ICON.laterOn : ICON.later, isLater(s))}`,
       })}
-      ${aboutHTML(syn, m && !hasSpanish(m) && m.synopsis && canTranslate() ? `<button class="link-btn" data-act="translate"${metaKey ? ` data-key="${esc(metaKey)}"` : ''}>Traducir sinopsis al español</button>` : '', fichaHTML({ m, seen: s.all.filter((e) => (prog(e) || {}).w).length, total: s.all.length }))}
+      ${aboutHTML(syn, m && !hasSpanish(m) && m.synopsis && canTranslate() ? `<button class="link-btn" data-act="translate"${metaKey ? ` data-key="${esc(metaKey)}"` : ''}>Traducir sinopsis al español</button>` : '', fichaHTML({ m, seen: s.all.filter((e) => (prog(e) || {}).w).length, total: s.all.length, eps: s.all }))}
       <section class="ep-section">
         <div class="ep-head"><h3 class="ep-heading">Temporadas</h3></div>
         <ul class="shelf season-grid" role="list">${cards}</ul>

@@ -10,11 +10,13 @@ importScripts('core.js');
  * cada subida dentro de esa versión (el navegador solo instala de nuevo si este archivo cambia) y vuelve a 1 cuando
  * sube VERSION. */
 const VERSION = 44;
-const ENTREGA = 7;
+const ENTREGA = 8;
 const CACHE = `kai-${VERSION}.${ENTREGA}`;
 /* Lo que cambió en esta versión, corto y en palabras de todos los días: lo muestran la burbuja de "Versión nueva"
  * (al tocarla) y Ajustes → Versión. Se escribe de nuevo al empezar cada versión. */
 const CAMBIOS = [
+  'Bloques, versión nueva: en el inicio, lo que viste esta semana día por día (y la transferencia de MEGA en la computadora); el avance de cada serie en segmentos; el mapa de capítulos en su ficha; y cada capítulo en su bloque.',
+  'Bloques ahora tiene dos colores, verde y naranja, cada uno en claro y en oscuro: Piedra, Papel, Bosque y Brasa.',
   'La página de una serie o película muestra su ficha en números (la nota y tu avance) junto a la sinopsis, y la de una película termina con «Más películas».',
   'Tu avatar: en Ajustes puedes subir una imagen o elegir un dibujo (gato, estrella, luna…) en lugar de tu inicial.',
   'Catálogo: filtrar por la nota de AniList y ordenar por la mejor nota.',

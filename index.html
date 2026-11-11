@@ -32,8 +32,8 @@
       if (s.lab && s.style === 'bloques') {
         // estilo Bloques (solo con el Laboratorio): los colores son los de BLOCK_TONES y BLOCK_DARK
         d.dataset.style = 'bloques';
-        var bl = { piedra: '#d9d3c7', papel: '#eeede9' }, bd = { grafito: '#18181a', bosque: '#2c6337' };
-        var k = t === 'dark' ? (bd[s.blockDark] ? s.blockDark : 'grafito') : (bl[s.blockTone] ? s.blockTone : 'piedra');
+        var bl = { piedra: '#d9d3c7', papel: '#eeede9' }, bd = { bosque: '#121614', brasa: '#171412' };
+        var k = t === 'dark' ? (bd[s.blockDark] ? s.blockDark : 'bosque') : (bl[s.blockTone] ? s.blockTone : 'piedra');
         if (t === 'dark') d.dataset.dark = k; else d.dataset.tone = k;
         bg = t === 'dark' ? bd[k] : bl[k];
         // sus letras (guardadas en Kai, fonts/), pedidas desde ya para que los títulos no cambien de forma al cargar

@@ -59,6 +59,38 @@ export function profileStats(series, progOf, now = Date.now()) {
   return { seconds, eps, done, monthSeconds, monthTop };
 }
 
+/**
+ * Lo visto en los últimos 7 días (hoy es el último): el tiempo y los capítulos terminados, en total y por día.
+ * Sale de la fecha en que se tocó cada capítulo por última vez (`u`), así que es una aproximación: un capítulo
+ * visto en dos días cuenta entero el segundo.
+ * @param {StatSeries[]} series
+ * @param {(ep: any) => Prog | undefined} progOf
+ * @param {number} [now]
+ * @returns {{ seconds: number, eps: number, days: number[], labels: string[] }}
+ */
+export function weekStats(series, progOf, now = Date.now()) {
+  const DAY = 86400000;
+  const today = new Date(now);
+  const start = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime() - 6 * DAY;
+  const days = Array(7).fill(0);
+  let seconds = 0;
+  let eps = 0;
+  for (const s of series || []) {
+    for (const e of s.all || []) {
+      const p = progOf(e);
+      if (!p || !p.u || p.u < start || p.u > now) continue;
+      const sec = p.w ? p.d || 0 : p.t || 0;
+      if (!sec) continue;
+      days[Math.min(6, Math.floor((p.u - start) / DAY))] += sec;
+      seconds += sec;
+      if (p.w) eps++;
+    }
+  }
+  const names = ['D', 'L', 'M', 'X', 'J', 'V', 'S'];
+  const labels = days.map((_, i) => names[new Date(start + i * DAY).getDay()]);
+  return { seconds, eps, days, labels };
+}
+
 /** "12 h", "3 h 20 min", "45 min" (corto: "3 h", redondeado a la hora). @param {number} s @param {boolean} [short] */
 export function fmtWatched(s, short = false) {
   const m = Math.round(s / 60);

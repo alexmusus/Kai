@@ -24,8 +24,8 @@ const contrast = (a, b) => {
 
 const base = "[data-style='bloques']";
 const TONES = {
-  Grafito: tone(`${base}[data-theme='dark']`),
-  Bosque: { ...tone(`${base}[data-theme='dark']`), ...tone(`${base}[data-theme='dark'][data-dark='bosque']`) },
+  Bosque: tone(`${base}[data-theme='dark']`),
+  Brasa: { ...tone(`${base}[data-theme='dark']`), ...tone(`${base}[data-theme='dark'][data-dark='brasa']`) },
   Piedra: tone(`${base}[data-theme='light']`),
   Papel: { ...tone(`${base}[data-theme='light']`), ...tone(`${base}[data-theme='light'][data-tone='papel']`) },
 };

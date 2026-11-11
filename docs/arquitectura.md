@@ -107,7 +107,8 @@ se cambian sus campos, nunca se reemplazan (`setIndex` cambia el contenido del �
 Kai tiene dos estilos. **Vidrio** es el de siempre. **Bloques** está en prueba: solo aparece con el Laboratorio
 encendido (Ajustes → Avanzado), y solo en ese dispositivo (`settings.lab`, `settings.style`).
 
-- `html[data-style='bloques']` y su tono (`data-tone` claro: Piedra, Papel; `data-dark` oscuro: Grafito, Bosque). Los
+- `html[data-style='bloques']` y su tono: dos colores, verde y naranja, cada uno en claro (`data-tone`: Piedra, Papel)
+  y en oscuro (`data-dark`: Bosque, Brasa). Los
   colores de fondo están en `models/store.js` (`BLOCK_TONES`, `BLOCK_DARK`), en el arranque de `index.html` y en
   `styles.css`; `tests/unit/tema-inicial.test.js` revisa que coincidan.
 - Bloques no redefine cada componente: cambia las variables (`--surface`, `--surface2`, `--edge`, `--accent`,
@@ -117,6 +118,9 @@ encendido (Ajustes → Avanzado), y solo en ese dispositivo (`settings.lab`, `se
   ("Bloques: lo mismo en todas las pantallas").
 - `tests/unit/contraste.test.js` exige contraste 4.5 en cada tono (texto, tenue, apagado, botón, enlaces): al cambiar
   un color de Bloques, esa prueba dice si se lee.
+- Solo en Bloques (`isBlocks()` en `views/home.js`): en el inicio, lo visto esta semana junto a la portada
+  (`homeSideHTML`, con `weekStats` de `models/stats.js`) y el avance de la serie en segmentos (`segMeterHTML`); en la
+  ficha, el mapa de capítulos (`.ficha-dots`); y cada capítulo en su bloque. Vidrio no dibuja nada de eso.
 - `views/lively.js`: las animaciones al tocar de Bloques (la píldora que se desliza, los números que suben). Con Vidrio
   no observa nada.
 - Los recorridos (`tests/e2e/recorridos.spec.js`, "Bloques …") abren los cuatro tonos y revisan el inicio, una serie,

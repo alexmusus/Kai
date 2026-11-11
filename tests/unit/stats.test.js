@@ -1,6 +1,6 @@
 // El resumen de un perfil (Ajustes → Tu resumen) y el orden de Studio (en orden o aleatorio).
 import { describe, it, expect } from 'vitest';
-import { profileStats, fmtWatched } from '../../models/stats.js';
+import { weekStats, profileStats, fmtWatched } from '../../models/stats.js';
 import { studioQueue, studioSorted, setStudioShuffle } from '../../models/collections.js';
 
 const ep = (path) => ({ path, id: path, name: path });
@@ -55,5 +55,29 @@ describe('Studio: el orden en que suenan', () => {
     expect(studioQueue(eps, 'Juan Gabriel - Querida.mp4').map((e) => e.id)).toEqual(order);
     setStudioShuffle(null);
     expect(studioQueue(eps, 'Juan Gabriel - Querida.mp4')[0].id).toBe('Juan Gabriel - Amor eterno.mp4');
+  });
+});
+
+describe('lo visto esta semana (inicio, estilo Bloques)', () => {
+  const DAY = 86400000;
+  const now = new Date(2026, 10, 11, 20, 0, 0).getTime(); // miércoles 11 nov 2026, 8 pm
+  const series = [{ name: 'S', all: [ep('a'), ep('b'), ep('c'), ep('d')] }];
+  const prog = {
+    a: { t: 1400, d: 1400, w: true, u: now - 3600e3 }, // hoy, terminado
+    b: { t: 600, d: 1400, w: false, u: now - 2 * DAY }, // anteayer, a medias
+    c: { t: 1400, d: 1400, w: true, u: now - 9 * DAY }, // hace más de una semana: no cuenta
+    d: { t: 1400, d: 1400, w: true, u: now + DAY }, // fecha imposible: no cuenta
+  };
+  const w = weekStats(series, (e) => prog[e.path], now);
+  it('suma el tiempo y los capítulos terminados de los últimos 7 días', () => {
+    expect(w.seconds).toBe(2000);
+    expect(w.eps).toBe(1);
+  });
+  it('lo reparte por día, con hoy al final', () => {
+    expect(w.days).toEqual([0, 0, 0, 0, 600, 0, 1400]);
+    expect(w.labels).toEqual(['J', 'V', 'S', 'D', 'L', 'M', 'X']);
+  });
+  it('sin nada visto, todo en cero', () => {
+    expect(weekStats(series, () => undefined, now)).toMatchObject({ seconds: 0, eps: 0, days: [0, 0, 0, 0, 0, 0, 0] });
   });
 });

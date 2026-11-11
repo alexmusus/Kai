@@ -669,7 +669,7 @@ test('pósters: tarjeta al pasar el ratón (PC) y menú al mantener presionado (
 });
 
 // El estilo Bloques (Laboratorio) en sus cuatro tonos: tiene que verse igual en todas las pantallas, no solo en el inicio.
-for (const [theme, tone] of [['dark', 'grafito'], ['dark', 'bosque'], ['light', 'piedra'], ['light', 'papel']]) {
+for (const [theme, tone] of [['dark', 'bosque'], ['dark', 'brasa'], ['light', 'piedra'], ['light', 'papel']]) {
   test(`Bloques ${tone}: las capas flotantes y la portada siguen el estilo, sin pedir nada a internet`, async ({ page }, info) => {
     const { ls } = buildFixture();
     const settings = { ...ls.settings, theme, lab: true, style: 'bloques', blockTone: tone, blockDark: tone };
@@ -679,6 +679,9 @@ for (const [theme, tone] of [['dark', 'grafito'], ['dark', 'bosque'], ['light', 
     });
     const k = await openKai(page, '#/', { extraLS: { settings } });
     await expect(page.locator('html')).toHaveAttribute('data-style', 'bloques');
+    // el tablero de la semana junto a la portada (solo en Bloques)
+    await expect(page.locator('.home-top .home-side .side-week')).toBeVisible();
+    await expect(page.locator('.home-side .side-bars i')).toHaveCount(7);
     await shot(page, `bloques-${tone}-inicio`, info);
     // el color de superficie de este tono, tal como lo resuelve el navegador
     const surface = await page.evaluate(() => {
@@ -716,7 +719,9 @@ for (const [theme, tone] of [['dark', 'grafito'], ['dark', 'bosque'], ['light', 
 }
 
 test('catálogo: filtrar y ordenar por la nota de AniList; Ajustes: elegir un dibujo de avatar', async ({ page }) => {
-  const k = await openKai(page, '#/catalogo');
+  const k = await openKai(page, '#/');
+  await expect(page.locator('.home-side')).toHaveCount(0); // en Vidrio el inicio no lleva el tablero de la semana
+  await go(page, '#/catalogo');
   const titles = () => page.locator('#cat-results .shelf-title').allInnerTexts();
   await page.selectOption('select[name="s"]', '80');
   await expect(page.locator('#cat-count')).toHaveText('4 títulos');
