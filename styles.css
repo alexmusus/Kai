@@ -2315,7 +2315,7 @@ html[data-style='bloques'] .ep-num { font-family: var(--mono) !important; font-w
   position: fixed; inset: 0; z-index: 0; overflow: hidden; background: #000; color: #fff; max-width: none; margin: 0;
   display: flex; flex-direction: column; justify-content: flex-end;
   padding: calc(env(safe-area-inset-top) + 58px) 0 calc(env(safe-area-inset-bottom) + 96px);
-  --sala-poster: 92px;
+  --sala-poster: 108px;
 }
 .sala-bg { position: absolute; inset: 0; z-index: -1; }
 .sala-img {
@@ -2366,11 +2366,11 @@ html.calm .sala-img { transition: none; }
 .sala-btn.is-on { background: rgba(255, 255, 255, 0.3); }
 @media (hover: hover) { .sala-btn:not(.is-play):hover { background: rgba(255, 255, 255, 0.26); } .sala-btn.is-play:hover { transform: scale(1.03); } }
 
-.sala-rail { margin-top: 18px; }
+.sala-rail { position: relative; margin-top: 18px; }
 .sala-count { margin: 0 var(--gutter) 6px; font-size: 12px; color: rgba(255, 255, 255, 0.6); }
 .sala-row {
   list-style: none; margin: 0; display: flex; gap: 12px; align-items: center; overflow-x: auto; scrollbar-width: none;
-  padding: 14px calc(50% - var(--sala-poster) / 2); scroll-snap-type: x mandatory; overscroll-behavior-x: contain;
+  padding: 20px calc(50% - var(--sala-poster) / 2); scroll-snap-type: x mandatory; overscroll-behavior-x: contain;
 }
 .sala-row::-webkit-scrollbar { display: none; }
 .sala-row li { flex: none; scroll-snap-align: center; }
@@ -2381,7 +2381,7 @@ html.calm .sala-img { transition: none; }
 }
 .sala-poster img, .sala-poster .is-fallback { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .sala-poster .is-fallback { display: grid; place-items: center; }
-.sala-poster.is-on { opacity: 1; transform: scale(1.1); box-shadow: 0 0 0 2px #fff, 0 14px 34px rgba(0, 0, 0, 0.6); }
+.sala-poster.is-on { opacity: 1; transform: scale(1.06); box-shadow: 0 0 0 2px #fff, 0 14px 34px rgba(0, 0, 0, 0.6); }
 .sala-poster:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent); opacity: 1; }
 @media (hover: hover) { .sala-poster:not(.is-on):hover { opacity: 0.85; } }
 html.calm .sala-poster { transition: none; }
@@ -2392,12 +2392,26 @@ body:has(#sala) .bar.is-overlay .bar-title { color: #fff; text-shadow: 0 1px 12p
 
 /* pantallas bajas (teléfono acostado): sin sinopsis */
 @media (max-height: 560px) { .sala-syn { display: none; } .sala-top .cine-kinds { display: none; } }
+@media (max-height: 720px) { .sala { --sala-poster: 88px; } }
 /* PC: la barra flotante va arriba; los datos a la izquierda, más grandes, y pósters más grandes */
 @media (min-width: 900px) {
-  .sala { padding: calc(env(safe-area-inset-top) + 76px) 0 28px; --sala-poster: 128px; }
+  .sala { padding: calc(env(safe-area-inset-top) + 76px) 0 24px; --sala-poster: clamp(150px, 10.5vw, 210px); }
   .sala-top { top: calc(env(safe-area-inset-top) + 76px); max-width: 860px; padding: 0 clamp(24px, 5vw, 72px); }
   .sala-info { padding: 0 clamp(24px, 5vw, 72px); max-width: 720px; }
   .sala-syn { font-size: 16px; }
-  .sala-row { padding-left: clamp(24px, 5vw, 72px); padding-right: 50%; scroll-snap-type: none; gap: 16px; }
+  .sala-row { padding-left: clamp(24px, 5vw, 72px); padding-right: clamp(24px, 5vw, 72px); scroll-snap-type: none; gap: 18px; }
+  .sala-arrow {
+    position: absolute; top: calc(50% + 9px); z-index: 2; display: grid; place-items: center; width: 48px; height: 48px; margin-top: -24px; padding: 0;
+    border: 0; border-radius: 50%; background: rgba(0, 0, 0, 0.6); color: #fff; cursor: pointer; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+    opacity: 0; transition: opacity 0.2s, background-color 0.15s;
+  }
+  .sala-arrow[hidden] { display: none; }
+  .sala-arrow svg { width: 24px; height: 24px; }
+  .sala-arrow.is-prev { left: 12px; }
+  .sala-arrow.is-prev svg { transform: rotate(180deg); }
+  .sala-arrow.is-next { right: 12px; }
+  .sala-rail:hover .sala-arrow { opacity: 1; }
+  .sala-arrow:hover { background: rgba(0, 0, 0, 0.85); }
   .sala-count { margin-left: clamp(24px, 5vw, 72px); }
 }
+@media (min-width: 900px) and (max-height: 820px) { .sala { --sala-poster: 140px; } .sala-syn { -webkit-line-clamp: 2; } }

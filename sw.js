@@ -10,13 +10,13 @@ importScripts('core.js');
  * cada subida dentro de esa versión (el navegador solo instala de nuevo si este archivo cambia) y vuelve a 1 cuando
  * sube VERSION. */
 const VERSION = 44;
-const ENTREGA = 11;
+const ENTREGA = 12;
 const CACHE = `kai-${VERSION}.${ENTREGA}`;
 /* Lo que cambió en ESTA subida (no en toda la versión), corto y en palabras de todos los días: lo muestra la burbuja
  * de "Versión nueva" al tocarla. Se escribe de nuevo en cada subida: así la lista es siempre corta.
  * Cada línea empieza con su sección y dos puntos ("Catálogo: …"): la burbuja junta todo lo de una misma sección. */
 const CAMBIOS = [
-  'Cine: ahora es una sala: la película elegida ocupa toda la pantalla con su imagen, y abajo un carrusel para elegir otra (deslizando en el teléfono; con el ratón o las flechas en la computadora). Al tocar Ver se apagan las luces.',
+  'Cine: ahora es una sala: la película elegida ocupa toda la pantalla con su imagen, y abajo un carrusel de pósters grandes para elegir otra (deslizando en el teléfono; en la computadora, con el ratón, la rueda o las flechas: el carrusel sigue a la que eliges). Al tocar Ver se apagan las luces.',
   'Cine: buscador propio y tipos para elegir arriba: Estrenos, Animación, Stop motion, Sagas y Clásicos. El botón de cuadrícula muestra todas de un vistazo.',
   'Cine: la carpeta va aparte, en Cine de tu MEGA (fuera de Anime), y ya no se mezcla con nada de anime: ni en los catálogos ni al buscar.',
 ];

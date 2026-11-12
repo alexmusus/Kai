@@ -197,6 +197,8 @@ function renderSala(/** @type {any} */ kind, /** @type {string} */ text) {
     <div class="sala-rail">
       <p class="sala-count" id="cine-count">${esc(countText(list, text))}</p>
       <ul class="sala-row" id="sala-row" role="list">${railHTML(list)}</ul>
+      <button class="sala-arrow is-prev" aria-label="Anteriores" tabindex="-1" hidden>${ICON.chev}</button>
+      <button class="sala-arrow is-next" aria-label="Siguientes" tabindex="-1" hidden>${ICON.chev}</button>
     </div>
   </main>`;
   bindCommon();
@@ -246,13 +248,14 @@ function railHTML(/** @type {any[]} */ list) {
 }
 
 /** Elige una película: cambia el fondo (fundido), los datos y el póster resaltado. */
-function select(/** @type {string} */ key, { center = false, smooth = true } = {}) {
+function select(/** @type {string} */ key, { center = false, smooth = true, follow = false } = {}) {
   if (!page) return;
   const x = page.list.find((y) => y.it.key === key);
   if (!x) return;
   const row = $('#sala-row');
   const btn = row && /** @type {HTMLElement | null} */ (row.querySelector(`[data-key="${CSS.escape(key)}"]`));
   if (center && btn) btn.scrollIntoView({ inline: 'center', block: 'nearest', behavior: smooth ? 'smooth' : 'auto' });
+  else if (follow && btn && row) followInRow(row, btn);
   if (page.sel === key && $('#sala-info')?.dataset.key === key) return;
   page.sel = key;
   for (const b of app.querySelectorAll('.sala-poster')) {
@@ -278,6 +281,15 @@ function select(/** @type {string} */ key, { center = false, smooth = true } = {
   }
   swapBackdrop(backdrop(x), x.title);
   keepInHash();
+}
+
+/** Si el póster quedó cerca de un borde del carrusel, el carrusel se desliza para que se vean las de al lado. */
+function followInRow(/** @type {HTMLElement} */ row, /** @type {HTMLElement} */ btn) {
+  const r = row.getBoundingClientRect();
+  const b = btn.getBoundingClientRect();
+  const room = b.width * 1.6; // un póster y medio de aire
+  if (b.right > r.right - room) row.scrollBy({ left: b.right - (r.right - room), behavior: 'smooth' });
+  else if (b.left < r.left + room) row.scrollBy({ left: b.left - (r.left + room), behavior: 'smooth' });
 }
 
 /** El fondo nuevo aparece sobre el de antes cuando ya cargó (sin quedar un momento en negro). */
@@ -399,14 +411,39 @@ function bindSala() {
     else select(key, { center: true });
   });
   if (finePointer()) {
-    // computadora: pasar el ratón elige (con una pausa corta, para no cambiar el fondo al cruzar la fila)
+    /* computadora: mover el ratón elige (con una pausa corta, para no cambiar el fondo al cruzar la fila), y el
+     * carrusel la sigue: si la elegida queda en el borde, se desliza para mostrar las de al lado. Elige al mover el
+     * ratón y no al pasar por encima: si no, al deslizarse la fila quedaba otra bajo el ratón quieto y seguía sola. */
     let hover = 0;
-    row.addEventListener('mouseover', (/** @type {MouseEvent} */ e) => {
+    row.addEventListener('mousemove', (/** @type {MouseEvent} */ e) => {
       const b = /** @type {HTMLElement | null} */ (/** @type {HTMLElement} */ (e.target).closest('.sala-poster'));
       clearTimeout(hover);
-      if (b) hover = window.setTimeout(() => select(/** @type {string} */ (b.dataset.key)), 160);
+      if (b && b.dataset.key !== page?.sel)
+        hover = window.setTimeout(() => select(/** @type {string} */ (b.dataset.key), { follow: true }), 160);
     });
     row.addEventListener('mouseleave', () => clearTimeout(hover));
+    // la rueda del ratón (hacia arriba o abajo) desliza el carrusel de lado
+    row.addEventListener(
+      'wheel',
+      (/** @type {WheelEvent} */ e) => {
+        if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+        e.preventDefault();
+        row.scrollBy({ left: e.deltaY * 1.5 });
+      },
+      { passive: false },
+    );
+    // flechas a los lados, como en las filas del inicio
+    const arrows = () => {
+      const end = row.scrollWidth - row.clientWidth - 2;
+      app.querySelector('.sala-arrow.is-prev')?.toggleAttribute('hidden', row.scrollLeft <= 2);
+      app.querySelector('.sala-arrow.is-next')?.toggleAttribute('hidden', row.scrollLeft >= end);
+    };
+    row.addEventListener('scroll', () => requestAnimationFrame(arrows), { passive: true });
+    for (const a of app.querySelectorAll('.sala-arrow'))
+      a.addEventListener('click', () =>
+        row.scrollBy({ left: (a.classList.contains('is-prev') ? -1 : 1) * row.clientWidth * 0.75, behavior: 'smooth' }),
+      );
+    requestAnimationFrame(arrows);
   } else {
     // teléfono: la del centro del carrusel es la elegida
     let raf = 0;
