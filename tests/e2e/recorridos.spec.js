@@ -87,26 +87,41 @@ test('película y cine', async ({ page }, info) => {
   expect(k.errors).toEqual([]);
 });
 
-test('Cine: buscador propio y tipos; una película puede estar en varios', async ({ page }, info) => {
+test('Cine: la sala, con buscador propio y tipos; una película puede estar en varios', async ({ page }, info) => {
   const k = await openKai(page, '#/');
   const si = k.si('Cine');
   await go(page, `#/serie/${si}`);
-  const list = page.locator('#cine-list .shelf-item');
-  await expect(list).toHaveCount(2);
+  const posters = page.locator('#sala-row .sala-poster');
+  await expect(posters).toHaveCount(2);
   // los fijos siempre; Stop motion y Sagas porque Pollitos en fuga lo es
   await expect(page.locator('.cine-kind')).toHaveText(['Todas2', 'Estrenos0', 'Animación2', 'Stop motion1', 'Sagas1', 'Clásicos2']);
-  await shot(page, 'cine', info);
+  await expect(page.locator('.sala-title')).toHaveText('El gigante de hierro');
+  await shot(page, 'cine-sala', info);
+  // tocar un póster lo elige: cambian el título y los datos
+  await posters.nth(1).click();
+  await expect(page.locator('.sala-title')).toHaveText('Pollitos en fuga');
+  await expect(page.locator('.sala-kicker')).toHaveText('Saga · Pollitos en fuga');
+  await expect(page.locator('.sala-actions [data-cine="play"]')).toHaveAttribute('href', /#\/play\//);
+  await shot(page, 'cine-sala-2', info);
   await page.locator('.cine-kind', { hasText: 'Stop motion' }).click();
-  await expect(list).toHaveCount(1);
-  await expect(list).toContainText('Pollitos en fuga');
+  await expect(posters).toHaveCount(1);
   await expect(page).toHaveURL(new RegExp(`#/serie/${si}\\?t=stop-motion$`));
-  await page.locator('.cine-kind', { hasText: 'Clásicos' }).click();
-  await expect(list).toHaveCount(2);
+  // la lupa abre el buscador, que solo busca en Cine
+  await page.locator('[data-cine="search"]').click();
   await page.locator('#cine-q').fill('gigante');
-  await expect(list).toHaveCount(1);
-  await expect(list).toContainText('El gigante de hierro');
-  await page.locator('#cine-q').fill('zzz');
-  await expect(page.locator('#cine-count')).toHaveText('Nada coincide con la búsqueda.');
+  await expect(posters).toHaveCount(0);
+  await expect(page.locator('.sala-empty')).toHaveText('Nada coincide con la búsqueda.');
+  await page.locator('.cine-kind', { hasText: 'Todas' }).click();
+  await expect(posters).toHaveCount(1);
+  await expect(page.locator('.sala-title')).toHaveText('El gigante de hierro');
+  // la cuadrícula, con lo mismo elegido
+  await page.locator('[data-cine="grid"]').click();
+  await expect(page.locator('#cine-list .shelf-item')).toHaveCount(1);
+  await page.locator('#cine-q').fill('');
+  await expect(page.locator('#cine-list .shelf-item')).toHaveCount(2);
+  await shot(page, 'cine-cuadricula', info);
+  await page.locator('[data-cine="sala"]').click();
+  await expect(posters).toHaveCount(2);
   // la ficha lleva a su saga dentro de Cine, no al catálogo de anime
   await go(page, `#/pelicula/${si}/${encodeURIComponent('Pollitos en fuga (2000)')}`);
   await expect(page.locator('.tv-facts a.fact', { hasText: 'Pollitos en fuga' })).toHaveAttribute('href', new RegExp(`^#/serie/${si}\\?t=sagas`));

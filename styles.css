@@ -2306,3 +2306,98 @@ html[data-style='bloques'] .ep-num { font-family: var(--mono) !important; font-w
   .st-seek:active::-webkit-slider-thumb { transform: scale(1.5); }
   .st-seek:active::-webkit-slider-runnable-track { height: 6px; }
 }
+
+/* ── Cine: la sala ──
+ * Toda la pantalla es la película elegida: su imagen de fondo, sus datos y, abajo, el carrusel de pósters. Siempre
+ * oscura, sea cual sea el tema o el tono. El fondo cambia con un fundido y se acerca despacio (solo transform y
+ * opacidad; con animaciones reducidas o el modo liviano, quieto). */
+.sala {
+  position: fixed; inset: 0; z-index: 0; overflow: hidden; background: #000; color: #fff; max-width: none; margin: 0;
+  display: flex; flex-direction: column; justify-content: flex-end;
+  padding: calc(env(safe-area-inset-top) + 58px) 0 calc(env(safe-area-inset-bottom) + 96px);
+  --sala-poster: 92px;
+}
+.sala-bg { position: absolute; inset: 0; z-index: -1; }
+.sala-img {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 22%;
+  opacity: 0; transition: opacity 0.7s ease; background: hsl(var(--h, 220) 30% 16%);
+}
+.sala-img:not([src]) { background: linear-gradient(160deg, hsl(var(--h, 220) 35% 22%), #000 75%); }
+.sala-img.is-on { opacity: 1; animation: sala-zoom 26s ease-out both; }
+@keyframes sala-zoom { from { transform: scale(1); } to { transform: scale(1.08); } }
+.sala-bg::after {
+  content: ''; position: absolute; inset: 0;
+  background:
+    linear-gradient(to top, #000 0%, rgba(0, 0, 0, 0.82) 34%, rgba(0, 0, 0, 0.25) 62%, rgba(0, 0, 0, 0.55) 100%),
+    linear-gradient(to right, rgba(0, 0, 0, 0.55), transparent 70%);
+}
+html.calm .sala-img.is-on, html.lite .sala-img.is-on { animation: none; }
+html.calm .sala-img { transition: none; }
+/* al tocar Ver se apagan las luces */
+.sala::after { content: ''; position: fixed; inset: 0; z-index: 30; background: #000; opacity: 0; pointer-events: none; transition: opacity 0.42s ease-in; }
+.sala.is-dimming::after { opacity: 1; }
+
+.sala-top { position: absolute; left: 0; right: 0; top: calc(env(safe-area-inset-top) + 58px); display: grid; gap: 10px; padding: 0 var(--gutter); }
+.sala .cine-search { margin: 0; background: rgba(0, 0, 0, 0.45); color: #fff; }
+.sala .cine-search[hidden] { display: none; }
+.sala .cine-search input { color: #fff; }
+.sala .cine-search input::placeholder, .sala .search-icon { color: rgba(255, 255, 255, 0.6); }
+.sala .cine-kind { background: rgba(0, 0, 0, 0.42); color: #fff; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14); }
+.sala .cine-kind-n { color: rgba(255, 255, 255, 0.6); }
+.sala .cine-kind.is-on { background: #fff; color: #000; box-shadow: none; }
+@media (hover: hover) { .sala .cine-kind:not(.is-on):hover { background: rgba(255, 255, 255, 0.16); } }
+
+.sala-info { padding: 0 var(--gutter); max-width: 620px; min-height: 0; }
+.sala-kicker { margin: 0 0 6px; font-size: 12px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(255, 255, 255, 0.7); }
+.sala-title { margin: 0; font: 800 clamp(30px, 8vw, 64px)/1.02 var(--font-display); letter-spacing: -0.03em; text-wrap: balance; text-shadow: 0 2px 24px rgba(0, 0, 0, 0.5); }
+.sala-facts { display: flex; flex-wrap: wrap; gap: 4px 0; margin: 10px 0 0; font-size: 14px; color: rgba(255, 255, 255, 0.78); }
+.sala-facts span + span::before { content: '·'; margin: 0 8px; opacity: 0.6; }
+.sala-syn { margin: 10px 0 0; font-size: 15px; line-height: 1.45; color: rgba(255, 255, 255, 0.82); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.sala-empty { margin: 0; font-size: 16px; color: rgba(255, 255, 255, 0.75); }
+.sala-actions { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
+.sala-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 46px; padding: 0 20px; border: 0; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16); color: #fff; font: inherit; font-size: 15px; font-weight: 700; text-decoration: none; cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18); transition: background-color 0.15s, transform 0.15s;
+}
+.sala-btn svg { width: 20px; height: 20px; }
+.sala-btn.is-play { background: #fff; color: #000; box-shadow: none; }
+.sala-btn.is-square { width: 46px; padding: 0; }
+.sala-btn.is-on { background: rgba(255, 255, 255, 0.3); }
+@media (hover: hover) { .sala-btn:not(.is-play):hover { background: rgba(255, 255, 255, 0.26); } .sala-btn.is-play:hover { transform: scale(1.03); } }
+
+.sala-rail { margin-top: 18px; }
+.sala-count { margin: 0 var(--gutter) 6px; font-size: 12px; color: rgba(255, 255, 255, 0.6); }
+.sala-row {
+  list-style: none; margin: 0; display: flex; gap: 12px; align-items: center; overflow-x: auto; scrollbar-width: none;
+  padding: 14px calc(50% - var(--sala-poster) / 2); scroll-snap-type: x mandatory; overscroll-behavior-x: contain;
+}
+.sala-row::-webkit-scrollbar { display: none; }
+.sala-row li { flex: none; scroll-snap-align: center; }
+.sala-poster {
+  position: relative; display: block; width: var(--sala-poster); aspect-ratio: 2 / 3; padding: 0; border: 0; border-radius: 10px; overflow: hidden;
+  background: hsl(var(--h, 220) 30% 22%); cursor: pointer; opacity: 0.55; transform: scale(0.92);
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.25s, box-shadow 0.25s;
+}
+.sala-poster img, .sala-poster .is-fallback { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.sala-poster .is-fallback { display: grid; place-items: center; }
+.sala-poster.is-on { opacity: 1; transform: scale(1.1); box-shadow: 0 0 0 2px #fff, 0 14px 34px rgba(0, 0, 0, 0.6); }
+.sala-poster:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent); opacity: 1; }
+@media (hover: hover) { .sala-poster:not(.is-on):hover { opacity: 0.85; } }
+html.calm .sala-poster { transition: none; }
+/* la sala no se desplaza: la barra flotante no se achica */
+body:has(#sala) { overflow: hidden; }
+body:has(#sala) .bar.is-overlay .icon-btn { background: rgba(0, 0, 0, 0.4); border-color: rgba(255, 255, 255, 0.14); color: #fff; }
+body:has(#sala) .bar.is-overlay .bar-title { color: #fff; text-shadow: 0 1px 12px rgba(0, 0, 0, 0.5); }
+
+/* pantallas bajas (teléfono acostado): sin sinopsis */
+@media (max-height: 560px) { .sala-syn { display: none; } .sala-top .cine-kinds { display: none; } }
+/* PC: la barra flotante va arriba; los datos a la izquierda, más grandes, y pósters más grandes */
+@media (min-width: 900px) {
+  .sala { padding: calc(env(safe-area-inset-top) + 76px) 0 28px; --sala-poster: 128px; }
+  .sala-top { top: calc(env(safe-area-inset-top) + 76px); max-width: 860px; padding: 0 clamp(24px, 5vw, 72px); }
+  .sala-info { padding: 0 clamp(24px, 5vw, 72px); max-width: 720px; }
+  .sala-syn { font-size: 16px; }
+  .sala-row { padding-left: clamp(24px, 5vw, 72px); padding-right: 50%; scroll-snap-type: none; gap: 16px; }
+  .sala-count { margin-left: clamp(24px, 5vw, 72px); }
+}
