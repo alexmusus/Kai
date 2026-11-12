@@ -269,19 +269,20 @@ function showCard(/** @type {NonNullable<ReturnType<typeof seriesPoster>>} */ p)
       ${playId ? `<a class="tv-btn is-primary" href="#/play/${encodeURIComponent(playId)}">${ICON.play}<span>${esc(label)}</span></a>` : ''}
       <button class="pc-btn" ${laterAttrs} aria-label="Más tarde" aria-pressed="${later}">${later ? ICON.laterOn : ICON.later}</button>
     </div>`;
-  /* Sobre la mitad de abajo de su propio póster, casi de su mismo ancho: al lado tapaba el póster vecino, y al ir
-   * hacia él el ratón quedaba sobre la tarjeta (la del vecino no salía nunca). */
+  /* Al lado del póster (a la derecha; si no cabe, a la izquierda), desde su mitad hacia abajo: así la mitad de
+   * arriba del póster vecino queda libre para pasar a él. Antes empezaba arriba y lo tapaba entero: al ir hacia el
+   * vecino el ratón quedaba sobre la tarjeta y la del vecino no salía nunca. */
   const r = (a.querySelector('.shelf-poster') || a).getBoundingClientRect();
-  const W = Math.round(Math.min(260, Math.max(196, r.width + 12)));
-  card.style.width = `${W}px`;
+  const W = 220; // el ancho de .poster-card
   clearTimeout(hideTimer);
   card.hidden = false;
   const H = card.offsetHeight;
-  const left = Math.min(innerWidth - 12 - W, Math.max(12, r.left + r.width / 2 - W / 2));
-  const top = Math.min(innerHeight - 12 - H, Math.max(12, r.top + r.height * 0.45));
+  const right = r.right + 8 + W <= innerWidth - 12;
+  const left = right ? r.right + 8 : Math.max(12, r.left - 8 - W);
+  const top = Math.min(innerHeight - 12 - H, Math.max(12, r.top + r.height * 0.5));
   card.style.left = `${left + scrollX}px`;
   card.style.top = `${top + scrollY}px`;
-  card.dataset.side = 'over';
+  card.dataset.side = right ? 'right' : 'left';
   cardHref = a.getAttribute('href') || '';
   cardId = p.id;
   requestAnimationFrame(() => card.classList.add('is-in'));
