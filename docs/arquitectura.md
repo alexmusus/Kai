@@ -41,7 +41,7 @@ decide. ESLint lo revisa (`no-restricted-imports`).
 | `media.js` | leer videos por rangos, códec de cada archivo, si este navegador lo reproduce, capítulos guardados |
 | `plans.js` | qué capítulo toca después y qué ofrece la portada, una temporada o una película |
 | `context.js` | de qué serie, temporada o película es un capítulo, y su título |
-| `updates.js` | si hay una versión nueva de Kai lista, y qué cambió (lo cuenta `sw.js`, en `CAMBIOS`) |
+| `updates.js` | si hay una versión nueva de Kai lista, y qué cambió en esa subida (lo cuenta `sw.js`, en `CAMBIOS`: una línea por cambio, empezando por su sección, "Catálogo: …") |
 | `stats.js` | el resumen de un perfil: tiempo visto, series terminadas, lo más visto del mes |
 | `discover.js` | Descubrir: recomendaciones y lo que está en emisión (AniList) |
 

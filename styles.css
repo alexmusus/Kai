@@ -965,6 +965,12 @@ html.has-mini body { padding-bottom: var(--mini-space); }
 .update-notice.is-open { flex-wrap: wrap; width: min(440px, calc(100vw - 24px)); white-space: normal; border-radius: 22px; padding: 12px 18px 14px; }
 .update-notice.is-open .update-what { flex: 1; }
 .update-more { flex-basis: 100%; display: grid; gap: 12px; padding-right: 10px; animation: pick-in-y 0.22s ease-out; }
+/* lo que cambió se desliza dentro de la burbuja; el botón de actualizar queda siempre a la vista, debajo */
+.update-scroll { max-height: min(46vh, 340px); overflow-y: auto; overscroll-behavior: contain; display: grid; gap: 12px; padding-right: 4px; -webkit-overflow-scrolling: touch; }
+.update-sec { display: grid; gap: 5px; }
+.update-sec-title { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: 0.02em; color: var(--dim); }
+html[data-style='bloques'] .update-sec-title { font-family: var(--mono); font-weight: 400; }
+html[data-style='bloques'] .update-sec-title::before { content: '● '; color: var(--accent); }
 @keyframes pick-in-y { from { opacity: 0; transform: translateY(-6px); } }
 .update-more[hidden] { display: none; }
 .update-list { margin: 0; padding-left: 18px; display: grid; gap: 7px; font-size: 14px; font-weight: 500; line-height: 1.4; color: var(--text); }
@@ -2272,18 +2278,6 @@ html[data-style='bloques'] .ep-num { font-family: var(--mono) !important; font-w
 .cat-select select:focus, .cat-select select:focus-visible { outline: none; }
 .cat-select:has(select:focus-visible) { box-shadow: inset 0 0 0 2px var(--accent); }
 @media (hover: none) { .cat-select:has(select:focus-visible) { box-shadow: none; } }
-/* Bloques, teléfono: el avatar arriba junto a la lupa; en la barra de abajo quedan solo las pestañas */
-.top-avatar { display: none; }
-@media (max-width: 899px) {
-  html[data-style='bloques'] .top-avatar { position: relative; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 14px; }
-  html[data-style='bloques'] .top-avatar .avatar { width: 40px; height: 40px; border-radius: 14px; font-size: 16px; }
-  html[data-style='bloques'] .top-avatar .avatar.has-img img { border-radius: 14px; }
-  html[data-style='bloques'] .top-sync { position: absolute; right: -2px; bottom: -2px; width: 11px; height: 11px; border-radius: 50%; background: var(--ok, #4caf6a); border: 2px solid var(--bg); }
-  html[data-style='bloques'][data-sync='syncing'] .top-sync, html[data-style='bloques'][data-sync='pending'] .top-sync { background: var(--accent); }
-  html[data-style='bloques'][data-sync='offline'] .top-sync { background: var(--faint); }
-  html[data-style='bloques'] body:has(.tv.is-home) .dock:not(.is-open) .dock-btn { display: none; }
-  html[data-style='bloques'] .tv.is-home .tv-icon { border-radius: 14px; width: 44px; height: 44px; }
-}
 /* reproductor en la computadora: el video ocupa justo su 16:9 (con el alto limitado quedaban franjas negras a los
  * lados, con sus esquinas curvas) y, en Bloques, sin sombra alrededor */
 @media (min-width: 900px) {

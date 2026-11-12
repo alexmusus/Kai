@@ -10,29 +10,14 @@ importScripts('core.js');
  * cada subida dentro de esa versión (el navegador solo instala de nuevo si este archivo cambia) y vuelve a 1 cuando
  * sube VERSION. */
 const VERSION = 44;
-const ENTREGA = 7;
+const ENTREGA = 8;
 const CACHE = `kai-${VERSION}.${ENTREGA}`;
-/* Lo que cambió en esta versión, corto y en palabras de todos los días: lo muestran la burbuja de "Versión nueva"
- * (al tocarla) y Ajustes → Versión. Se escribe de nuevo al empezar cada versión. */
+/* Lo que cambió en ESTA subida (no en toda la versión), corto y en palabras de todos los días: lo muestra la burbuja
+ * de "Versión nueva" al tocarla. Se escribe de nuevo en cada subida: así la lista es siempre corta.
+ * Cada línea empieza con su sección y dos puntos ("Catálogo: …"): la burbuja junta todo lo de una misma sección. */
 const CAMBIOS = [
-  'Reproductor: la línea de tiempo se agarra más fácil con el dedo, y varios toques de ± seguidos se suman en un solo salto. En la computadora, el video sin franjas negras a los lados.',
-  'Bloques: tu avatar arriba junto a la lupa en el teléfono, Papel con un beige más suave, y la selección se desliza de lado a lado sin saltar.',
-  'Catálogo: la lista de un filtro ya no se cierra sola, y su marco no se queda puesto. Ajustes en la computadora: Avanzado ya no se monta; la ficha de una serie ya no deja un hueco debajo.',
-  'Bloques, versión nueva: en el inicio, lo que viste esta semana día por día (y la transferencia de MEGA en la computadora); el avance de cada serie en segmentos; el mapa de capítulos en su ficha; y cada capítulo en su bloque.',
-  'Bloques ahora tiene dos colores, verde y naranja, cada uno en claro y en oscuro: Piedra, Papel, Bosque y Brasa.',
-  'La página de una serie o película muestra su ficha en números (la nota y tu avance) junto a la sinopsis, y la de una película termina con «Más películas».',
-  'Tu avatar: en Ajustes puedes subir una imagen o elegir un dibujo (gato, estrella, luna…) en lugar de tu inicial.',
-  'Catálogo: filtrar por la nota de AniList y ordenar por la mejor nota.',
-  'En la computadora, la tarjeta de un póster ya sale siempre al pasar de uno al de al lado, y las listas de los filtros siguen el tema.',
-  'Bloques: la casita achicada sin el cuadro de color suelto, Descubrir como un solo bloque y «Ver catálogo» como pastilla.',
-  'Bloques: se ve igual en todas las pantallas (menús, avisos, la tarjeta de la serie y los botones sobre la portada) y sus letras ya van dentro de Kai, sin pedirlas a internet.',
-  'Bloques: textos y botones con mejor contraste en Papel, Piedra, Bosque y Grafito.',
-  'Sincronizar es más liviano: si nada cambió en MEGA, no vuelve a bajar tus archivos.',
-  'Cada tono tiene su color: el botón principal, la pestaña abierta, lo que eliges y la barra de avance combinan con el fondo.',
-  'Ajustes → Avanzado → Laboratorio: lo que está en prueba, solo en este dispositivo. Al encenderlo aparece el estilo Bloques en Apariencia.',
-  'Bloques: superficies lisas, letra de máquina en los datos, cuatro tonos (Grafito, Bosque, Piedra y Papel) y animaciones al tocar: la selección se desliza, los ✓ aparecen suaves, los números suben y cada temporada muestra su avance en un anillo.',
-  'En monitores grandes (1440p): la serie, los capítulos y el reproductor usan más ancho, y Ajustes va en dos columnas.',
-  'La transferencia de MEGA en Ajustes cuenta todo lo que cuenta MEGA y dice cuándo se revisó por última vez.',
+  'Novedades: esta lista muestra solo lo de cada actualización, agrupado por sección, y se puede deslizar; el botón de actualizar queda siempre a la vista.',
+  'Bloques: en el teléfono, tu avatar vuelve a la barra de abajo en todas las páginas.',
 ];
 const SHELL = [
   './', 'styles.css', 'app.js', 'core.js', 'models/mp4.js', 'models/meta-api.js',

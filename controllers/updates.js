@@ -44,15 +44,34 @@ export async function showUpdateNews() {
     return;
   }
   const info = await swInfo();
-  more.innerHTML = `${
-    info.cambios.length
-      ? `<ul class="update-list">${info.cambios.map((c) => `<li>${esc(c)}</li>`).join('')}</ul>`
-      : '<p class="update-list">Arreglos y mejoras pequeñas.</p>'
-  }<button class="update-btn" data-act="apply-update">Actualizar${info.label ? ` a ${esc(info.label)}` : ''}</button>`;
+  more.innerHTML = `<div class="update-scroll">${changesHTML(info.cambios)}</div><button class="update-btn" data-act="apply-update">Actualizar${info.label ? ` a ${esc(info.label)}` : ''}</button>`;
   more.hidden = false;
   el.classList.add('is-open');
   btn.setAttribute('aria-expanded', 'true');
   btn.querySelector('.update-see').textContent = 'Lo nuevo:';
+}
+
+/**
+ * Lo que cambió, agrupado por sección. Cada cambio de sw.js empieza con su sección ("Catálogo: …"): todo lo de una
+ * sección sale junto, en el orden en que aparece la primera vez. Lo que no trae sección va en "Otros".
+ * @param {string[]} cambios
+ */
+export function changesHTML(cambios) {
+  if (!cambios.length) return '<p class="update-list">Arreglos y mejoras pequeñas.</p>';
+  /** @type {Map<string, string[]>} */
+  const groups = new Map();
+  for (const c of cambios) {
+    const m = /^([^:.]{2,28}):\s+(.+)$/s.exec(c);
+    const sec = m ? m[1] : 'Otros';
+    const text = m ? m[2] : c;
+    groups.set(sec, [...(groups.get(sec) || []), text.charAt(0).toUpperCase() + text.slice(1)]);
+  }
+  return [...groups]
+    .map(
+      ([sec, items]) =>
+        `<section class="update-sec"><h4 class="update-sec-title">${esc(sec)}</h4><ul class="update-list">${items.map((t) => `<li>${esc(t)}</li>`).join('')}</ul></section>`,
+    )
+    .join('');
 }
 
 /** Recarga con la versión nueva, guardando antes dónde va el capítulo. */

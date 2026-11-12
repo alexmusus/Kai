@@ -593,7 +593,16 @@ test('Ajustes: tu resumen; y la burbuja de versión nueva se abre con lo que cam
   await expect(notice.locator('[data-act="apply-update"]')).toHaveCount(0); // para actualizar hay que abrirla
   await notice.locator('[data-act="update-news"]').click();
   await expect(notice).toHaveClass(/is-open/);
-  await expect(notice.locator('.update-list')).toBeVisible();
+  await expect(notice.locator('.update-list').first()).toBeVisible();
+  // lo que cambió va por secciones (todo lo de una, junto) y se desliza; el botón queda fuera de lo que se desliza
+  const html = await page.evaluate(async () =>
+    (await import('/controllers/updates.js')).changesHTML(['Catálogo: uno.', 'Reproductor: dos.', 'Catálogo: tres.', 'Sin sección']),
+  );
+  expect(html.match(/update-sec-title/g)).toHaveLength(3);
+  expect(html).toMatch(/Catálogo<\/h4><ul class="update-list"><li>Uno\.<\/li><li>Tres\.<\/li>/);
+  expect(html).toContain('Otros');
+  await expect(notice.locator('.update-scroll')).toHaveCSS('overflow-y', 'auto');
+  await expect(notice.locator('.update-scroll [data-act="apply-update"]')).toHaveCount(0);
   await expect(notice.locator('[data-act="apply-update"]')).toBeVisible();
   const open = await notice.boundingBox();
   expect((open?.x || 0) >= 0 && (open?.x || 0) + (open?.width || 0) <= (page.viewportSize()?.width || 0)).toBe(true);
