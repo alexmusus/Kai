@@ -1067,6 +1067,20 @@ p.update-list { padding-left: 0; }
 /* películas: el estante de pósters (la carpeta) */
 .shelf-main { padding: 8px var(--gutter) 120px; max-width: 1400px; margin: 0 auto; }
 .shelf-count { margin: 4px 0 16px; }
+/* Cine: su buscador y los tipos (una fila de chips que se desliza de lado en el teléfono) */
+.cine-search { margin: 4px 0 12px; }
+.cine-kinds { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; margin: 0 calc(-1 * var(--gutter)); padding: 2px var(--gutter); }
+.cine-kinds::-webkit-scrollbar { display: none; }
+.cine-kind {
+  flex: none; display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px; border: 0; border-radius: 999px;
+  background: var(--btn); color: var(--text); font: inherit; font-size: 14px; font-weight: 600; white-space: nowrap; cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+.cine-kind-n { font-size: 12px; font-weight: 500; color: var(--dim); }
+.cine-kind.is-on { background: var(--text); color: var(--bg); }
+.cine-kind.is-on .cine-kind-n { color: inherit; opacity: 0.7; }
+@media (hover: hover) { .cine-kind:not(.is-on):hover { background: var(--btn-hover); } }
+.cine-main .shelf-count { margin: 12px 0 16px; }
 .shelf { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 22px 16px; }
 .shelf-item { display: grid; color: inherit; text-decoration: none; }
 .shelf-poster {

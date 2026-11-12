@@ -534,6 +534,23 @@ export async function tmdbCheckKey(key) {
     throw err;
   }
 }
+/**
+ * Lo que la búsqueda de TMDB no trae y sirve para los tipos de Cine: la saga a la que pertenece ("Madagascar:
+ * Colección") y si es stop motion (por sus palabras clave). Un pedido más por película, una sola vez.
+ * @param {number | string} id el número de TMDB
+ * @param {string} key
+ * @returns {Promise<{ saga: string, stop: boolean }>}
+ */
+export async function tmdbExtras(id, key) {
+  const d = await tmdb(`/movie/${id}`, { language: 'es-MX', append_to_response: 'keywords' }, key);
+  const words = (d.keywords && d.keywords.keywords) || [];
+  return {
+    saga: (d.belongs_to_collection && d.belongs_to_collection.name) || '',
+    stop: words.some((/** @type {{ name?: string }} */ w) =>
+      /stop[\s-]?motion|claymation|plastilina/i.test(w.name || ''),
+    ),
+  };
+}
 /** Ficha de una película por el nombre de su carpeta: "El gigante de hierro (1999)" busca "El gigante de hierro" del año 1999. */
 export async function tmdbFindMovie(folderName, key) {
   folderName = noLang(folderName);
@@ -569,6 +586,7 @@ export async function tmdbFindMovie(folderName, key) {
   }
   if (!best || bestScore < 0.7) return null;
   return {
+    ...(await tmdbExtras(best.id, key)),
     id: 'tmdb:' + best.id, // nunca se confunde con un id de AniList
     src: 'TMDB',
     v: 2,

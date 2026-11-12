@@ -30,6 +30,21 @@ beforeEach(() => {
 });
 
 describe('buildLibrary', () => {
+  it('Cine va en su propia carpeta de la raíz de MEGA, aparte de Anime (la de dentro se ignora si existe la de afuera)', () => {
+    const anime = dir('Anime', [dir('Dorohedoro', [file('9_1_SUB.mp4')]), dir('Cine', [dir('Vieja (1990)', [file('vieja.mp4')])])]);
+    const cine = dir('Cine', [dir('El gigante de hierro (1999)', [file('El gigante de hierro.mp4')])]);
+    const root = dir('', [anime, cine]);
+    root.parent = null;
+    const lib = buildLibrary({ root });
+    expect(lib.series.map((s) => s.name)).toEqual(['Cine', 'Dorohedoro']);
+    const c = lib.series[0];
+    expect(c.seasons.map((se) => se.name)).toEqual(['El gigante de hierro (1999)']);
+    expect(c.seasons[0].episodes[0].path).toBe('Cine/El gigante de hierro (1999)/El gigante de hierro.mp4');
+  });
+  it('sin la carpeta Cine de afuera, sigue sirviendo la de dentro de Anime', () => {
+    const lib = buildLibrary(tree(dir('Anime', [dir('Cine', [dir('Vieja (1990)', [file('vieja.mp4')])])])));
+    expect(lib.series.map((s) => s.name)).toEqual(['Cine']);
+  });
   it('la imagen y el .txt con el mismo nombre que un video son su miniatura y su descripción (Studio)', () => {
     const st = tree(dir('Anime', [
       dir('Studio', [file('Juan Gabriel - Querida.mp4'), file('Juan Gabriel - Querida.jpg'), file('juan gabriel - querida.txt'), file('Otra.mp4'), file('portada.png')]),

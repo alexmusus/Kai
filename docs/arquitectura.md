@@ -25,7 +25,7 @@ decide. ESLint lo revisa (`no-restricted-imports`).
 | `mega.js` | sesión, árbol, leer y escribir archivos (avisa `tree-changed`) |
 | `library.js` | biblioteca desde el árbol, índice, Sub/Doblado, carpetas renombradas; la imagen y el .txt con el nombre de un video |
 | `profile-copies.js` | encontrar y separar lo que se copió entre perfiles |
-| `collections.js` | Peliculas, Cine y Studio (música en vivo: artista y canción salen del nombre del archivo; su orden o el aleatorio) |
+| `collections.js` | Peliculas, Cine (en su propia carpeta de la raíz de MEGA; sus tipos: Estrenos, Animación, Sagas…) y Studio (música en vivo: artista y canción salen del nombre del archivo; su orden o el aleatorio) |
 | `progress.js` | lo visto, Más tarde, Continuar viendo, seguir en otro dispositivo |
 | `profiles.js` | perfiles y lo compartido, duplicados, respaldo |
 | `sync.js` | juntar con MEGA y dejar una sola copia |

@@ -8,6 +8,7 @@ import { index, state, pkey, setIndex, saveProgressLocal, knownEps } from './sto
 import { LS } from '../lib/util.js';
 import { baseName, episodeNumber, MIME, isVideoName, sortEpisodes, seasonInfo, langOf, twinKey } from './naming.js';
 import { C, isGone, visibleChildren } from './mega.js';
+import { isCine } from './collections.js';
 
 /** @typedef {import('./types.js').Library} Library */
 /** @typedef {import('./types.js').LibraryIndex} LibraryIndex */
@@ -129,7 +130,7 @@ const byName = (/** @type {string} */ a, /** @type {string} */ b) => a.localeCom
  * @returns {Series | null} null si no tiene videos
  */
 function buildSeries(folder, rootPath) {
-  const path = rootPath + '/' + folder.name;
+  const path = rootPath ? rootPath + '/' + folder.name : folder.name;
   const kids = visibleChildren(folder);
   /** @type {Season[]} */
   const seasons = [];
@@ -154,6 +155,8 @@ function buildSeries(folder, rootPath) {
 /**
  * Arma la biblioteca desde la carpeta de series (Ajustes → carpeta; por omisión "Anime").
  * Cada subcarpeta (que no empiece con ".") es una serie. Lanza Error('NOROOT') si la carpeta no existe.
+ * Cine (películas que no son anime) va aparte, en la carpeta "Cine" de la raíz de MEGA, fuera de la de series: si
+ * existe, se usa esa y la "Cine" de dentro de Anime se ignora; si no, sigue sirviendo la de dentro (la de antes).
  * @param {{ root: MegaNode }} storage
  * @param {string} [rootSetting]
  * @returns {Library}
@@ -162,12 +165,25 @@ export function buildLibrary(storage, rootSetting = state.settings.root) {
   const root = findFolder(storage, rootSetting);
   if (!root) throw new Error('NOROOT');
   const rootPath = nodePath(root, storage.root);
-  const series = visibleChildren(root)
+  /** @type {Series[]} */
+  let series = visibleChildren(root)
     .filter((c) => c.directory && !c.name.startsWith('.'))
     .map((folder) => buildSeries(folder, rootPath))
-    .filter((s) => s !== null)
-    .sort((a, b) => byName(a.name, b.name));
+    .filter((s) => s !== null);
+  const cine = cineFolder(storage, root);
+  if (cine) {
+    const own = buildSeries(cine, nodePath(cine.parent, storage.root));
+    series = series.filter((s) => !isCine(s));
+    if (own) series.push(own);
+  }
+  series.sort((a, b) => byName(a.name, b.name));
   return { root: rootSetting, rootId: root.nodeId, v: 2, series, updated: Date.now() };
+}
+
+/** La carpeta Cine de la raíz de MEGA ("Cine" u "Otras películas"), si existe y no es la de series. @param {{ root: MegaNode }} storage @param {MegaNode} libRoot */
+function cineFolder(storage, libRoot) {
+  const same = visibleChildren(storage.root).filter((c) => c.directory && c !== libRoot && isCine(c));
+  return same.sort((a, b) => (b.children || []).length - (a.children || []).length)[0] || null;
 }
 
 /* ── índice e idiomas ── */

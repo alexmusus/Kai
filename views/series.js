@@ -9,6 +9,7 @@ import { langPref, langsOf, epById } from '../models/library.js';
 import { state, index } from '../models/store.js';
 import {
   isCollection,
+  isCine,
   isStudio,
   studioTitle,
   studioSorted,
@@ -50,6 +51,7 @@ import { canTranslate } from '../models/meta-api.js';
 import { ICON } from './icons.js';
 import { episodeRow } from './episodes.js';
 import { pickable } from '../models/downloads.js';
+import { renderCine, cineFactsHTML } from './cine.js';
 
 /** Botones Sub | Doblado de una serie que tiene capítulos en los dos idiomas. */
 export function langSwitchHTML(s, langs) {
@@ -125,6 +127,10 @@ export function renderSeries(arg) {
   }
   if (isStudio(s)) {
     renderStudio(s, si);
+    return;
+  }
+  if (isCine(s)) {
+    renderCine(s, si);
     return;
   }
   if (isCollection(s)) {
@@ -403,11 +409,14 @@ export function renderMovie(arg) {
       langsOf(it.eps).length ? `<span>${esc(langText(langsOf(it.eps)))}</span>` : '',
     ].join(''),
     m,
-    [
-      m && m.year ? chip(m.year, { y: m.year }) : '',
-      chip('Película', { f: 'Película' }),
-      ...((m && m.genres) || []).slice(0, 3).map((g) => chip(g, { g })),
-    ].join(''),
+    // Cine no lleva al catálogo de anime: sus etiquetas abren sus tipos (Animación, Sagas…) dentro de Cine
+    isCine(s)
+      ? cineFactsHTML(si, m)
+      : [
+          m && m.year ? chip(m.year, { y: m.year }) : '',
+          chip('Película', { f: 'Película' }),
+          ...((m && m.genres) || []).slice(0, 3).map((g) => chip(g, { g })),
+        ].join(''),
   );
   const later = isLater(s, it.key);
   setTint((m && m.color) || seriesColor(s));

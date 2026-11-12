@@ -15,6 +15,7 @@ import { state, SYN_FILE, FICHAS_FILE, saveShared } from './store.js';
 import {
   scoresByIds,
   tmdbFindMovie,
+  tmdbExtras,
   findMovie,
   toMeta,
   findTitle,
@@ -126,16 +127,20 @@ export async function ensureMeta() {
         for (const it of collectionItems(s)) {
           const k = itemMetaKey(s, it.key);
           const c = state.meta[k];
-          if (c && c.tm === 1 && c.key === key.slice(-6) && isFresh(c)) continue;
+          const same = c && c.key === key.slice(-6) && isFresh(c);
+          if (same && (c.tm === 2 || (c.tm === 1 && c.none))) continue;
           let m = null;
           try {
-            if (it.query) m = await tmdbFindMovie(it.query, key);
+            // tm 2: con la saga y si es stop motion (los tipos de Cine). Lo que ya tenía ficha solo pide eso.
+            if (same && c.tm === 1 && /^tmdb:\d+$/.test(String(c.id)))
+              m = { ...c, ...(await tmdbExtras(String(c.id).slice(5), key)), at: Date.now() };
+            else if (it.query) m = await tmdbFindMovie(it.query, key);
           } catch (err) {
             console.warn('tmdb', err);
             break;
           }
           state.meta[k] = m
-            ? { ...m, tm: 1, key: key.slice(-6) }
+            ? { ...m, tm: 2, key: key.slice(-6) }
             : { none: true, id: 0, tm: 1, key: key.slice(-6), at: Date.now() };
           changed = true;
           saveMeta();

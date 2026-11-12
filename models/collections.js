@@ -3,9 +3,10 @@
  * models/collections.js — colecciones: una carpeta "Peliculas" (o "Cine") no es una serie, es un estante de películas.
  * Cada película (una subcarpeta, o un archivo si están sueltos) tiene su propia ficha y su propia página.
  *
- * Cine: películas que no son anime (p. ej. "El gigante de hierro"). Carpeta "Cine" (u "Otras películas") dentro de
- * Anime: funciona como Películas pero no sale en el inicio ni en los catálogos, solo con su botón al final del inicio
- * y al buscar. Sus fichas vienen de TMDB (con la clave que se pone en Ajustes).
+ * Cine: películas que no son anime (p. ej. "El gigante de hierro"). Carpeta "Cine" (u "Otras películas") en la raíz
+ * de MEGA, aparte de Anime (la de dentro de Anime sirve mientras no exista la de afuera). Funciona como Películas pero
+ * no se mezcla con nada de anime: ni en el inicio, ni en los catálogos, ni al buscar; tiene su propia página (con
+ * buscador y tipos) desde su botón al final del inicio. Sus fichas vienen de TMDB (con la clave de Ajustes).
  *
  * Studio: música en vivo (carpeta "Studio" dentro de Anime), un video por canción. Tampoco sale en el inicio ni en
  * los catálogos: tiene su botón al final del inicio. No hay de dónde sacar fichas: el nombre del archivo dice el
@@ -44,7 +45,7 @@ export const isCine = (s) => !!s && CINE_RE.test(plainName(s));
 export const isStudio = (s) => !!s && STUDIO_RE.test(plainName(s));
 /** @param {{ name?: string } | null | undefined} s */
 export const isCollection = (s) => !!s && (COLLECTION_RE.test(plainName(s)) || isCine(s) || isStudio(s));
-/** Estantes aparte (Cine y Studio): no salen en el inicio ni en los catálogos, solo con su botón y al buscar. */
+/** Estantes aparte (Cine y Studio): no salen en el inicio ni en los catálogos, solo con su botón (Studio, también al buscar). */
 export const isAside = (/** @type {{ name?: string } | null | undefined} */ s) => isCine(s) || isStudio(s);
 
 /**
@@ -192,3 +193,31 @@ export function movieImage(s, it) {
   const m = itemMeta(s, it.key);
   return (m && (m.banner || m.cover)) || '';
 }
+
+/* ── Cine: tipos de película ──
+ * Los chips de la página de Cine. Una película puede estar en varios (Pollitos en fuga: Animación, Stop motion, Sagas
+ * y Clásicos). Salen de su ficha de TMDB; sin ficha solo está en Todas. */
+/** @typedef {{ id: string, label: string, fixed?: boolean, has: (m: any, year: number) => boolean }} CineKind */
+/** @param {any} m */
+const isAnimated = (m) => !!m && (!!m.stop || (m.genres || []).includes('Animación'));
+/** @type {CineKind[]} */
+export const CINE_KINDS = [
+  { id: '', label: 'Todas', fixed: true, has: () => true },
+  // del año pasado para acá: en noviembre de 2026, lo de 2025 y 2026
+  { id: 'estrenos', label: 'Estrenos', fixed: true, has: (m, y) => !!m && m.year >= y - 1 },
+  { id: 'animacion', label: 'Animación', fixed: true, has: (m) => isAnimated(m) },
+  { id: 'stop-motion', label: 'Stop motion', has: (m) => !!m && !!m.stop },
+  { id: 'sagas', label: 'Sagas', has: (m) => !!m && !!m.saga },
+  { id: 'con-actores', label: 'Con actores', has: (m) => !!m && !!(m.genres || []).length && !isAnimated(m) },
+  { id: 'clasicos', label: 'Clásicos', has: (m) => !!m && !!m.year && m.year < 2010 },
+];
+/** El tipo por su id ('' o uno que no existe: Todas). @param {string | null | undefined} id */
+export const cineKind = (id) => CINE_KINDS.find((k) => k.id === id) || CINE_KINDS[0];
+/** Las películas de ese tipo. @template {{ m: any }} T @param {T[]} items @param {CineKind} kind @param {number} [year] */
+export const ofCineKind = (items, kind, year = new Date().getFullYear()) => items.filter((x) => kind.has(x.m, year));
+/** "Madagascar: Colección" → "Madagascar" (así se llama la saga en la ficha de TMDB). @param {string} saga */
+export const sagaName = (saga) =>
+  String(saga || '')
+    .replace(/\s*[-–:]?\s*(colecci[oó]n|collection|saga)\s*$/i, '')
+    .replace(/^(colecci[oó]n|saga)\s*(de\s+)?/i, '')
+    .trim() || saga;

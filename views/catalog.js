@@ -4,7 +4,7 @@
  */
 
 import { state } from '../models/store.js';
-import { isCollection, collectionItems, itemMeta, movieTitle, isAside } from '../models/collections.js';
+import { isCollection, collectionItems, itemMeta, movieTitle, isAside, isCine } from '../models/collections.js';
 import { movieHref, route } from '../lib/route.js';
 import { langsOf } from '../models/library.js';
 import { metaFor } from '../models/fichas.js';
@@ -24,12 +24,14 @@ export const norm = (t) =>
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase();
 
-/** Series y, de las colecciones, cada película por separado (cada una con sus etiquetas de AniList). */
+/** Series y, de las colecciones, cada película por separado (cada una con sus etiquetas de AniList).
+ * Cine no está: es aparte de todo lo de anime y tiene su propio buscador (views/cine.js). */
 export function catalogEntries() {
   const lib = state.library;
   if (!lib || lib.v !== 2) return [];
   const out = [];
   lib.series.forEach((s, si) => {
+    if (isCine(s)) return;
     if (isCollection(s)) {
       for (const it of collectionItems(s)) {
         const m = itemMeta(s, it.key);
@@ -46,7 +48,7 @@ export function catalogEntries() {
           added: Math.max(0, ...it.eps.map((e) => e.ts || 0)),
           href: movieHref(si, it.key),
           movie: it.key,
-          cine: isAside(s), // Cine y Studio: solo al buscar
+          aside: isAside(s), // Studio: solo al buscar
           langs: langsOf(it.eps),
           done: allSeen(it.eps),
           words: norm([title, m && m.title, m && m.romaji, m && m.native, s.name].join(' ')),
@@ -105,7 +107,7 @@ export function sortEntries(list, o) {
 export const CAT_TITLES = { series: 'Series', peliculas: 'Películas' };
 export const isFiltering = (st) => !!(st.q || st.g || st.y || st.f || st.l || st.s);
 export function catalogBase(t, st) {
-  const all = catalogEntries().filter((e) => !e.cine || st.q); // Cine no se mezcla: solo aparece al buscar
+  const all = catalogEntries().filter((e) => !e.aside || st.q); // Studio no se mezcla: solo aparece al buscar
   if (!CAT_TITLES[t] || isFiltering(st)) return all;
   return all.filter((e) => (t === 'peliculas') === !!e.movie);
 }

@@ -60,7 +60,11 @@ export function buildFixture() {
   };
   const cine = {
     name: 'Cine', folderId: 'f4', added: NOW - 86400e3 * 5,
-    seasons: [season(null, 'El gigante de hierro (1999)', 'El gigante de hierro (1999)', [ep('Anime/Cine/El gigante de hierro (1999)', 'El gigante de hierro.mp4', null)])],
+    // Cine va aparte de Anime: en la carpeta Cine de la raíz de MEGA
+    seasons: [
+      season(null, 'El gigante de hierro (1999)', 'El gigante de hierro (1999)', [ep('Cine/El gigante de hierro (1999)', 'El gigante de hierro.mp4', null)]),
+      season(null, 'Pollitos en fuga (2000)', 'Pollitos en fuga (2000)', [ep('Cine/Pollitos en fuga (2000)', 'Pollitos en fuga_DOB.mp4', null)]),
+    ],
   };
   // Studio: música en vivo; el primero con su descripción (.txt con el mismo nombre)
   const qd = ep('Anime/Studio', 'Juan Gabriel - Querida (Bellas Artes, 1990).mp4', null);
@@ -79,7 +83,8 @@ export function buildFixture() {
     [`${yah}/4. OVA`]: { ...meta(21769, 'Yahari Ore no Seishun Love Comedy wa Machigatteiru. Zoku OVA', 250, { year: 2015, format: 'OVA', episodes: 1 }), sm: 3 },
     'Peliculas/Kimi no Na wa': { ...meta(21519, 'Your Name.', 300, { year: 2016, format: 'Película', episodes: 1, score: 85 }), mv: 5 },
     'Peliculas/Koe no Katachi': { ...meta(20954, 'A Silent Voice', 330, { year: 2016, format: 'Película', episodes: 1, score: 88 }), mv: 5 },
-    'Cine/El gigante de hierro (1999)': { ...meta('tmdb:10386', 'El gigante de hierro', 40, { year: 1999, format: 'Película', src: 'TMDB', tm: 1 }), mv: 5 },
+    'Cine/El gigante de hierro (1999)': { ...meta('tmdb:10386', 'El gigante de hierro', 40, { year: 1999, format: 'Película', src: 'TMDB', tm: 2, genres: ['Animación', 'Ciencia ficción', 'Familia'], saga: '', stop: false }) },
+    'Cine/Pollitos en fuga (2000)': { ...meta('tmdb:7443', 'Pollitos en fuga', 60, { year: 2000, format: 'Película', src: 'TMDB', tm: 2, genres: ['Animación', 'Comedia', 'Familia'], saga: 'Pollitos en fuga: Colección', stop: true }) },
   };
   const yahariMeta = metaMap[`${yah}/${s1}`];
   metaMap[yah] = { ...yahariMeta, sv: 6 };

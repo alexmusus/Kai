@@ -87,6 +87,33 @@ test('película y cine', async ({ page }, info) => {
   expect(k.errors).toEqual([]);
 });
 
+test('Cine: buscador propio y tipos; una película puede estar en varios', async ({ page }, info) => {
+  const k = await openKai(page, '#/');
+  const si = k.si('Cine');
+  await go(page, `#/serie/${si}`);
+  const list = page.locator('#cine-list .shelf-item');
+  await expect(list).toHaveCount(2);
+  // los fijos siempre; Stop motion y Sagas porque Pollitos en fuga lo es; Con actores no (las dos son animación)
+  await expect(page.locator('.cine-kind')).toHaveText(['Todas2', 'Estrenos0', 'Animación2', 'Stop motion1', 'Sagas1', 'Clásicos2']);
+  await shot(page, 'cine', info);
+  await page.locator('.cine-kind', { hasText: 'Stop motion' }).click();
+  await expect(list).toHaveCount(1);
+  await expect(list).toContainText('Pollitos en fuga');
+  await expect(page).toHaveURL(new RegExp(`#/serie/${si}\\?t=stop-motion$`));
+  await page.locator('.cine-kind', { hasText: 'Clásicos' }).click();
+  await expect(list).toHaveCount(2);
+  await page.locator('#cine-q').fill('gigante');
+  await expect(list).toHaveCount(1);
+  await expect(list).toContainText('El gigante de hierro');
+  await page.locator('#cine-q').fill('zzz');
+  await expect(page.locator('#cine-count')).toHaveText('Nada coincide con la búsqueda.');
+  // la ficha lleva a su saga dentro de Cine, no al catálogo de anime
+  await go(page, `#/pelicula/${si}/${encodeURIComponent('Pollitos en fuga (2000)')}`);
+  await expect(page.locator('.tv-facts a.fact', { hasText: 'Pollitos en fuga' })).toHaveAttribute('href', new RegExp(`^#/serie/${si}\\?t=sagas`));
+  await expect(page.locator('.tv-facts a[href^="#/catalogo"]')).toHaveCount(0);
+  expect(k.errors).toEqual([]);
+});
+
 test('catálogo: tipos, filtros y búsqueda', async ({ page }, info) => {
   const k = await openKai(page, '#/');
   await go(page, '#/catalogo?t=series');
@@ -103,8 +130,9 @@ test('catálogo: tipos, filtros y búsqueda', async ({ page }, info) => {
   body = await page.locator('.catalog').innerText();
   expect(body).toContain('Koe no Katachi');
   expect(body).not.toContain('Dorohedoro');
+  // Cine es aparte del anime: ni al buscar en el catálogo sale
   await go(page, '#/catalogo?' + new URLSearchParams({ q: 'gigante' }));
-  expect(await page.locator('.catalog').innerText()).toContain('gigante');
+  await expect(page.locator('#cat-count')).toHaveText('Nada coincide con la búsqueda o los filtros.');
   expect(k.errors).toEqual([]);
 });
 

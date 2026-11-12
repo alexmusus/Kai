@@ -397,7 +397,7 @@ export function cineKeyHTML(note = '') {
   const lib = state.library;
   const cine = lib && lib.series && lib.series.find(isCine);
   return `<p class="settings-label">Cine</p>
-    <p class="dim">Películas que no son anime, en la carpeta <strong>${esc(state.settings.root)}/Cine</strong>, una subcarpeta por película (por ejemplo «El gigante de hierro (1999)»). No salen en el inicio: se abren con el botón Cine al final. Sus pósters y sinopsis vienen de TMDB.</p>
+    <p class="dim">Películas que no son anime, en la carpeta <strong>Cine</strong> de tu MEGA (aparte de ${esc(state.settings.root)}), una subcarpeta por película (por ejemplo «Cine/El gigante de hierro (1999)»). No se mezclan con el anime: se abren con el botón Cine al final del inicio, que tiene su propio buscador y sus tipos. Sus pósters y sinopsis vienen de TMDB.</p>
     ${
       key
         ? `<p class="settings-value">Clave de TMDB guardada (…${esc(key.slice(-4))})${cine ? '' : ' · todavía no hay carpeta Cine'}</p>

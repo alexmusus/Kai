@@ -10,20 +10,21 @@ importScripts('core.js');
  * cada subida dentro de esa versión (el navegador solo instala de nuevo si este archivo cambia) y vuelve a 1 cuando
  * sube VERSION. */
 const VERSION = 44;
-const ENTREGA = 8;
+const ENTREGA = 9;
 const CACHE = `kai-${VERSION}.${ENTREGA}`;
 /* Lo que cambió en ESTA subida (no en toda la versión), corto y en palabras de todos los días: lo muestra la burbuja
  * de "Versión nueva" al tocarla. Se escribe de nuevo en cada subida: así la lista es siempre corta.
  * Cada línea empieza con su sección y dos puntos ("Catálogo: …"): la burbuja junta todo lo de una misma sección. */
 const CAMBIOS = [
-  'Novedades: esta lista muestra solo lo de cada actualización, agrupado por sección, y se puede deslizar; el botón de actualizar queda siempre a la vista.',
-  'Bloques: en el teléfono, tu avatar vuelve a la barra de abajo en todas las páginas.',
+  'Cine: la carpeta va aparte, en Cine de tu MEGA (fuera de Anime), y ya no se mezcla con nada de anime: ni en los catálogos ni al buscar.',
+  'Cine: buscador propio y tipos para elegir: Estrenos, Animación, Stop motion, Sagas, Con actores y Clásicos.',
+  'Cine: en la ficha de una película, la saga, Animación y Stop motion llevan a su tipo dentro de Cine.',
 ];
 const SHELL = [
   './', 'styles.css', 'app.js', 'core.js', 'models/mp4.js', 'models/meta-api.js',
   'lib/util.js', 'lib/events.js', 'lib/route.js', 'lib/nav-history.js', 'lib/motion.js', 'lib/diag.js', 'models/naming.js', 'models/store.js', 'models/mega.js', 'models/library.js',
   'models/quota.js', 'models/collections.js', 'models/progress.js', 'models/profiles.js', 'models/sync.js', 'models/profile-copies.js', 'models/fichas.js', 'models/fichas-sync.js', 'models/idb.js', 'models/news.js', 'models/thumbs.js', 'models/downloads.js', 'models/media.js', 'models/plans.js', 'models/context.js', 'models/updates.js', 'models/discover.js', 'models/stats.js', 'views/icons.js', 'views/quota.js', 'views/thumbs.js', 'views/view-state.js', 'views/components.js', 'views/home.js', 'views/episodes.js', 'views/series.js', 'views/dock.js', 'views/catalog.js', 'views/explorer.js', 'views/downloads.js',
-  'views/settings.js', 'views/discover.js', 'views/account.js', 'views/sheet.js', 'views/toast.js', 'views/theme.js', 'views/lively.js', 'views/images.js',
+  'views/settings.js', 'views/cine.js', 'views/discover.js', 'views/account.js', 'views/sheet.js', 'views/toast.js', 'views/theme.js', 'views/lively.js', 'views/images.js',
   'controllers/picking.js', 'controllers/posters.js', 'controllers/router.js', 'controllers/dock.js', 'controllers/sync.js',
   'controllers/actions.js', 'controllers/home.js', 'controllers/lifecycle.js', 'controllers/updates.js',
   'controllers/account.js', 'controllers/downloads.js', 'controllers/sheet.js', 'controllers/player/state.js', 'controllers/player/dom.js',
