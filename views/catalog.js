@@ -7,7 +7,7 @@ import { state } from '../models/store.js';
 import { isCollection, collectionItems, itemMeta, movieTitle, isAside, isCine } from '../models/collections.js';
 import { movieHref, route } from '../lib/route.js';
 import { langsOf } from '../models/library.js';
-import { metaFor } from '../models/fichas.js';
+import { metaFor, withSeriesScore } from '../models/fichas.js';
 import { esc, $, debounce, plural } from '../lib/util.js';
 import { app, header, resetPosterCache, posterAny, entryTile, rowHTML } from './components.js';
 import { ICON } from './icons.js';
@@ -55,7 +55,7 @@ export function catalogEntries() {
         });
       }
     } else {
-      const m = metaFor(s);
+      const m = withSeriesScore(s, metaFor(s)); // la nota: el promedio de sus temporadas
       out.push({
         si,
         title: s.name,

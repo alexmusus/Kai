@@ -830,3 +830,22 @@ test('PC: al pasar de un póster al de al lado, la tarjeta del nuevo sale (antes
   await expect(page.locator('.poster-card')).toBeVisible();
   expect(k.errors).toEqual([]);
 });
+
+test('PC: en el menú de temporadas, la tarjeta cambia al pasar a la temporada de al lado', async ({ page }, info) => {
+  test.skip(info.project.name !== 'pc', 'la tarjeta es de la computadora');
+  const k = await openKai(page, '#/');
+  await go(page, '#/serie/' + k.si(k.yah));
+  const cards = page.locator('.season-grid a.shelf-item');
+  await cards.nth(0).scrollIntoViewIfNeeded();
+  await page.waitForTimeout(300);
+  const a = await cards.nth(0).boundingBox();
+  await page.mouse.move(a.x + 40, a.y + 80, { steps: 4 });
+  const card = page.locator('.poster-card');
+  await expect(card).toBeVisible();
+  const first = await card.locator('.pc-title').innerText();
+  const c = await cards.nth(2).boundingBox();
+  await page.mouse.move(c.x + 40, c.y + 80, { steps: 8 });
+  await expect(card.locator('.pc-title')).not.toHaveText(first);
+  await expect(card.locator('.pc-title')).toContainText('Zoku');
+  expect(k.errors).toEqual([]);
+});

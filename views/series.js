@@ -30,6 +30,7 @@ import {
   hasSpanish,
   firstSeasonMeta,
   isFranchise,
+  withSeriesScore,
 } from '../models/fichas.js';
 import { newEpisodes, markSeriesSeen, announceNew } from '../models/news.js';
 import { nextUnseen, prog, isLater } from '../models/progress.js';
@@ -74,7 +75,7 @@ function fichaHTML({ m, seen = 0, total = 0, eps = [], movie }) {
   const score = m && m.score ? Number(m.score) : 0;
   if (score) {
     const on = Math.round(score / 10);
-    cards.push(`<div class="ficha-card"><span class="ficha-k">Nota en ${m.src === 'TMDB' ? 'TMDB' : 'AniList'}</span>
+    cards.push(`<div class="ficha-card"><span class="ficha-k">${m.scoreN ? `Promedio de ${m.scoreN} temporadas en AniList` : `Nota en ${m.src === 'TMDB' ? 'TMDB' : 'AniList'}`}</span>
       <b class="ficha-n">${(score / 10).toFixed(1).replace('.', ',')}<small> de 10</small></b>
       <span class="ficha-seg" aria-hidden="true">${Array.from({ length: 10 }, (_, i) => `<i${i < on ? ' class="is-on"' : ''}></i>`).join('')}</span></div>`);
   }
@@ -249,7 +250,8 @@ export function renderSeries(arg) {
 
 /** Menú de una serie con varias temporadas: la ficha de la serie y una tarjeta por temporada. */
 export function renderSeasonMenu(s, si) {
-  const m = firstSeasonMeta(s);
+  const base = firstSeasonMeta(s);
+  const m = withSeriesScore(s, base); // la nota: el promedio de sus temporadas
   const plan = heroPlan(s);
   const next = plan.next;
   const nextKi = next ? index.byId.get(next.id).ki : -1;
@@ -259,7 +261,7 @@ export function renderSeasonMenu(s, si) {
   const seen = s.all.filter((e) => (prog(e) || {}).w).length;
   const coverEp = s.all.find((e) => e.fa);
   // la ficha de una franquicia ("Fate") es la de una de sus temporadas: traducir va a esa
-  const metaKey = isFranchise(s) ? (s.seasons.find((se) => seasonMeta(s, se) === m) || {}).name : '';
+  const metaKey = isFranchise(s) ? (s.seasons.find((se) => seasonMeta(s, se) === base) || {}).name : '';
   const cards = s.seasons
     .map((se, ki) => {
       const t = seasonLabel(s, se);

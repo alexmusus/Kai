@@ -86,7 +86,7 @@ export function factsRowsHTML(s, m, { count = null, seen = 0, total = 0, lang = 
 export function factRows(info, m, links) {
   const score =
     m && m.score
-      ? `${info ? '<span class="fact-sep" aria-hidden="true">|</span>' : ''}<span class="fact-score" title="Nota en ${esc(m.src || 'AniList')}">★ ${esc(m.score)}</span>`
+      ? `${info ? '<span class="fact-sep" aria-hidden="true">|</span>' : ''}<span class="fact-score" title="${m.scoreN ? `Promedio de ${m.scoreN} temporadas en AniList` : `Nota en ${esc(m.src || 'AniList')}`}">★ ${esc(m.score)}</span>`
       : '';
   return `<div class="facts-rows">${info || score ? `<p class="tv-facts is-info">${info}${score}</p>` : ''}${links ? `<p class="tv-facts">${links}</p>` : ''}</div>`;
 }
@@ -94,7 +94,7 @@ export function countLabel(s, m) {
   if (m && m.collection) return plural(m.count, 'película', 'películas');
   // si la ficha que se muestra es la de una temporada u OVA (en una franquicia como "Attack on Titan"), se cuentan
   // los capítulos de esa temporada, no los de toda la serie ("OVA · 97 capítulos" no tenía sentido)
-  const own = m && isFranchise(s) ? s.seasons.find((se) => seasonMeta(s, se) === m) : null;
+  const own = m && isFranchise(s) ? s.seasons.find((se) => (seasonMeta(s, se) || {}).id === m.id) : null;
   return plural(own ? own.episodes.length : s.all.length, 'capítulo', 'capítulos');
 }
 // Kai parpadea de vez en cuando (el que está sentado al final del inicio)

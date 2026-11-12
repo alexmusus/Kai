@@ -105,9 +105,38 @@ export function seasonLabels(s) {
 export function seasonLabel(s, se) {
   return seasonLabels(s).get(se) || seasonTab(s, se);
 }
+/** La ficha de una temporada: la suya; la Temporada 1 de una serie usa la de la serie como propia. */
+export function seasonOwnMeta(s, se) {
+  return ownSeasonMeta(s, se) || (seasonLabel(s, se) === 'Temporada 1' && !isFranchise(s) ? metaFor(s) : null);
+}
+/**
+ * La nota de una serie con varias temporadas: el promedio de la de cada temporada (las de serie, no OVAs, especiales
+ * ni películas; cada ficha una vez). AniList da la nota de cada temporada por separado, y la de la serie era solo la
+ * de la primera. Null si hay menos de dos temporadas con nota.
+ * @returns {{ score: number, n: number } | null}
+ */
+export function seriesScore(s) {
+  if (!s || isCollection(s) || !s.seasons || s.seasons.length < 2) return null;
+  const seen = new Set();
+  const scores = [];
+  for (const se of s.seasons) {
+    if (!isMainSeason(s, se)) continue;
+    const m = seasonOwnMeta(s, se);
+    if (!m || !m.score || seen.has(m.id)) continue;
+    seen.add(m.id);
+    scores.push(Number(m.score));
+  }
+  if (scores.length < 2) return null;
+  return { score: Math.round(scores.reduce((a, b) => a + b, 0) / scores.length), n: scores.length };
+}
+/** La ficha de la serie como un todo (portada, catálogo, búsqueda, tarjeta): con la nota promedio de sus temporadas. */
+export function withSeriesScore(s, m) {
+  const avg = m && seriesScore(s);
+  return avg ? { ...m, score: avg.score, scoreN: avg.n } : m;
+}
 /** Nombre completo para la página de la temporada: el de AniList; si no hay ficha, el de la carpeta. */
 export function seasonFullName(s, se) {
-  const m = ownSeasonMeta(s, se) || (seasonLabel(s, se) === 'Temporada 1' && !isFranchise(s) ? metaFor(s) : null);
+  const m = seasonOwnMeta(s, se);
   // dos carpetas con la misma ficha (Memory Snow y Hyouketsu no Kizuna son "Re:Zero… OVAs"): el nombre de la carpeta
   const shared = m && s.seasons.some((x) => x !== se && (ownSeasonMeta(s, x) || {}).id === m.id);
   if (m && !shared && (m.romaji || m.title)) return m.romaji || m.title;

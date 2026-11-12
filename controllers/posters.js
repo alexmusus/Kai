@@ -7,8 +7,15 @@
 import { esc, plural } from '../lib/util.js';
 import { state } from '../models/store.js';
 import { prog, isLater, setProgress } from '../models/progress.js';
-import { heroPlan, moviePlan } from '../models/plans.js';
-import { displayMeta, synopsisOf } from '../models/fichas.js';
+import { heroPlan, moviePlan, seasonPlan } from '../models/plans.js';
+import {
+  displayMeta,
+  synopsisOf,
+  withSeriesScore,
+  seasonOwnMeta,
+  seasonFullName,
+  isFranchise,
+} from '../models/fichas.js';
 import { isCollection, collectionItems, itemMeta, movieTitle } from '../models/collections.js';
 import { movieHref } from '../lib/route.js';
 import { app } from '../views/components.js';
@@ -18,8 +25,9 @@ import { softRender } from './router.js';
 import { sync } from './sync.js';
 
 /**
- * El póster (de serie o de película, no de capítulo) bajo ese elemento: su serie y, si es una película, cuál.
- * `id` lo distingue de los demás ("3" una serie, "5/Kimi no Na wa" una película).
+ * El póster (de serie, de temporada o de película, no de capítulo) bajo ese elemento: su serie y, si es una película
+ * o una temporada, cuál. `id` lo distingue de los demás ("3" una serie, "3#1" su segunda temporada, "5/Kimi no Na wa"
+ * una película): con el mismo id para todas las temporadas, la tarjeta se quedaba con la primera.
  * @param {EventTarget | null} t
  */
 function seriesPoster(t) {
@@ -36,7 +44,10 @@ function seriesPoster(t) {
     const it = isCollection(s) ? collectionItems(s).find((x) => x.key === key) : null;
     return it ? { a, si, s, it, id: `${si}/${key}` } : null;
   }
-  return isCollection(s) ? null : { a, si, s, it: null, id: String(si) };
+  if (isCollection(s)) return null;
+  const ki = parts[3] != null && parts[3] !== '' ? Number(parts[3]) : null;
+  if (ki != null && s.seasons[ki]) return { a, si, s, it: null, ki, id: `${si}#${ki}` };
+  return { a, si, s, it: null, ki: null, id: String(si) };
 }
 
 /** Lo que se dice de una película: el botón grande, sus datos y la sinopsis. */
@@ -47,17 +58,36 @@ function aboutMovie(s, it) {
   return { plan, m, facts, syn: synopsisOf(m), title: movieTitle(s, it) };
 }
 
-/** Lo que se dice de una serie: el botón grande, cuánto lleva y la sinopsis. */
+/** La nota en la tarjeta: ★ 82. @param {any} m */
+const scoreFact = (m) => (m && m.score ? `★ ${m.score}` : '');
+
+/** Lo que se dice de una serie: el botón grande, cuánto lleva, la nota (el promedio de sus temporadas) y la sinopsis. */
 function about(s) {
   const plan = heroPlan(s);
   const m = displayMeta(s);
   const seen = s.all.filter((e) => (prog(e) || {}).w).length;
   const facts = [
+    scoreFact(withSeriesScore(s, m)),
     m && m.year,
     m && m.format,
     seen ? `${seen} de ${s.all.length} vistos` : plural(s.all.length, 'capítulo', 'capítulos'),
   ].filter(Boolean);
   return { plan, m, seen, facts, syn: synopsisOf(m) };
+}
+
+/** Lo que se dice de una temporada (las tarjetas del menú de temporadas): lo suyo, con su propia nota. */
+function aboutSeason(s, ki) {
+  const se = s.seasons[ki];
+  const plan = seasonPlan(s, se);
+  const m = seasonOwnMeta(s, se) || (isFranchise(s) ? null : displayMeta(s));
+  const seen = se.episodes.filter((e) => (prog(e) || {}).w).length;
+  const facts = [
+    scoreFact(m),
+    m && m.year,
+    m && m.format,
+    seen ? `${seen} de ${se.episodes.length} vistos` : plural(se.episodes.length, 'capítulo', 'capítulos'),
+  ].filter(Boolean);
+  return { plan, m, seen, facts, syn: synopsisOf(m), title: seasonFullName(s, se) };
 }
 
 /* ── teléfono: mantener presionado ── */
@@ -205,6 +235,7 @@ card.className = 'poster-card';
 card.hidden = true;
 document.body.appendChild(card);
 let cardId = ''; // el póster cuya tarjeta está a la vista ('' = ninguna)
+let cardHref = ''; // adónde lleva su póster: tocar la tarjeta (fuera de sus botones) es como tocar el póster
 let showTimer = 0;
 let hideTimer = 0;
 
@@ -219,10 +250,10 @@ function hideCard() {
 
 /** Muestra la tarjeta de la serie o película junto a su póster (a la derecha; si no cabe, a la izquierda). */
 function showCard(/** @type {NonNullable<ReturnType<typeof seriesPoster>>} */ p) {
-  const { a, si, s, it } = p;
+  const { a, si, s, it, ki } = p;
   const mv = it ? aboutMovie(s, it) : null;
-  const sr = it ? null : about(s);
-  const title = mv ? mv.title : s.name;
+  const sr = it ? null : ki != null ? aboutSeason(s, ki) : about(s);
+  const title = mv ? mv.title : /** @type {any} */ (sr).title || s.name;
   const facts = mv ? mv.facts : /** @type {any} */ (sr).facts;
   const syn = mv ? mv.syn : /** @type {any} */ (sr).syn;
   const playId = mv ? mv.plan.ep.id : /** @type {any} */ (sr).plan.next && /** @type {any} */ (sr).plan.next.id;
@@ -238,15 +269,20 @@ function showCard(/** @type {NonNullable<ReturnType<typeof seriesPoster>>} */ p)
       ${playId ? `<a class="tv-btn is-primary" href="#/play/${encodeURIComponent(playId)}">${ICON.play}<span>${esc(label)}</span></a>` : ''}
       <button class="pc-btn" ${laterAttrs} aria-label="Más tarde" aria-pressed="${later}">${later ? ICON.laterOn : ICON.later}</button>
     </div>`;
+  /* Sobre la mitad de abajo de su propio póster, casi de su mismo ancho: al lado tapaba el póster vecino, y al ir
+   * hacia él el ratón quedaba sobre la tarjeta (la del vecino no salía nunca). */
   const r = (a.querySelector('.shelf-poster') || a).getBoundingClientRect();
-  const W = 320;
-  const right = r.right + 12 + W <= innerWidth - 12;
-  const left = right ? r.right + 12 : Math.max(12, r.left - 12 - W);
-  card.style.left = `${left + scrollX}px`;
-  card.style.top = `${Math.max(scrollY + 12, r.top + scrollY)}px`;
-  card.dataset.side = right ? 'right' : 'left';
+  const W = Math.round(Math.min(260, Math.max(196, r.width + 12)));
+  card.style.width = `${W}px`;
   clearTimeout(hideTimer);
   card.hidden = false;
+  const H = card.offsetHeight;
+  const left = Math.min(innerWidth - 12 - W, Math.max(12, r.left + r.width / 2 - W / 2));
+  const top = Math.min(innerHeight - 12 - H, Math.max(12, r.top + r.height * 0.45));
+  card.style.left = `${left + scrollX}px`;
+  card.style.top = `${top + scrollY}px`;
+  card.dataset.side = 'over';
+  cardHref = a.getAttribute('href') || '';
   cardId = p.id;
   requestAnimationFrame(() => card.classList.add('is-in'));
 }
@@ -279,6 +315,11 @@ card.addEventListener('click', (e) => {
   );
   if (b) setTimeout(() => cardId && card.contains(b) && refreshLater(b), 0);
   else if (/** @type {HTMLElement} */ (e.target).closest('a')) hideCard();
+  else if (cardHref && !(/** @type {HTMLElement} */ (e.target).closest('button'))) {
+    const to = cardHref;
+    hideCard();
+    location.hash = to;
+  }
 });
 function refreshLater(/** @type {HTMLElement} */ b) {
   const s = state.library && state.library.series[Number(b.dataset.si)];

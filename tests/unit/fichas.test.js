@@ -2,7 +2,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { state, setIndex } from '../../models/store.js';
 import { seasonInfo } from '../../models/naming.js';
-import { seasonLabel, seasonFullName, metaFor, isFranchise, displayMeta, synopsisOf } from '../../models/fichas.js';
+import { seasonLabel, seasonFullName, metaFor, isFranchise, displayMeta, synopsisOf, seriesScore, withSeriesScore } from '../../models/fichas.js';
 import { mergeFichas, mergeSyn, syncFichas, seasonQuery, hasAllMeta } from '../../models/fichas-sync.js';
 
 const se = (name, eps = 12) => ({ ...seasonInfo(name), name, episodes: Array.from({ length: eps }, (_, i) => ({ id: name + i })) });
@@ -95,5 +95,31 @@ describe('fichas compartidas', () => {
     state.meta = { a: { id: 1, at: 1 } };
     // sin sesión de MEGA, leer falla: syncFichas tiene que fallar sin escribir
     await expect(syncFichas(home)).rejects.toThrow();
+  });
+});
+
+describe('la nota de una serie con varias temporadas', () => {
+  it('es el promedio de sus temporadas, sin OVAs (Yahari: cada temporada con su ficha)', () => {
+    const y = 'Yahari';
+    const s = serie(y, [`1. ${y}`, ['2. OVA', 1], `3. ${y} Zoku`, `4. ${y} Kan`]);
+    state.meta[`${y}/1. ${y}`] = ficha(14813, y, 'Serie', { score: 78 });
+    state.meta[`${y}/2. OVA`] = ficha(18753, 'Yahari OVA', 'OVA', { score: 60 }); // las OVAs no cuentan
+    state.meta[`${y}/3. ${y} Zoku`] = ficha(20698, `${y} Zoku`, 'Serie', { score: 82 });
+    state.meta[`${y}/4. ${y} Kan`] = ficha(108489, `${y} Kan`, 'Serie', { score: 86 });
+    expect(seriesScore(s)).toEqual({ score: 82, n: 3 });
+    expect(withSeriesScore(s, metaFor(s)).score).toBe(82);
+    expect(metaFor(s).score).toBe(78); // la de la temporada sigue con la suya
+  });
+  it('la Temporada 1 cuenta con la ficha de la serie', () => {
+    const s = serie('Re', ['1. Temporada 1', '2. Temporada 2']);
+    state.meta.Re = ficha(1, 'Re', 'Serie', { score: 70 });
+    state.meta['Re/2. Temporada 2'] = ficha(2, 'Re 2', 'Serie', { score: 80 });
+    expect(seriesScore(s)).toEqual({ score: 75, n: 2 });
+  });
+  it('con una sola temporada con nota, no hay promedio', () => {
+    const s = serie('Una', ['1. Temporada 1', '2. Temporada 2']);
+    state.meta.Una = ficha(1, 'Una', 'Serie', { score: 70 });
+    expect(seriesScore(s)).toBe(null);
+    expect(withSeriesScore(s, metaFor(s)).score).toBe(70);
   });
 });
