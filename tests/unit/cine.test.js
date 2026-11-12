@@ -17,7 +17,6 @@ describe('tipos de Cine', () => {
     expect(ids('stop-motion')).toEqual(['pollitos']);
     expect(ids('sagas')).toEqual(['pollitos', 'piratas']);
     expect(ids('clasicos')).toEqual(['pollitos', 'piratas']);
-    expect(ids('con-actores')).toEqual(['spider', 'piratas']);
   });
   it('Estrenos: del año pasado para acá', () => {
     expect(ids('estrenos', 2026)).toEqual(['spider']);

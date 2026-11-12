@@ -93,7 +93,7 @@ test('Cine: buscador propio y tipos; una película puede estar en varios', async
   await go(page, `#/serie/${si}`);
   const list = page.locator('#cine-list .shelf-item');
   await expect(list).toHaveCount(2);
-  // los fijos siempre; Stop motion y Sagas porque Pollitos en fuga lo es; Con actores no (las dos son animación)
+  // los fijos siempre; Stop motion y Sagas porque Pollitos en fuga lo es
   await expect(page.locator('.cine-kind')).toHaveText(['Todas2', 'Estrenos0', 'Animación2', 'Stop motion1', 'Sagas1', 'Clásicos2']);
   await shot(page, 'cine', info);
   await page.locator('.cine-kind', { hasText: 'Stop motion' }).click();

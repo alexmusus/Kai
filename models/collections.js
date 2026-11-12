@@ -208,7 +208,6 @@ export const CINE_KINDS = [
   { id: 'animacion', label: 'Animación', fixed: true, has: (m) => isAnimated(m) },
   { id: 'stop-motion', label: 'Stop motion', has: (m) => !!m && !!m.stop },
   { id: 'sagas', label: 'Sagas', has: (m) => !!m && !!m.saga },
-  { id: 'con-actores', label: 'Con actores', has: (m) => !!m && !!(m.genres || []).length && !isAnimated(m) },
   { id: 'clasicos', label: 'Clásicos', has: (m) => !!m && !!m.year && m.year < 2010 },
 ];
 /** El tipo por su id ('' o uno que no existe: Todas). @param {string | null | undefined} id */
