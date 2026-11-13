@@ -10,7 +10,7 @@ importScripts('core.js');
  * cada subida dentro de esa versión (el navegador solo instala de nuevo si este archivo cambia) y vuelve a 1 cuando
  * sube VERSION. */
 const VERSION = 44;
-const ENTREGA = 15;
+const ENTREGA = 16;
 const CACHE = `kai-${VERSION}.${ENTREGA}`;
 /* Lo que cambió en ESTA subida (no en toda la versión), corto y en palabras de todos los días: lo muestra la burbuja
  * de "Versión nueva" al tocarla. Se escribe de nuevo en cada subida: así la lista es siempre corta.

@@ -198,7 +198,6 @@ function sagaPosterHTML(/** @type {any} */ x) {
   return `<li><a class="shelf-item is-saga" href="${sagaHref(x.saga)}" style="--h:${hue(x.title)}">
     <span class="shelf-poster">
       ${x.m.cover ? `<img src="${esc(x.m.cover)}" alt="" loading="lazy" decoding="async">` : `<span class="is-fallback"><span class="cover-glyph">${esc([...x.title.trim()][0] || '·')}</span></span>`}
-      <span class="saga-count">${x.movies.length}</span>
     </span>
     <span class="shelf-title">${esc(x.title)}</span>
     <span class="shelf-sub">${esc(seen ? `${seen} de ${x.movies.length} vistas` : plural(x.movies.length, 'película', 'películas'))}</span>
@@ -365,7 +364,6 @@ function railHTML(/** @type {any[]} */ list) {
       return `<li><button type="button" class="sala-poster${on ? ' is-on' : ''}${x.group ? ' is-saga' : ''}" data-key="${esc(x.it.key)}" aria-label="${esc(x.group ? `Saga ${x.title}` : x.title)}" aria-current="${on}" style="--h:${hue(x.title)}">
         ${x.m && x.m.cover ? `<img src="${esc(x.m.cover)}" alt="" loading="lazy" decoding="async">` : `<span class="is-fallback" data-thumb="${esc(x.it.eps[0].id)}"><span class="cover-glyph">${esc([...x.title.trim()][0] || '·')}</span></span>`}
         ${isNew ? '<span class="tile-badge">Nueva</span>' : ''}
-        ${x.group ? `<span class="saga-count">${x.movies.length}</span>` : ''}
         ${x.plan.pct && !x.plan.seen ? `<span class="tile-bar"><span style="width:${x.plan.pct}%"></span></span>` : ''}
       </button></li>`;
     })

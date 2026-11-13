@@ -2417,7 +2417,7 @@ body:has(#sala) .bar.is-overlay .bar-title { color: #fff; text-shadow: 0 1px 12p
 }
 @media (min-width: 900px) and (max-height: 820px) { .sala { --sala-poster: 140px; } .sala-syn { -webkit-line-clamp: 2; } }
 
-/* Cine: las sagas (una portada por saga, con cuántas películas tiene) y el botón para volver a todas */
+/* Cine: las sagas (una portada por saga, como un montón de pósters) y el botón para volver a todas */
 .cine-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .cine-head #cine-back:empty { display: none; }
 .cine-back {
@@ -2431,13 +2431,6 @@ body:has(#sala) .bar.is-overlay .bar-title { color: #fff; text-shadow: 0 1px 12p
 @media (hover: hover) { .cine-back:hover { background: var(--btn-hover); } .sala .cine-back:hover { background: rgba(255, 255, 255, 0.26); } }
 .cine-main .cine-head { margin: 12px 0 16px; }
 .cine-main .cine-head .shelf-count { margin: 0; }
-.saga-count {
-  position: absolute; z-index: 1; top: 6px; right: 6px; min-width: 24px; height: 24px; padding: 0 7px; border-radius: 999px;
-  display: grid; place-items: center; background: rgba(0, 0, 0, 0.72); color: #fff; font: 700 12px/1 var(--font);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25);
-}
-.saga-count::after { content: ' películas'; font-weight: 500; margin-left: 3px; }
-.sala-poster .saga-count::after { content: ''; margin: 0; }
 /* una saga parece un montón de pósters: dos bordes asomando detrás */
 .sala-poster.is-saga { box-shadow: 5px -5px 0 -1px rgba(255, 255, 255, 0.28), 10px -10px 0 -3px rgba(255, 255, 255, 0.14); }
 .sala-poster.is-saga.is-on { box-shadow: 0 0 0 2px #fff, 6px -6px 0 0 rgba(255, 255, 255, 0.4), 12px -12px 0 -2px rgba(255, 255, 255, 0.2), 0 14px 34px rgba(0, 0, 0, 0.6); }
