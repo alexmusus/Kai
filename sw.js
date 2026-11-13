@@ -10,14 +10,14 @@ importScripts('core.js');
  * cada subida dentro de esa versión (el navegador solo instala de nuevo si este archivo cambia) y vuelve a 1 cuando
  * sube VERSION. */
 const VERSION = 44;
-const ENTREGA = 14;
+const ENTREGA = 15;
 const CACHE = `kai-${VERSION}.${ENTREGA}`;
 /* Lo que cambió en ESTA subida (no en toda la versión), corto y en palabras de todos los días: lo muestra la burbuja
  * de "Versión nueva" al tocarla. Se escribe de nuevo en cada subida: así la lista es siempre corta.
  * Cada línea empieza con su sección y dos puntos ("Catálogo: …"): la burbuja junta todo lo de una misma sección. */
 const CAMBIOS = [
-  'Series: la nota de una serie con varias temporadas es el promedio de sus temporadas (sin OVAs ni especiales); dentro de cada temporada sigue saliendo la suya.',
-  'Pósters: en la computadora, la tarjeta que sale al dejar el ratón encima es más pequeña y va al lado, de la mitad hacia abajo, sin tapar el póster vecino entero; en el menú de temporadas cambia al pasar a otra temporada y muestra su nota.',
+  'Cine: en Sagas, cada saga es una sola portada (con el póster de la saga); al entrar salen sus películas en orden, y «Todas las sagas» vuelve.',
+  'Cine: solo cuentan como saga las que tienes con 2 películas o más; de una saga de la que tienes una sola, esa película no sale en Sagas.',
 ];
 const SHELL = [
   './', 'styles.css', 'app.js', 'core.js', 'models/mp4.js', 'models/meta-api.js',

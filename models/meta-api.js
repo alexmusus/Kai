@@ -539,13 +539,17 @@ export async function tmdbCheckKey(key) {
  * Colección") y si es stop motion (por sus palabras clave). Un pedido más por película, una sola vez.
  * @param {number | string} id el número de TMDB
  * @param {string} key
- * @returns {Promise<{ saga: string, stop: boolean }>}
+ * @returns {Promise<{ saga: string, sagaCover: string, sagaBanner: string, stop: boolean }>}
  */
 export async function tmdbExtras(id, key) {
   const d = await tmdb(`/movie/${id}`, { language: 'es-MX', append_to_response: 'keywords' }, key);
   const words = (d.keywords && d.keywords.keywords) || [];
+  const col = d.belongs_to_collection || null;
   return {
-    saga: (d.belongs_to_collection && d.belongs_to_collection.name) || '',
+    saga: (col && col.name) || '',
+    // el póster y la imagen de la saga entera (la portada de la saga en Cine)
+    sagaCover: col && col.poster_path ? `${TMDB_IMG}w500${col.poster_path}` : '',
+    sagaBanner: col && col.backdrop_path ? `${TMDB_IMG}w1280${col.backdrop_path}` : '',
     stop: words.some((/** @type {{ name?: string }} */ w) =>
       /stop[\s-]?motion|claymation|plastilina/i.test(w.name || ''),
     ),

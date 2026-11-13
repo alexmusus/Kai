@@ -92,10 +92,11 @@ test('Cine: la sala, con buscador propio y tipos; una película puede estar en v
   const si = k.si('Cine');
   await go(page, `#/serie/${si}`);
   const posters = page.locator('#sala-row .sala-poster');
-  await expect(posters).toHaveCount(2);
-  // los fijos siempre; Stop motion y Sagas porque Pollitos en fuga lo es
-  await expect(page.locator('.cine-kind')).toHaveText(['Todas2', 'Estrenos0', 'Animación2', 'Stop motion1', 'Sagas1', 'Clásicos2']);
+  await expect(posters).toHaveCount(3);
+  // los fijos siempre; Stop motion y Sagas porque Pollitos en fuga lo es (Sagas cuenta sagas, no películas)
+  await expect(page.locator('.cine-kind')).toHaveText(['Todas3', 'Estrenos0', 'Animación3', 'Stop motion2', 'Sagas1', 'Clásicos2']);
   await expect(page.locator('.sala-title')).toHaveText('El gigante de hierro');
+  await expect(page.locator('.sala-kicker')).toHaveText('Cine'); // de su saga solo tienes esta: no dice Saga
   await shot(page, 'cine-sala', info);
   // tocar un póster lo elige: cambian el título y los datos
   await posters.nth(1).click();
@@ -104,8 +105,8 @@ test('Cine: la sala, con buscador propio y tipos; una película puede estar en v
   await expect(page.locator('.sala-actions [data-cine="play"]')).toHaveAttribute('href', /#\/play\//);
   await shot(page, 'cine-sala-2', info);
   await page.locator('.cine-kind', { hasText: 'Stop motion' }).click();
-  await expect(posters).toHaveCount(1);
-  await expect(page).toHaveURL(new RegExp(`#/serie/${si}\\?t=stop-motion$`));
+  await expect(posters).toHaveCount(2);
+  await expect(page).toHaveURL(new RegExp(`#/serie/${si}\\?t=stop-motion`));
   // la lupa abre el buscador, que solo busca en Cine
   await page.locator('[data-cine="search"]').click();
   await page.locator('#cine-q').fill('gigante');
@@ -114,17 +115,34 @@ test('Cine: la sala, con buscador propio y tipos; una película puede estar en v
   await page.locator('.cine-kind', { hasText: 'Todas' }).click();
   await expect(posters).toHaveCount(1);
   await expect(page.locator('.sala-title')).toHaveText('El gigante de hierro');
-  // la cuadrícula, con lo mismo elegido
+  await page.locator('#cine-q').fill('');
+  // Sagas: una portada por saga; al entrar, sus películas en orden
+  await page.locator('.cine-kind', { hasText: 'Sagas' }).click();
+  await expect(posters).toHaveCount(1);
+  await expect(page.locator('.sala-kicker')).toHaveText('Saga');
+  await expect(page.locator('.sala-title')).toHaveText('Pollitos en fuga');
+  await expect(page.locator('#cine-count')).toHaveText('1 saga');
+  await shot(page, 'cine-saga', info);
+  await posters.first().click(); // la ya elegida: entra a la saga
+  await expect(posters).toHaveCount(2);
+  await expect(page.locator('#cine-count')).toHaveText('Saga Pollitos en fuga · 2 películas');
+  await expect(page.locator('.sala-title')).toHaveText('Pollitos en fuga');
+  await posters.nth(1).click();
+  await expect(page.locator('.sala-title')).toHaveText('Pollitos en fuga: El origen de los nuggets');
+  await page.locator('[data-cine="sagas"]').click();
+  await expect(posters).toHaveCount(1);
+  await expect(page.locator('#cine-count')).toHaveText('1 saga');
+  // la cuadrícula: la saga es un póster que lleva a sus películas
   await page.locator('[data-cine="grid"]').click();
   await expect(page.locator('#cine-list .shelf-item')).toHaveCount(1);
-  await page.locator('#cine-q').fill('');
+  await page.locator('#cine-list .shelf-item.is-saga').click();
   await expect(page.locator('#cine-list .shelf-item')).toHaveCount(2);
   await shot(page, 'cine-cuadricula', info);
   await page.locator('[data-cine="sala"]').click();
   await expect(posters).toHaveCount(2);
   // la ficha lleva a su saga dentro de Cine, no al catálogo de anime
   await go(page, `#/pelicula/${si}/${encodeURIComponent('Pollitos en fuga (2000)')}`);
-  await expect(page.locator('.tv-facts a.fact', { hasText: 'Pollitos en fuga' })).toHaveAttribute('href', new RegExp(`^#/serie/${si}\\?t=sagas`));
+  await expect(page.locator('.tv-facts a.fact', { hasText: 'Pollitos en fuga' })).toHaveAttribute('href', new RegExp(`^#/serie/${si}\\?t=sagas&g=`));
   await expect(page.locator('.tv-facts a[href^="#/catalogo"]')).toHaveCount(0);
   expect(k.errors).toEqual([]);
 });

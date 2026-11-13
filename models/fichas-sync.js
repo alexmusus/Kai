@@ -128,11 +128,11 @@ export async function ensureMeta() {
           const k = itemMetaKey(s, it.key);
           const c = state.meta[k];
           const same = c && c.key === key.slice(-6) && isFresh(c);
-          if (same && (c.tm === 2 || (c.tm === 1 && c.none))) continue;
+          if (same && (c.tm === 3 || (c.tm === 1 && c.none))) continue;
           let m = null;
           try {
-            // tm 2: con la saga y si es stop motion (los tipos de Cine). Lo que ya tenía ficha solo pide eso.
-            if (same && c.tm === 1 && /^tmdb:\d+$/.test(String(c.id)))
+            // tm 3: con la saga (y su póster) y si es stop motion (los tipos de Cine). Lo que ya tenía ficha solo pide eso.
+            if (same && (c.tm === 1 || c.tm === 2) && /^tmdb:\d+$/.test(String(c.id)))
               m = { ...c, ...(await tmdbExtras(String(c.id).slice(5), key)), at: Date.now() };
             else if (it.query) m = await tmdbFindMovie(it.query, key);
           } catch (err) {
@@ -140,7 +140,7 @@ export async function ensureMeta() {
             break;
           }
           state.meta[k] = m
-            ? { ...m, tm: 2, key: key.slice(-6) }
+            ? { ...m, tm: 3, key: key.slice(-6) }
             : { none: true, id: 0, tm: 1, key: key.slice(-6), at: Date.now() };
           changed = true;
           saveMeta();

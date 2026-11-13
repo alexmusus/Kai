@@ -8,10 +8,23 @@
  *    pósters. En el teléfono se elige deslizando (la del centro); en la computadora, pasando el ratón, con clic o
  *    con las flechas. Los tipos y la lupa van arriba, sobre la imagen, y filtran el carrusel.
  *  - Cuadrícula: todos los pósters de un vistazo.
+ *
+ * En Sagas, cada saga es una sola portada (con el póster de la saga de TMDB); al entrar (#/serie/3?t=sagas&g=…) salen
+ * sus películas en orden. Solo cuentan como saga las que tienes con 2 películas o más en MEGA: de una saga de la que
+ * tienes una sola (Harry Potter 1, por ejemplo), esa película no sale en Sagas ni dice que es de una saga.
  */
 
 import { route, movieHref } from '../lib/route.js';
-import { CINE_KINDS, cineKind, ofCineKind, movieTitle, sagaName } from '../models/collections.js';
+import {
+  CINE_KINDS,
+  cineKind,
+  ofCineKind,
+  movieTitle,
+  sagaName,
+  collectionItems,
+  itemMeta,
+} from '../models/collections.js';
+import { state } from '../models/store.js';
 import { shelfItems } from '../models/plans.js';
 import { newEpisodes, markSeriesSeen, announceNew } from '../models/news.js';
 import { seriesColor, synopsisOf } from '../models/fichas.js';
@@ -34,8 +47,9 @@ const norm = (/** @type {unknown} */ t) =>
     .toLowerCase();
 
 /**
- * Lo que se dibuja en la página: la serie Cine, sus películas, cuáles son nuevas y la elegida en la sala.
- * @type {{ s: any, si: number, items: any[], fresh: Set<string>, list: any[], sel: string } | null}
+ * Lo que se dibuja en la página: la serie Cine, sus películas, cuáles son nuevas, la elegida en la sala y la saga en
+ * la que se entró ('' = ninguna).
+ * @type {{ s: any, si: number, items: any[], fresh: Set<string>, list: any[], sel: string, saga: string } | null}
  */
 let page = null;
 
@@ -46,7 +60,7 @@ const finePointer = () => matchMedia('(hover: hover) and (pointer: fine)').match
 /** @param {any} s @param {number} si */
 export function renderCine(s, si) {
   const fresh = new Set(newEpisodes(s).map((e) => e.id));
-  const items = shelfItems(s).map((x) => ({
+  const items = withOwnSagas(shelfItems(s)).map((x) => ({
     ...x,
     title: movieTitle(s, x.it),
     words: norm(
@@ -54,8 +68,8 @@ export function renderCine(s, si) {
     ),
   }));
   const q = route().q;
-  page = { s, si, items, fresh, list: [], sel: q.get('m') || '' };
   const kind = cineKind(q.get('t'));
+  page = { s, si, items, fresh, list: [], sel: q.get('m') || '', saga: kind.id === 'sagas' ? q.get('g') || '' : '' };
   const text = q.get('q') || '';
   if (isSala()) renderSala(kind, text);
   else renderGrid(kind, text);
@@ -70,7 +84,10 @@ function chipsHTML(/** @type {import('../models/collections.js').CineKind} */ ki
   if (!page) return '';
   const year = new Date().getFullYear();
   const items = page.items;
-  return CINE_KINDS.map((k) => ({ k, n: ofCineKind(items, k, year).length }))
+  return CINE_KINDS.map((k) => {
+    const of = ofCineKind(items, k, year);
+    return { k, n: k.id === 'sagas' ? sagaGroups(of).length : of.length }; // en Sagas, cuántas sagas
+  })
     .filter(({ k, n }) => k.fixed || n || k === kind)
     .map(
       ({ k, n }) =>
@@ -91,26 +108,104 @@ const viewBtn = () =>
     ? `<button class="icon-btn" data-cine="grid" aria-label="Ver como cuadrícula" title="Ver como cuadrícula">${ICON.grid}</button>`
     : `<button class="icon-btn" data-cine="sala" aria-label="Ver como sala" title="Ver como sala">${ICON.film}</button>`;
 
-/** Las películas de ese tipo que coinciden con lo escrito, en su orden. */
+/**
+ * Deja la saga solo en las películas de sagas de las que tienes 2 o más (a las demás se les quita, en una copia de
+ * su ficha: la guardada no se toca).
+ * @template {{ m: any }} T @param {T[]} items @returns {T[]}
+ */
+function withOwnSagas(items) {
+  /** @type {Map<string, number>} */
+  const n = new Map();
+  for (const x of items) if (x.m && x.m.saga) n.set(x.m.saga, (n.get(x.m.saga) || 0) + 1);
+  return items.map((x) => (x.m && x.m.saga && (n.get(x.m.saga) || 0) < 2 ? { ...x, m: { ...x.m, saga: '' } } : x));
+}
+
+const byYear = (/** @type {any} */ a, /** @type {any} */ b) =>
+  (a.m.year || 0) - (b.m.year || 0) || a.title.localeCompare(b.title, 'es', { numeric: true });
+
+/**
+ * Las sagas como una portada cada una: sus películas en orden, el póster y la imagen de la saga (si TMDB los tiene;
+ * si no, los de la primera película) y lo que toca ver (la primera que no has visto). Una saga de la que tienes una
+ * sola película queda como esa película.
+ * @param {any[]} list películas con saga
+ */
+function sagaGroups(list) {
+  /** @type {Map<string, any[]>} */
+  const by = new Map();
+  for (const x of list) {
+    const k = x.m && x.m.saga;
+    if (!k) continue;
+    if (!by.has(k)) by.set(k, []);
+    by.get(k)?.push(x);
+  }
+  const out = [];
+  for (const [saga, movies] of by) {
+    movies.sort(byYear);
+    if (movies.length < 2) continue; // ya no pasa (withOwnSagas), pero una saga de una sola no tiene portada propia
+    const next = movies.find((y) => !y.plan.seen) || movies[0];
+    const art = (/** @type {string} */ k) => (movies.find((y) => y.m[k]) || { m: {} }).m[k] || '';
+    out.push({
+      group: true,
+      saga,
+      movies,
+      next,
+      title: sagaName(saga),
+      it: { key: 'saga:' + saga, eps: movies.flatMap((y) => y.it.eps) },
+      m: { cover: art('sagaCover') || movies[0].m.cover, banner: art('sagaBanner') || movies[0].m.banner },
+      plan: { ...next.plan, pct: 0, seen: movies.every((y) => y.plan.seen) },
+    });
+  }
+  return out.sort((a, b) => a.title.localeCompare(b.title, 'es', { numeric: true }));
+}
+
+/** Las películas de ese tipo que coinciden con lo escrito, en su orden (en Sagas, las sagas; dentro de una, sus películas). */
 function filtered(/** @type {import('../models/collections.js').CineKind} */ kind, /** @type {string} */ text) {
   if (!page) return [];
   const terms = norm(text).split(/\s+/).filter(Boolean);
   let list = ofCineKind(page.items, kind).filter((x) => terms.every((t) => x.words.includes(t)));
-  // las sagas juntas y en orden; los estrenos, lo más nuevo primero; lo demás queda A–Z
-  if (kind.id === 'sagas')
-    list = [...list].sort(
-      (a, b) => sagaName(a.m.saga).localeCompare(sagaName(b.m.saga), 'es') || (a.m.year || 0) - (b.m.year || 0),
-    );
-  else if (kind.id === 'estrenos') list = [...list].sort((a, b) => (b.m.year || 0) - (a.m.year || 0));
+  // las sagas, una portada cada una; dentro de una, sus películas por año; los estrenos, lo más nuevo primero; lo demás A–Z
+  if (kind.id === 'sagas') {
+    const saga = page.saga;
+    return saga ? list.filter((x) => x.m.saga === saga).sort(byYear) : sagaGroups(list);
+  }
+  if (kind.id === 'estrenos') list = [...list].sort((a, b) => (b.m.year || 0) - (a.m.year || 0));
   return list;
 }
 
 const countText = (/** @type {any[]} */ list, /** @type {string} */ text) =>
   list.length
-    ? plural(list.length, 'película', 'películas')
+    ? page && page.saga
+      ? `Saga ${sagaName(page.saga)} · ${plural(list.length, 'película', 'películas')}`
+      : list.some((x) => x.group)
+        ? plural(list.length, 'saga', 'sagas')
+        : plural(list.length, 'película', 'películas')
     : text.trim()
       ? 'Nada coincide con la búsqueda.'
       : 'Todavía no hay películas de este tipo.';
+
+/** Dentro de una saga: el botón para volver a todas las sagas. */
+const backHTML = () =>
+  page && page.saga
+    ? `<button type="button" class="cine-back" data-cine="sagas">${ICON.back}<span>Todas las sagas</span></button>`
+    : '';
+
+/** Adónde lleva entrar a una saga. @param {string} saga */
+const sagaHref = (saga) => `#/serie/${page ? page.si : 0}?${new URLSearchParams({ t: 'sagas', g: saga })}`;
+
+/** El póster de una saga en la cuadrícula: lleva a sus películas. */
+function sagaPosterHTML(/** @type {any} */ x) {
+  const seen = x.movies.filter((/** @type {any} */ y) => y.plan.seen).length;
+  return `<li><a class="shelf-item is-saga" href="${sagaHref(x.saga)}" style="--h:${hue(x.title)}">
+    <span class="shelf-poster">
+      ${x.m.cover ? `<img src="${esc(x.m.cover)}" alt="" loading="lazy" decoding="async">` : `<span class="is-fallback"><span class="cover-glyph">${esc([...x.title.trim()][0] || '·')}</span></span>`}
+      <span class="saga-count">${x.movies.length}</span>
+    </span>
+    <span class="shelf-title">${esc(x.title)}</span>
+    <span class="shelf-sub">${esc(seen ? `${seen} de ${x.movies.length} vistas` : plural(x.movies.length, 'película', 'películas'))}</span>
+  </a></li>`;
+}
+const gridItemHTML = (/** @type {any} */ x) =>
+  x.group ? sagaPosterHTML(x) : page ? moviePosterHTML(page.s, page.si, x, page.fresh) : '';
 
 /** Lo elegido (tipo y búsqueda) leído de la página. */
 function current() {
@@ -125,6 +220,7 @@ function keepInHash() {
   const params = new URLSearchParams();
   if (kind.id) params.set('t', kind.id);
   if (text.trim()) params.set('q', text);
+  if (page.saga) params.set('g', page.saga);
   if (isSala() && page.sel && page.list.length && page.list[0].it.key !== page.sel) params.set('m', page.sel);
   const h = `#/serie/${page.si}` + (params.toString() ? '?' + params : '');
   if (location.hash !== h) history.replaceState(history.state, '', h);
@@ -134,7 +230,7 @@ function keepInHash() {
 
 function renderGrid(/** @type {any} */ kind, /** @type {string} */ text) {
   if (!page) return;
-  const { s, si, fresh } = page;
+  const { s } = page;
   setTint(seriesColor(s));
   const list = filtered(kind, text);
   page.list = list;
@@ -143,8 +239,8 @@ function renderGrid(/** @type {any} */ kind, /** @type {string} */ text) {
     `<main class="shelf-main cine-main">
     ${searchHTML(text)}
     <nav class="cine-kinds" id="cine-kinds" aria-label="Tipos de película">${chipsHTML(kind)}</nav>
-    <p class="dim shelf-count" id="cine-count" aria-live="polite">${esc(countText(list, text))}</p>
-    <ul class="shelf" role="list" id="cine-list">${list.map((x) => moviePosterHTML(s, si, x, fresh)).join('')}</ul>
+    <div class="cine-head"><span id="cine-back">${backHTML()}</span><p class="dim shelf-count" id="cine-count" aria-live="polite">${esc(countText(list, text))}</p></div>
+    <ul class="shelf" role="list" id="cine-list">${list.map(gridItemHTML).join('')}</ul>
   </main>`;
   bindCommon();
 }
@@ -155,13 +251,14 @@ function paintGrid() {
   const { kind, text } = current();
   const list = filtered(kind, text);
   page.list = list;
-  const html = list.map((x) => moviePosterHTML(page.s, page.si, x, page.fresh)).join('');
+  const html = list.map(gridItemHTML).join('');
   if (box.dataset.sig !== html) {
     box.innerHTML = html;
     box.dataset.sig = html;
     hydrateThumbs(box);
   }
   $('#cine-count').textContent = countText(list, text);
+  $('#cine-back').innerHTML = backHTML();
   keepInHash();
 }
 
@@ -195,7 +292,7 @@ function renderSala(/** @type {any} */ kind, /** @type {string} */ text) {
     </div>
     <section class="sala-info" id="sala-info" aria-live="polite">${infoHTML(sel, text)}</section>
     <div class="sala-rail">
-      <p class="sala-count" id="cine-count">${esc(countText(list, text))}</p>
+      <div class="cine-head"><span id="cine-back">${backHTML()}</span><p class="sala-count" id="cine-count">${esc(countText(list, text))}</p></div>
       <ul class="sala-row" id="sala-row" role="list">${railHTML(list)}</ul>
       <button class="sala-arrow is-prev" aria-label="Anteriores" tabindex="-1" hidden>${ICON.chev}</button>
       <button class="sala-arrow is-next" aria-label="Siguientes" tabindex="-1" hidden>${ICON.chev}</button>
@@ -209,6 +306,7 @@ function renderSala(/** @type {any} */ kind, /** @type {string} */ text) {
 function infoHTML(/** @type {any} */ x, /** @type {string} */ text) {
   if (!page) return '';
   if (!x) return `<p class="sala-empty">${esc(countText([], text))}</p>`;
+  if (x.group) return sagaInfoHTML(x);
   const { si, s } = page;
   const m = x.m;
   const later = isLater(s, x.it.key);
@@ -230,6 +328,32 @@ function infoHTML(/** @type {any} */ x, /** @type {string} */ text) {
     </div>`;
 }
 
+/** Una saga elegida: cuántas películas y de qué años, cuáles son, y los botones para seguirla o entrar. */
+function sagaInfoHTML(/** @type {any} */ x) {
+  const movies = x.movies;
+  const seen = movies.filter((/** @type {any} */ y) => y.plan.seen).length;
+  const years = movies.map((/** @type {any} */ y) => y.m.year).filter(Boolean);
+  const facts = [
+    plural(movies.length, 'película', 'películas'),
+    years.length ? (years[0] === years[years.length - 1] ? years[0] : `${years[0]} – ${years[years.length - 1]}`) : '',
+    seen ? (seen === movies.length ? 'Vista' : `${seen} de ${movies.length} vistas`) : '',
+  ].filter(Boolean);
+  const names = movies.map((/** @type {any} */ y) => y.title + (y.m.year ? ` (${y.m.year})` : ''));
+  const list = names.length > 1 ? `${names.slice(0, -1).join(', ')} y ${names[names.length - 1]}.` : names[0];
+  const next = x.next;
+  // la que toca: "Ver Madagascar 2", "Continuar Madagascar 2" o, si ya viste todas, "Ver de nuevo Madagascar"
+  const verb = x.plan.seen ? 'Ver de nuevo' : /^Continuar/.test(next.plan.label) ? 'Continuar' : 'Ver';
+  const label = `${verb} ${next.title}`;
+  return `<p class="sala-kicker">Saga</p>
+    <h2 class="sala-title">${esc(x.title)}</h2>
+    <p class="sala-facts">${facts.map((f) => `<span>${esc(f)}</span>`).join('')}</p>
+    <p class="sala-syn">${esc(list)}</p>
+    <div class="sala-actions">
+      <a class="sala-btn is-play" href="#/play/${encodeURIComponent(next.plan.ep.id)}" data-cine="play">${ICON.play}<span>${esc(label)}</span></a>
+      <a class="sala-btn" href="${sagaHref(x.saga)}">Ver las ${movies.length}</a>
+    </div>`;
+}
+
 /** Los pósters del carrusel. */
 function railHTML(/** @type {any[]} */ list) {
   if (!page) return '';
@@ -238,9 +362,10 @@ function railHTML(/** @type {any[]} */ list) {
     .map((x) => {
       const on = x.it.key === page?.sel;
       const isNew = x.it.eps.some((/** @type {any} */ e) => fresh.has(e.id));
-      return `<li><button type="button" class="sala-poster${on ? ' is-on' : ''}" data-key="${esc(x.it.key)}" aria-label="${esc(x.title)}" aria-current="${on}" style="--h:${hue(x.title)}">
+      return `<li><button type="button" class="sala-poster${on ? ' is-on' : ''}${x.group ? ' is-saga' : ''}" data-key="${esc(x.it.key)}" aria-label="${esc(x.group ? `Saga ${x.title}` : x.title)}" aria-current="${on}" style="--h:${hue(x.title)}">
         ${x.m && x.m.cover ? `<img src="${esc(x.m.cover)}" alt="" loading="lazy" decoding="async">` : `<span class="is-fallback" data-thumb="${esc(x.it.eps[0].id)}"><span class="cover-glyph">${esc([...x.title.trim()][0] || '·')}</span></span>`}
         ${isNew ? '<span class="tile-badge">Nueva</span>' : ''}
+        ${x.group ? `<span class="saga-count">${x.movies.length}</span>` : ''}
         ${x.plan.pct && !x.plan.seen ? `<span class="tile-bar"><span style="width:${x.plan.pct}%"></span></span>` : ''}
       </button></li>`;
     })
@@ -328,6 +453,7 @@ function paintSala() {
   hydrateThumbs(row);
   row.scrollLeft = 0;
   $('#cine-count').textContent = countText(list, text);
+  $('#cine-back').innerHTML = backHTML();
   const info = $('#sala-info');
   if (info) {
     info.dataset.key = '';
@@ -367,8 +493,15 @@ function bindCommon() {
       x.setAttribute('aria-pressed', String(on));
     }
     b.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    if (page) page.saga = ''; // otro tipo (o Sagas otra vez): se sale de la saga
     if (isSala()) paintSala();
     else paintGrid();
+  });
+  // volver a todas las sagas, con la que se dejó elegida
+  app.querySelector('.cine-head')?.addEventListener('click', (/** @type {MouseEvent} */ e) => {
+    if (!page || !(/** @type {HTMLElement} */ (e.target).closest('[data-cine="sagas"]'))) return;
+    const saga = page.saga;
+    emit('navigate', { hash: `#/serie/${page.si}?${new URLSearchParams({ t: 'sagas', m: 'saga:' + saga })}` });
   });
   for (const b of app.querySelectorAll('[data-cine="grid"], [data-cine="sala"]'))
     b.addEventListener('click', () => {
@@ -407,7 +540,9 @@ function bindSala() {
     const b = /** @type {HTMLElement | null} */ (/** @type {HTMLElement} */ (e.target).closest('.sala-poster'));
     if (!b || !page) return;
     const key = /** @type {string} */ (b.dataset.key);
-    if (key === page.sel) emit('navigate', { hash: movieHref(page.si, key) });
+    const x = page.list.find((y) => y.it.key === key);
+    // la ya elegida: una saga se abre (sus películas), una película abre su ficha
+    if (key === page.sel) emit('navigate', { hash: x && x.group ? sagaHref(x.saga) : movieHref(page.si, key) });
     else select(key, { center: true });
   });
   if (finePointer()) {
@@ -506,6 +641,10 @@ document.addEventListener('keydown', (e) => {
 /** Las etiquetas de la ficha de una película de Cine: llevan a sus tipos dentro de Cine, nunca al catálogo de anime. */
 export function cineFactsHTML(/** @type {number} */ si, /** @type {any} */ m) {
   if (!m) return '';
+  // la saga, solo si tienes 2 películas o más de ella
+  const s = state.library && state.library.series[si];
+  const mates = m.saga && s ? collectionItems(s).filter((it) => (itemMeta(s, it.key) || {}).saga === m.saga).length : 0;
+  if (mates < 2) m = { ...m, saga: '' };
   const to = (/** @type {string} */ label, /** @type {Record<string, string>} */ params) =>
     `<a class="fact" href="#/serie/${si}?${new URLSearchParams(params)}">${esc(label)}</a>`;
   const y = new Date().getFullYear();
@@ -516,7 +655,7 @@ export function cineFactsHTML(/** @type {number} */ si, /** @type {any} */ m) {
         : `<span>${esc(m.year)}</span>`
       : '',
     m.stop ? to('Stop motion', { t: 'stop-motion' }) : '',
-    m.saga ? to(sagaName(m.saga), { t: 'sagas', q: sagaName(m.saga) }) : '',
+    m.saga ? to(sagaName(m.saga), { t: 'sagas', g: m.saga }) : '',
     ...(m.genres || [])
       .slice(0, 3)
       .map((/** @type {string} */ g) => (g === 'Animación' ? to(g, { t: 'animacion' }) : `<span>${esc(g)}</span>`)),
